@@ -4,14 +4,15 @@ A small browser first-person shooter set in a rainy industrial port. Cut three u
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.7.0
+## Saltline fork 0.8.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
-- **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure three sectors in order. The LAN staging room is available when launched with the local server.
+- **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure four sectors in order, beginning at West Dispatch. The LAN staging room is available when launched with the local server.
 - Set enemy pressure, starting tickets and the time limit before deploying. These settings apply only to port battles.
 - Choose Support, Medic, Recon or Engineer before entering an AI battle. Activate their abilities with **X** or the on-screen button.
 - Press **M** for the tactical map. Spend support points with **5** for recon, **6** for reinforcement at a nearby objective, or **7** for field supplies. Safe captured ground can provide forward redeployment.
 - Press **Q** to pause and open Requisition. Select an objective for smoke or artillery. Smoke blocks enemy line of sight for 22 seconds. Artillery strikes an objective that is not held by Blue four times after a five-second warning. Walls provide cover from the strikes.
+- The AI side can announce a counterattack or incoming bombardment. Watch the tactical map for the affected objective and move to cover.
 - Hold **Tab** for the battle scoreboard. It shows time, tickets or remaining sectors, kills, deaths, captures and support points.
 - The interface defaults to Simplified Chinese, with English available in Settings.
 - See the [operations report](docs/PORT_OPERATIONS_020.docx) for scope, controls and verification.
@@ -22,9 +23,13 @@ The battle settings, requisition menu and scoreboard adapt systems from [IRONFRO
 
 Choose **Campaign → Start campaign** to deploy at Berth 4. Chapters unlock in story order after extraction. Choose **Continue story** from the debrief or Campaign page to start the next chapter. Progress is saved in this browser. After the relays, archive recovery, and upload, checkpoints save automatically. Retry or choose **Resume from checkpoint** on the Campaign page to pick up the current chapter. **Restart chapter** clears that chapter's checkpoint. Completed chapters can be replayed from the beginning.
 
-Cut the three uplinks, then follow **LOG** to the shed and hold **E** to download the dispatch archive. Follow **TX** to the quay beacon and start the upload with **E**. Stay within range for 18 seconds while machines converge. The transfer pauses when you leave the area and resumes when you return. Once Control confirms receipt, follow **EX** to the boat at the south quay ladder.
+Both maps extend 68 metres west with their own cargo or rail district. Three crossings connect each annex to the original play area.
 
-The second chapter, **Rail Inspection Yard**, unlocks after you complete Berth 4. Follow the shore dispatch signature into the port’s inland rail district. Its three routes link the tracks, truck weighbridge and covered examination bay. Recover the signed original in **LOG**, hold **TX** for 22 seconds, then follow **EX** to the service gate. The district uses Saltline’s own materials, weather and props.
+At Berth 4, cut the three uplinks, then follow **LOG** to West Dispatch and hold **E** to download the archive. Follow **TX** to the quay beacon and start the upload with **E**. Stay within range for 18 seconds while machines converge. The transfer pauses when you leave the area and resumes when you return. Once Control confirms receipt, follow **EX** to the boat at the south quay ladder.
+
+In **Rail Inspection Yard**, follow **LOG** to the west customs terminal and inspect the signed manifest. Go to **AIR** outside the canopy to meet the transport. When it goes down, follow **PWR** to restore gate power, then take the ground route to **EX**. This chapter has no relay-cutting or timed defense stage.
+
+Campaign rounds start with two patrol units. The Berth 4 upload can call a short reinforcement wave. Walk up to the marked ammunition crates to top up reserves. When running low, **AM** points to an available crate nearby.
 
 ## Multiplayer
 

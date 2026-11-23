@@ -8,13 +8,20 @@
   const SUPPORTS = Object.freeze({ mark: 2, reinforce: 4, supply: 3, smoke: 4, artillery: 7 });
   const SUPPORT_DURATION = { mark: 15, reinforce: 18, supply: 3, smoke: 22, artillery: 35 };
   const SMOKE_RADIUS = 6;
+  const FIRST_EVENT = 35;
+  const EVENT_COOLDOWN = 28;
+  const EVENT_WARNING = 5;
+  const BOMBARDMENT_RADIUS = 7;
+  const BOMBARDMENT_OFFSETS = [[0, 0], [3, -2]];
 
   function nearby(position, point) {
     return Math.abs(position.y - point.y) <= HEIGHT &&
       Math.hypot(position.x - point.x, position.z - point.z) < RADIUS;
   }
 
-  window.createPortConquest = (relays, { mode = 'conquest', duration = DURATION, startingTickets = START_TICKETS } = {}) => {
+  window.createPortConquest = (relays, {
+    mode = 'conquest', duration = DURATION, startingTickets = START_TICKETS, majorEvents = false,
+  } = {}) => {
     if (![180, 240, 360].includes(duration)) duration = DURATION;
     if (![25, 40, 70].includes(startingTickets)) startingTickets = START_TICKETS;
     const breakthrough = mode === 'breakthrough';
@@ -36,6 +43,10 @@
     let deaths = 0;
     let kills = 0;
     let captures = 0;
+    let majorEvent = null;
+    let nextEventAt = FIRST_EVENT;
+    let nextEventKind = 'counterattack';
+    const eventSignals = [];
 
     function finish() {
       if (breakthrough) {
@@ -55,6 +66,63 @@
       supportPoints = Math.min(SUPPORT_CAP, supportPoints + amount);
     }
 
+    function sendEventSignal(action, pos = majorEvent.point.pos) {
+      const { kind, point, radius } = majorEvent;
+      eventSignals.push({ action, kind, point, pos, radius });
+    }
+
+    function advanceMajorEvent() {
+      if (!majorEvents) return;
+      if (majorEvent) {
+        if (winner || breakthrough && majorEvent.point !== points[sector]) {
+          sendEventSignal('end');
+          majorEvent = null;
+          nextEventAt = elapsed + EVENT_COOLDOWN;
+          return;
+        }
+        if (elapsed >= majorEvent.warningUntil) {
+          if (!majorEvent.started) {
+            majorEvent.started = true;
+            sendEventSignal('start');
+          }
+          if (majorEvent.kind === 'bombardment') {
+            while (majorEvent.pulse < BOMBARDMENT_OFFSETS.length &&
+              elapsed >= majorEvent.warningUntil + majorEvent.pulse * 3) {
+              const [dx, dz] = BOMBARDMENT_OFFSETS[majorEvent.pulse++];
+              const { x, y, z } = majorEvent.point.pos;
+              sendEventSignal('impact', { x: x + dx, y, z: z + dz });
+            }
+          }
+        }
+        if (elapsed >= majorEvent.endsAt) {
+          sendEventSignal('end');
+          majorEvent = null;
+        }
+        return;
+      }
+      if (winner || elapsed < nextEventAt) return;
+      // Conquest defenders react to a Blue-held point. Breakthrough always
+      // keeps the pressure on the one sector the player can currently take.
+      const target = breakthrough ? points[sector] : points
+        .filter(point => point.owner === 'blue')
+        .sort((a, b) => Number(b.contested) - Number(a.contested) || a.control - b.control)[0];
+      if (!target) {
+        nextEventAt = elapsed + 8;
+        return;
+      }
+      const kind = nextEventKind;
+      const warningUntil = elapsed + EVENT_WARNING;
+      const endsAt = warningUntil + (kind === 'counterattack' ? 12 : 5);
+      majorEvent = {
+        kind, point: target, warningUntil, endsAt,
+        radius: kind === 'bombardment' ? BOMBARDMENT_RADIUS : RADIUS,
+        started: false, pulse: 0,
+      };
+      nextEventAt = endsAt + EVENT_COOLDOWN;
+      nextEventKind = kind === 'counterattack' ? 'bombardment' : 'counterattack';
+      sendEventSignal('warning');
+    }
+
     finish();
     return {
       points, tickets, support, supportCosts: SUPPORTS,
@@ -68,6 +136,11 @@
       get kills() { return kills; },
       get captures() { return captures; },
       get respawning() { return respawnAt !== null; },
+      get majorEvent() { return winner ? null : majorEvent; },
+      takeMajorEventSignals() {
+        const signals = eventSignals.splice(0);
+        return winner ? signals.filter(signal => signal.action === 'end') : signals;
+      },
       near(position) { return points.find(point => nearby(position, point.pos)); },
       useSupport(kind, position, targetId) {
         if (winner || respawnAt !== null || !Object.hasOwn(SUPPORTS, kind)) return false;
@@ -163,6 +236,7 @@
           if (majority < 0) tickets.blue = Math.max(0, tickets.blue + majority * .85 * dt);
         }
         finish();
+        advanceMajorEvent();
         const respawn = !winner && respawnAt !== null && elapsed >= respawnAt;
         if (respawn) respawnAt = null;
         return { captures: capturedPoints, respawn };

@@ -49,8 +49,13 @@
     panel.dataset.noLocalize = '';
     panel.hidden = true;
     const map = document.createElement('canvas');
-    map.width = 520;
-    map.height = 390;
+    const bounds = world.physics.bounds;
+    const extent = {
+      minX: bounds.min.x, maxX: Math.min(bounds.max.x, 32),
+      minZ: bounds.min.z, maxZ: bounds.max.z,
+    };
+    map.width = 700;
+    map.height = 32 + Math.round((map.width - 32) * (extent.maxZ - extent.minZ) / (extent.maxX - extent.minX));
     map.className = 'port-operations-map';
     map.hidden = true;
     const bar = document.createElement('div');
@@ -71,6 +76,9 @@
       buttons.set(support.type, button);
       bar.append(button);
     }
+    const battleEventStatus = document.createElement('span');
+    battleEventStatus.hidden = true;
+    bar.append(battleEventStatus);
     panel.append(map, bar);
     document.getElementById('app').append(panel);
 
@@ -208,11 +216,6 @@
     base.width = map.width;
     base.height = map.height;
     const terrain = base.getContext('2d');
-    const bounds = world.physics.bounds;
-    const extent = {
-      minX: Math.max(bounds.min.x, -40), maxX: Math.min(bounds.max.x, 32),
-      minZ: Math.max(bounds.min.z, -30), maxZ: Math.min(bounds.max.z, 30),
-    };
     const project = position => [
       16 + (position.x - extent.minX) * (map.width - 32) / (extent.maxX - extent.minX),
       16 + (position.z - extent.minZ) * (map.height - 32) / (extent.maxZ - extent.minZ),
@@ -221,11 +224,11 @@
     terrain.fillRect(0, 0, map.width, map.height);
     terrain.strokeStyle = '#20343c';
     terrain.lineWidth = 1;
-    for (let x = -40; x <= 32; x += 8) {
+    for (let x = Math.ceil(extent.minX / 8) * 8; x <= extent.maxX; x += 8) {
       const [a, b] = project({x, z: extent.minZ});
       terrain.beginPath();terrain.moveTo(a, b);terrain.lineTo(a, map.height - 16);terrain.stroke();
     }
-    for (let z = -30; z <= 30; z += 6) {
+    for (let z = Math.ceil(extent.minZ / 6) * 6; z <= extent.maxZ; z += 6) {
       const [a, b] = project({x: extent.minX, z});
       terrain.beginPath();terrain.moveTo(a, b);terrain.lineTo(map.width - 16, b);terrain.stroke();
     }
@@ -296,6 +299,14 @@
         mapButton.textContent = t('M Map', 'M 地图');
         const support = game.support;
         credits.textContent = t('RP ', '支援点 ') + game.supportPoints;
+        const battleEvent = world.developer?.flags.noEnemies ? null : game.majorEvent;
+        battleEventStatus.hidden = !battleEvent;
+        if (battleEvent) {
+          const warning = Math.max(0, Math.ceil(battleEvent.warningUntil - game.elapsed));
+          const name = battleEvent.kind === 'bombardment' ? t('Bombardment', '炮击') : t('Counterattack', '反攻');
+          const label = name + ' · ' + battleEvent.point.short + (warning ? ' · ' + warning + 's' : '');
+          if (battleEventStatus.textContent !== label) battleEventStatus.textContent = label;
+        }
         for (const item of SUPPORT) {
           const button = buttons.get(item.type);
           button.textContent = item.key + ' ' + t(item.en, item.zh) + ' ' + game.supportCosts[item.type];
@@ -304,6 +315,19 @@
         }
         if (map.hidden || !context) return;
         context.drawImage(base, 0, 0);
+        if (battleEvent) {
+          const [x, y] = project(battleEvent.point.pos);
+          const radius = battleEvent.radius + (battleEvent.kind === 'bombardment' ? 4 : 0);
+          context.save();
+          context.strokeStyle = '#ff796a';
+          context.lineWidth = 2;
+          context.setLineDash([5, 4]);
+          context.beginPath();
+          context.ellipse(x, y, radius * (map.width - 32) / (extent.maxX - extent.minX),
+            radius * (map.height - 32) / (extent.maxZ - extent.minZ), 0, 0, Math.PI * 2);
+          context.stroke();
+          context.restore();
+        }
         context.font = 'bold 15px system-ui';
         for (const point of game.points) {
           const color = point.contested ? '#ffc271' : point.locked ? '#758691' :

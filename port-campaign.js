@@ -70,11 +70,13 @@
   }
 
   window.createPortCampaign = ({
-    archive, beacon, extraction,
-    recoverySeconds = RECOVERY_SECONDS, uploadSeconds = UPLOAD_SECONDS, initialPhase,
+    archive, beacon, extraction, mission,
+    recoverySeconds = mission === 'rail' ? 1.1 : RECOVERY_SECONDS,
+    breakerSeconds = 2.5, uploadSeconds = UPLOAD_SECONDS, initialPhase,
   }) => {
-    let phase = CHECKPOINTS.includes(initialPhase) ? initialPhase : 'relays';
-    let recovered = 0;
+    const rail = mission === 'rail';
+    let phase = CHECKPOINTS.includes(initialPhase) ? initialPhase : rail ? 'archive' : 'relays';
+    let held = 0;
     let uploaded = 0;
 
     return {
@@ -88,15 +90,17 @@
       update(dt, player, interact, { canInteract = true } = {}) {
         if (!player.alive || !Number.isFinite(dt) || dt <= 0) return null;
         const pos = player.pos;
-        if (phase === 'archive') {
-          const accessible = canInteract && inside(pos, archive, 2.4, 1.8);
-          recovered = accessible && interact ? Math.min(recoverySeconds, recovered + dt) : 0;
-          if (recovered >= recoverySeconds) phase = 'beacon';
-          else if (accessible) return { prompt: 'recover', progress: recovered / recoverySeconds };
-        } else if (phase === 'beacon') {
-          if (canInteract && inside(pos, beacon, 2.4, 1.8)) {
-            if (interact) phase = 'defend';
-            else return { prompt: 'start', progress: 0 };
+        if (phase === 'archive' || phase === 'beacon') {
+          const recovering = phase === 'archive';
+          const target = recovering ? archive : beacon;
+          const required = recovering ? recoverySeconds : rail ? breakerSeconds : 0;
+          const accessible = canInteract && inside(pos, target, 2.4, 1.8);
+          held = accessible && interact ? held + dt : 0;
+          if (accessible && interact && held >= required) {
+            phase = recovering ? 'beacon' : rail ? 'extract' : 'defend';
+            held = 0;
+          } else if (accessible) {
+            return { prompt: recovering ? 'recover' : 'start', progress: required ? held / required : 0 };
           }
         } else if (phase === 'defend') {
           const inRange = inside(pos, beacon, 6.5, 2.2);
@@ -107,6 +111,22 @@
           phase = 'complete';
         }
         return null;
+      },
+    };
+  };
+
+  window.createCampaignSupplies = (sites, { reserveCap = 150, radius = 1.7, height = 1.8 } = {}) => {
+    const caches = sites.map(({ id, pos, rounds }) => ({ id, pos, rounds, used: false }));
+
+    return {
+      caches,
+      collect(player, reserve, { canCollect = () => true } = {}) {
+        if (!player.alive || !Number.isFinite(reserve) || reserve >= reserveCap) return null;
+        const cache = caches.find(entry => !entry.used && inside(player.pos, entry.pos, radius, height) && canCollect(entry));
+        const rounds = cache && Math.min(cache.rounds, reserveCap - reserve);
+        if (!(rounds > 0)) return null;
+        cache.used = true;
+        return { id: cache.id, rounds };
       },
     };
   };

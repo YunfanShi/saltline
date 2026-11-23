@@ -198,3 +198,74 @@ test('artillery rejects friendly targets and delivers four impacts exactly once 
   assert.equal(game.takeArtilleryImpacts().length, 3);
   assert.equal(game.takeArtilleryImpacts().length, 0);
 });
+
+function takeEvents(game) {
+  return Array.from(game.takeMajorEventSignals(), ({ kind, action, point }) => [kind, action, point.id]);
+}
+
+test('major events warn before a counterattack and resume after a finite cooldown', () => {
+  const game = start({ majorEvents: true });
+  game.update(8, unit(30), []);
+  game.update(26.5, unit(140), []);
+  assert.equal(game.majorEvent, null);
+  game.update(.5, unit(140), []);
+  assert.deepEqual(takeEvents(game), [['counterattack', 'warning', 'relay-1']]);
+  assert.equal(game.majorEvent.warningUntil, 40);
+  game.update(4.5, unit(140), []);
+  assert.deepEqual(takeEvents(game), []);
+  game.update(.5, unit(140), []);
+  assert.deepEqual(takeEvents(game), [['counterattack', 'start', 'relay-1']]);
+  game.update(12, unit(140), []);
+  assert.deepEqual(takeEvents(game), [['counterattack', 'end', 'relay-1']]);
+  game.update(27, unit(140), []);
+  assert.equal(game.majorEvent, null);
+  game.update(1, unit(140), []);
+  assert.deepEqual(takeEvents(game), [['bombardment', 'warning', 'relay-1']]);
+  game.update(5, unit(140), []);
+  const signals = game.takeMajorEventSignals();
+  assert.equal(signals.length, 2);
+  assert.equal(signals[0].action, 'start');
+  assert.equal(signals[1].action, 'impact');
+  assert.equal(signals[1].pos.x, 30);
+  assert.equal(signals[1].radius, 7);
+  game.update(3, unit(140), []);
+  assert.equal(game.takeMajorEventSignals()[0].pos.x, 33);
+  game.update(9, unit(140), []);
+  assert.deepEqual(takeEvents(game), [['bombardment', 'end', 'relay-1']]);
+  assert.deepEqual(takeEvents(game), []);
+});
+
+test('a breakthrough event cancels if the telegraphed sector is already secured', () => {
+  const game = start({ majorEvents: true, mode: 'breakthrough' });
+  game.update(14, unit(0), []);
+  game.update(21, unit(120), []);
+  assert.deepEqual(takeEvents(game), [['counterattack', 'warning', 'relay-0']]);
+  game.update(2, unit(0), []);
+  assert.equal(game.activePoint, game.points[1]);
+  assert.equal(game.majorEvent, null);
+  assert.deepEqual(takeEvents(game), [['counterattack', 'end', 'relay-0']]);
+});
+
+test('major events stay opt-in and idle Conquest rounds do not launch a red attack', () => {
+  const idle = start({ majorEvents: true, startingTickets: 70 });
+  idle.update(46, unit(120), []);
+  assert.equal(idle.majorEvent, null);
+  assert.deepEqual(takeEvents(idle), []);
+
+  const normal = start();
+  normal.update(8, unit(30), []);
+  normal.update(90, unit(120), []);
+  assert.equal(normal.majorEvent, null);
+  assert.deepEqual(takeEvents(normal), []);
+});
+
+test('winning a round drops undelivered attacks', () => {
+  const game = start({ majorEvents: true });
+  game.update(8, unit(30), []);
+  game.update(32, unit(120), []);
+  assert.equal(game.majorEvent.kind, 'counterattack');
+  for (let index = 0; index < 40; index++) game.killedMachine();
+  assert.equal(game.winner, 'blue');
+  assert.equal(game.majorEvent, null);
+  assert.deepEqual(takeEvents(game), []);
+});

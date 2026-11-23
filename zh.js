@@ -48,7 +48,7 @@
     'Open staging room': '进入准备室',
     'Cooperative missions are still in development.': '联机战斗仍在开发中。',
     'Capture objectives and drain enemy tickets.': '争夺据点，消耗敌方兵力票。',
-    'Advance through three sectors in order.': '依次突破三个防区。',
+    'Advance through four sectors in order.': '依次突破四个防区。',
     'Set up a LAN room for 2–4 players.': '创建或加入 2–4 人的局域网准备室。',
     'Chapter 1 · Berth 4': '第一章 · 4 号泊位',
     'Chapter 2 · Rail Inspection Yard': '第二章 · 铁路货检区',
@@ -208,7 +208,7 @@
       if (cutRelay) translated = '切断 ' + cutRelay[1] + ' 号中继';
     }
     if (translated === undefined) {
-      const prompt = /^Hold (E|USE|Y) — (下载调度记录|开始上传)$/.exec(key);
+      const prompt = /^Hold (E|USE|Y) — (下载调度记录|开始上传|读取货单|恢复闸门供电)$/.exec(key);
       if (prompt) translated = '按住 ' + prompt[1] + ' · ' + prompt[2];
     }
     if (translated === undefined && key.startsWith('Contact — ')) {

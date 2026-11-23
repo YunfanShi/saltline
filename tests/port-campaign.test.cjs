@@ -90,6 +90,49 @@ test('occlusion resets archive recovery and prevents initiating the upload', () 
   assert.equal(mission.phase, 'extract');
 });
 
+test('the rail chapter starts at the manifest and restores power without a relay or defense phase', () => {
+  const mission = start({ mission: 'rail', recoverySeconds: 1, breakerSeconds: 2 });
+  assert.equal(mission.phase, 'archive');
+  assert.equal(mission.relaysCut(), false);
+  mission.update(3, player(beacon), true);
+  assert.equal(mission.phase, 'archive');
+  assert.equal(mission.update(.5, player(archive), true).progress, .5);
+  mission.update(.5, player(archive), true);
+  assert.equal(mission.phase, 'beacon');
+  assert.equal(mission.update(1, player(beacon), true).progress, .5);
+  mission.update(1, player(beacon), true, { canInteract: false });
+  assert.equal(mission.update(1, player(beacon), true).progress, .5);
+  mission.update(1, player(beacon), true);
+  assert.equal(mission.phase, 'extract');
+  mission.update(.1, player(extraction.pos), false);
+  assert.equal(mission.phase, 'complete');
+});
+
+test('rail checkpoints still restore the manifest, breaker or extraction stage', () => {
+  for (const phase of ['archive', 'beacon', 'extract']) {
+    assert.equal(start({ mission: 'rail', initialPhase: phase }).phase, phase);
+  }
+});
+
+test('ammo caches top up reserve once and remain available if approached with a full reserve', () => {
+  const sites = [{ id: 'supply-one', pos: at(0), rounds: 60 }, { id: 'supply-two', pos: at(8), rounds: 30 }];
+  const newSupplies = () => browser.window.createCampaignSupplies(sites, { reserveCap: 100 });
+  const supplies = newSupplies();
+  assert.equal(supplies.collect(player(at(0)), 100), null);
+  assert.equal(supplies.caches[0].used, false);
+  assert.equal(supplies.collect(player(at(0, 2)), 75), null);
+  assert.equal(supplies.collect({ alive: false, pos: at(0) }, 75), null);
+  assert.equal(supplies.collect(player(at(0)), 75, { canCollect: () => false }), null);
+  const first = supplies.collect(player(at(0)), 75);
+  assert.equal(first.id, 'supply-one');
+  assert.equal(first.rounds, 25);
+  assert.equal(supplies.caches[0].used, true);
+  assert.equal(supplies.collect(player(at(0)), 0), null);
+  assert.equal(supplies.collect(player(at(8)), 0).rounds, 30);
+  assert.equal(supplies.collect(player(at(8)), 0), null);
+  assert.equal(newSupplies().collect(player(at(0)), 0).rounds, 60);
+});
+
 test('campaign progress unlocks chapters in order and survives a reload', () => {
   const saved = new Map();
   const storage = {

@@ -134,9 +134,12 @@
     fence(-37.6, -27.5, 28.5, -27.5);
     fence(-37.6, 27.5, 23.15, 27.5);
     fence(26.85, 27.5, 28.5, 27.5);
-    fence(-37.6, -27.5, -37.6, 27.5);
+    for (const [start, end] of [[-27.5, -19], [-13, 2], [8, 16], [23, 27.5]]) {
+      fence(-37.6, start, -37.6, end);
+    }
     fence(28.5, -27.5, 28.5, 27.5);
     fence(23.15, 27.5, 26.85, 27.5);
+    for (const x of [23.15, 26.85]) fence(x, 23.05, x, 27.5);
     for (const x of [23.15, 26.85]) {
       solid('steel_dark', x - .12, 0, 27.38, x + .12, 3.04, 27.62);
     }
@@ -165,14 +168,15 @@
 
     // Truck arrival, weighbridge, and adjacent inspection bay.
     prop('guard_booth', -34.4, -.67, halfTurn, { color: 'grey' });
-    prop('gate_arm', -30.1, 2.65, halfTurn, { open: .94 });
-    prop('sign_post', -34.1, 6.45, halfTurn, { sign: 'hazard_general', text: 'RAIL FREIGHT INSPECTION' });
-    for (const x of [-34.7, -30.7]) prop('jersey_barrier', x, 7.15);
+    prop('gate_arm', -30.1, 5, halfTurn, { open: .94 });
+    prop('sign_post', -34.1, 8.65, halfTurn, { sign: 'hazard_general', text: 'RAIL FREIGHT INSPECTION' });
+    for (const x of [-34.7, -30.7]) prop('jersey_barrier', x, 8.65);
     for (const z of [-2.4, 6.5]) {
       for (let x = -34; x <= 24; x += 3.35) box('paint_white', 1.65, .008, .105, x, .018, z);
     }
     decal('arrow', 2.6, -23.9, .023, 2.4, 'y+', 0);
     decal('arrow', 2.6, 1.5, .023, 2.4, 'y+', 0);
+    for (const z of [-16, 5, 19.5]) decal('arrow', 2.1, -34, .023, z, 'y+', 0);
     for (const x of [-28, 11]) {
       for (let z = -15.25; z < -3.5; z += 2) box('paint_white', .11, .008, .95, x, .022, z);
     }
@@ -242,7 +246,7 @@
     return {
       playerStart: { pos: vector(-35.3, 0, 3.35), yaw: -halfTurn },
       objectives,
-      extraction: { pos: vector(25, 0, 24.65), radius: 2.4 },
+      extraction: { pos: vector(25, 0, 24.65), radius: 1.35 },
       campaignPoints: { archive: vector(-6.8, 0, 18.6), beacon: vector(21.9, 0, 16.7) },
       enemySpawns: [
         ...enemyPositions.map(([zone, x, z]) => ({ pos: vector(x, 0, z), zone, type: 'ground' })),
