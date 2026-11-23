@@ -84,3 +84,21 @@
 .port-scoreboard h2 { margin: 0 0 .8rem; font-size: 1.2rem; }
 .port-scoreboard dl { display: grid; grid-template-columns: 1fr auto; gap: .5rem 1rem; margin: 0; }
 .port-scoreboard dd { margin: 0; color: var(--signal); font-variant-numeric: tabular-nums; }
+
+.port-lan label { display: grid; gap: .25rem; margin: .75rem 0; }
+.port-lan input {
+  width: 100%;
+  padding: .45rem .65rem;
+  border: 1px solid var(--bone-faint);
+  color: var(--bone);
+  background: var(--ink);
+  font: inherit;
+}
+.port-lan ul { margin: .5rem 0 1rem; padding-left: 1.35rem; }
+.port-lan [data-status] {
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#port-main-actions [hidden],
+#campaign-next[hidden] { display: none; }

@@ -7,8 +7,10 @@
     'Saltline Terminal · 05:42': '盐线码头 · 05:42',
     'Saltline Terminal · Berth 4 · 05:42': '盐线码头 · 4 号泊位 · 05:42',
     'Port Authority Breach Unit — one breacher, no backup': '港务突击队 · 单人行动，无后援',
-    'The port’s security net has gone feral. Cut its three uplinks. Reach the boat.':
-      '港口安防系统已失控。切断三座通信中继，再乘船撤离。',
+    'The harbor stopped answering at 05:37. Cut its three uplinks and find out who ordered the lockdown.':
+      '05:37，港口失去联络。切断三座通信中继，查明谁下令封锁码头。',
+    '05:58. The boat clears Berth 4. The recovered log traces the lockdown to shore dispatch. Control forwards the dispatcher’s signature to the harbor inquiry.':
+      '05:58，撤离船驶离 4 号泊位。调度记录显示，封锁令来自岸上调度室。指挥中心将签发记录移交港口调查组。',
     'Every surface, machine and sound is generated in your browser. Nothing is downloaded.':
       '场景、机器和音效均由浏览器生成。',
     'Deploy': '部署',
@@ -31,7 +33,17 @@
     'Back': '返回',
     'AI battles': 'AI 对战',
     'Single-player campaign': '单人战役',
-    'LAN multiplayer is planned.': '局域网多人模式计划中。',
+    'Port battles': 'AI 港口战斗',
+    'Local network': '局域网',
+    'LAN staging room': '局域网准备室',
+    'Rail Inspection Yard': '铁路货检区',
+    'Rail Inspection Yard · Debrief': '铁路货检区 · 行动简报',
+    'Berth 4': '4 号泊位',
+    'Continue to the rail yard': '前往铁路货检区',
+    'Trace the lockdown order through the rail inspection yard and get the original records out.':
+      '沿着封锁令的线索进入铁路货检区，带出原始调度记录。',
+    'The inquiry brings the lockdown order and the amended manifest together. Berth 4 is reopened under manual control.':
+      '调查组将封锁令和篡改后的装运清单比对。4 号泊位恢复人工调度，重新开放。',
     'Original Mission': '原版任务',
     'Settings': '设置',
     'Controls': '操作指南',
@@ -138,12 +150,12 @@
       '突击队员，这里是指挥中心。港口管理员控制着泊位。切断堆场、仓棚和码头的三座中继。',
     'It has seen you. Gulls fly, Hounds walk. Put them down.':
       '它发现你了。海鸥无人机在空中，猎犬机器人在地面。消灭它们。',
-    'One relay dark. It felt that — machines inbound.': '第一座中继已断开。敌方发现了，机械单位正在靠近。',
-    'Two dark. It is throwing everything it has left at you.': '第二座中继已断开。敌方正出动全部剩余兵力。',
-    'All three dark. The boat is holding at the quay ladder, south end. Run.':
-      '三座中继均已断开。撤离船在码头南端的梯子旁。快走。',
+    'First relay down. It logged the last order before the blackout. That order came from shore.':
+      '第一座中继已断开。它记下了失联前的最后一条命令，命令来自岸上。',
+    'Second relay down. The emergency gate was held shut even after the crew called for help.':
+      '第二座中继已断开。船员发出求救以后，紧急通道仍然处于封锁状态。',
     'You are hit hard. Get behind steel and breathe.': '你伤得很重。先到钢制掩体后喘口气。',
-    'Breacher is aboard. Saltline is dark. Good work.': '突击队员已登船。中继均已断开，任务完成。',
+    'Breacher is aboard. The archive made it out with you.': '突击队员已登船，调度记录也带出来了。',
     'Raising the terminal': '正在初始化码头',
     'Waking the renderer': '正在启动渲染器',
     'Mixing paint, rust and rain': '正在加载材质与雨效',
@@ -175,6 +187,10 @@
       const cutRelay = /^Cut relay ([A-Z0-9]+)$/.exec(key);
       if (moreRelays) translated = '切断剩余 ' + moreRelays[1] + ' 座中继';
       if (cutRelay) translated = '切断 ' + cutRelay[1] + ' 号中继';
+    }
+    if (translated === undefined) {
+      const prompt = /^Hold (E|USE|Y) — (下载调度记录|开始上传)$/.exec(key);
+      if (prompt) translated = '按住 ' + prompt[1] + ' · ' + prompt[2];
     }
     if (translated === undefined && key.startsWith('Contact — ')) {
       const direction = directions.get(key.slice('Contact — '.length));
