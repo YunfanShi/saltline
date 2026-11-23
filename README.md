@@ -1,10 +1,10 @@
 # Saltline — Fable 5.2 FPS
 
-A small browser first-person shooter set in a rainy industrial port. Cut three uplink relays and uncover the order that sealed the harbor while drones ("Gulls") and robot dogs ("Hounds") hunt you.
+A small browser first-person shooter set in a rainy industrial port. Recover evidence from a sealed harbor and search a wrecked transport while drones ("Gulls") and robot dogs ("Hounds") patrol the docks.
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.10.0
+## Saltline fork 0.11.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
 - **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure four sectors in order, beginning at West Dispatch. The LAN staging room is available when launched with the local server.
@@ -21,19 +21,21 @@ The battle settings, requisition menu and scoreboard adapt systems from [IRONFRO
 
 ## Campaign
 
-Choose **Campaign → Start campaign** to deploy at Berth 4. Chapters unlock in story order after extraction. Choose **Continue story** from the debrief or Campaign page to start the next chapter. Progress is saved in this browser. After the relays, archive recovery, and upload, checkpoints save automatically. Retry or choose **Resume from checkpoint** on the Campaign page to pick up the current chapter. **Restart chapter** clears that chapter's checkpoint. Completed chapters can be replayed from the beginning.
+Choose **Campaign → Start campaign** to deploy at Berth 4. Chapters unlock in story order after extraction. Choose **Continue story** from the debrief or Campaign page to start the next chapter. Retry or choose **Resume from checkpoint** to pick up the current chapter. **Restart chapter** clears its checkpoint. Completed chapters can be replayed. Saves from earlier versions keep completed chapters and restart any unfinished chapter at its new entrance.
 
 Both maps extend 68 metres west. Three crossings connect West Dispatch to Berth 4. The rail annex has separate truck and pedestrian crossings into the inspection yard.
 
-At Berth 4, cut the three uplinks, then follow **LOG** to West Dispatch and hold **E** to download the archive. Follow **TX** to the quay beacon and start the upload with **E**. Stay within range for 18 seconds while machines converge. The transfer pauses when you leave the area and resumes when you return. Once Control confirms receipt, follow **EX** to the boat at the south quay ladder.
+At **Berth 4**, use the waterside maintenance approach or open the truck gate from the loading-road guard console. Keep clear of patrols and searchlights if you want a quiet run. An alarm sends patrols toward the escape boat and calls one reinforcement. Take the freight dossier from Port Control and board at the south quay ladder.
 
-In **Rail Inspection Yard**, follow **LOG** to the west customs terminal and inspect the signed manifest, then go to **AIR** outside the canopy. A missile hits the approaching transport and the crash blocks the pickup lane. Follow **ALT** through the maintenance lane, then **PWR** to restore gate power and **EX** to leave by road. Campaign cinematics play through before returning control.
+At **Rail Inspection Yard**, read the signed manifest at west customs and move to the transport lookout. After the crash, follow the survivor's signals and escort them out. The cargo ramp is shorter and exposed. The maintenance route takes longer and requires restoring shutter power. The survivor waits if you leave them behind or their route is blocked. Campaign cinematics play through before returning control.
 
 Commander speech uses the best English voice offered by the browser. On desktop Microsoft Edge it prefers Microsoft Natural voices when available. The browser may use its online speech service for those voices. The game sends only its fixed campaign lines to the browser speech API. If speech is unavailable, captions still follow the interface language. With speech enabled, captions appear when the utterance starts and clear when it ends. Master volume controls narration and scene audio.
 
 In the west rail annex, follow the southern service lane to the night-shift office. Hold **E** at the log to read the evacuation note and collect up to 60 rounds, depending on reserve capacity. The inspection is optional and can be repeated after redeployment.
 
-Campaign rounds start with two patrol units. The Berth 4 upload can call a short reinforcement wave. Walk up to the marked ammunition crates to top up reserves. When running low, **AM** points to an available crate nearby.
+Press **1** for the PAC-9 or **2** for the Tern S12 sidearm. Touch players can use the weapon switch button. The sidearm has its own 12-round magazine and 36 starting spare rounds.
+
+Walk up to marked ammunition crates to top up reserves, including the caches on both Berth 4 approaches. When running low, **AM** points to an available crate nearby.
 
 ## Multiplayer
 
@@ -45,7 +47,7 @@ During the campaign, Port Conquest or Port Breakthrough, press **~** (the backti
 
 - **Flight** uses WASD to move, Space to ascend, C to descend and Shift to boost. Terrain and walls still collide with the player.
 - **Invulnerability**, **Disable enemies** and **Infinite magazine** let you test combat and objectives independently. Disabling enemies removes existing units and cancels queued spawns. Re-enabling enemies deploys a fresh patrol.
-- Restore health, refill ammunition, spawn a Gull or Hound, or cut the next campaign relay. The panel shows your coordinates, health, ammo and active enemy count.
+- Restore health, refill ammunition, or spawn a Gull or Hound. The panel shows your coordinates, health, ammo and active enemy count.
 - **Reset switches** disables all toggles. Starting or restarting a match also resets them.
 
 ## Original demo

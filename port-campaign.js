@@ -1,11 +1,31 @@
 /* Objective progression for the single-player Saltline campaign. */
 (() => {
-  const RECOVERY_SECONDS = 3;
-  const UPLOAD_SECONDS = 18;
   const CHAPTERS = ['berth', 'rail'];
   const CHECKPOINTS = ['archive', 'lookout', 'detour', 'beacon', 'extract'];
+  const SAVE_PHASES = {
+    berth: ['extract'],
+    rail: ['lookout', 'search', 'locate', 'choose', 'escort'],
+  };
   const saveKey = id => 'saltline.campaign.completed.' + id;
-  const checkpointKey = id => 'saltline.campaign.checkpoint.' + id;
+  const legacyCheckpointKey = id => 'saltline.campaign.checkpoint.' + id;
+  const checkpointKey = id => 'saltline.campaign.checkpoint.v2.' + id;
+
+  function readSnapshot(id, state) {
+    if (!state || !SAVE_PHASES[id]?.includes(state.phase)) return null;
+    const { phase } = state;
+    if (id === 'berth') {
+      const { alarm, gateOpen, reinforcementCalled } = state;
+      if (typeof alarm !== 'boolean' || typeof gateOpen !== 'boolean' ||
+          typeof reinforcementCalled !== 'boolean' || (reinforcementCalled && !alarm)) return null;
+      return Object.freeze({ phase, alarm, gateOpen, reinforcementCalled });
+    }
+    if (phase === 'escort') {
+      const { route } = state;
+      if (route !== 'ramp' && route !== 'maintenance') return null;
+      return Object.freeze({ phase, route });
+    }
+    return Object.freeze({ phase });
+  }
 
   window.createPortCampaignProgress = (storage) => {
     let completed = 0;
@@ -17,19 +37,29 @@
       } catch { /* Keep the progress already known to this page. */ }
     }
     const checkpoints = new Map();
+    const cleared = new Set();
+    function stage(id, snapshot) {
+      return SAVE_PHASES[id].indexOf(snapshot?.phase);
+    }
     function checkpoint(id) {
       readProgress();
       if (!id || id !== CHAPTERS[completed]) return null;
-      try {
-        const saved = storage?.getItem(checkpointKey(id));
-        if (CHECKPOINTS.indexOf(saved) > CHECKPOINTS.indexOf(checkpoints.get(id))) checkpoints.set(id, saved);
-      } catch { /* Use the checkpoint already available in this page. */ }
+      if (!cleared.has(id)) {
+        try {
+          const raw = storage?.getItem(checkpointKey(id));
+          const saved = raw && readSnapshot(id, JSON.parse(raw));
+          if (stage(id, saved) > stage(id, checkpoints.get(id))) checkpoints.set(id, saved);
+        } catch { /* Use the checkpoint already available in this page. */ }
+      }
       return checkpoints.get(id) ?? null;
     }
     function clearCheckpoint(id) {
+      if (!CHAPTERS.includes(id)) return;
       checkpoints.delete(id);
-      try { storage?.removeItem(checkpointKey(id)); }
-      catch { /* Clear the in-page checkpoint even when storage is denied. */ }
+      try {
+        storage?.removeItem(legacyCheckpointKey(id));
+        storage?.removeItem(checkpointKey(id));
+      } catch { cleared.add(id); }
     }
 
     return {
@@ -44,12 +74,20 @@
         return index < completed ? 'complete' : 'next';
       },
       checkpoint,
-      saveCheckpoint(id, phase) {
+      legacyRestart(id) {
+        if (checkpoint(id) || !id || id !== CHAPTERS[completed] || cleared.has(id)) return false;
+        try { return CHECKPOINTS.includes(storage?.getItem(legacyCheckpointKey(id))); }
+        catch { return false; }
+      },
+      saveCheckpoint(id, snapshot) {
         const previous = checkpoint(id);
-        if (!id || id !== CHAPTERS[completed] || CHECKPOINTS.indexOf(phase) <= CHECKPOINTS.indexOf(previous)) return;
-        checkpoints.set(id, phase);
-        try { storage?.setItem(checkpointKey(id), phase); }
+        if (!id || id !== CHAPTERS[completed]) return false;
+        const next = readSnapshot(id, snapshot);
+        if (!next || stage(id, next) <= stage(id, previous)) return false;
+        checkpoints.set(id, next);
+        try { storage?.setItem(checkpointKey(id), JSON.stringify(next)); }
         catch { /* The player can still retry from this checkpoint in this page. */ }
+        return true;
       },
       clearCheckpoint,
       finish(id) {
@@ -68,6 +106,38 @@
     return Math.abs(position.y - target.y) <= height &&
       Math.hypot(position.x - target.x, position.z - target.z) <= radius;
   }
+
+  window.createRailCampaignPrelude = ({ archive, initialCheckpoint, recoverySeconds = 1.1 }) => {
+    const saved = readSnapshot('rail', initialCheckpoint);
+    let phase = !saved ? 'archive' : saved.phase === 'lookout' ? 'lookout' : 'rescue';
+    let held = 0;
+
+    return {
+      get phase() { return phase; },
+      get snapshot() { return phase === 'lookout' ? { phase } : null; },
+      transportCrashed() {
+        if (phase !== 'lookout') return false;
+        phase = 'rescue';
+        return true;
+      },
+      rescueComplete() {
+        if (phase !== 'rescue') return false;
+        phase = 'complete';
+        return true;
+      },
+      update(dt, player, interact, { canInteract = true } = {}) {
+        if (phase !== 'archive' || !Number.isFinite(dt) || dt <= 0) return null;
+        const accessible = player.alive && canInteract && inside(player.pos, archive, 2.4, 1.8);
+        held = accessible && interact ? held + dt : 0;
+        if (!accessible) return null;
+        if (interact && held >= recoverySeconds) {
+          phase = 'lookout';
+          return null;
+        }
+        return { prompt: 'recover', progress: held / recoverySeconds };
+      },
+    };
+  };
 
   window.createPortCinematicDirector = () => {
     let active = null;
@@ -99,62 +169,6 @@
       },
       skip() { return finish('skip'); },
       cancel() { return finish('cancel'); },
-    };
-  };
-
-  window.createPortCampaign = ({
-    archive, beacon, extraction, mission, diversion,
-    recoverySeconds = mission === 'rail' ? 1.1 : RECOVERY_SECONDS,
-    breakerSeconds = 2.5, uploadSeconds = UPLOAD_SECONDS, initialPhase,
-  }) => {
-    const rail = mission === 'rail';
-    const hasDetour = rail && Boolean(diversion);
-    const validCheckpoint = CHECKPOINTS.includes(initialPhase) &&
-      (hasDetour || (initialPhase !== 'lookout' && initialPhase !== 'detour'));
-    let phase = validCheckpoint ? initialPhase : rail ? 'archive' : 'relays';
-    let held = 0;
-    let uploaded = 0;
-
-    return {
-      get phase() { return phase; },
-      get uploadSeconds() { return uploadSeconds; },
-      relaysCut() {
-        if (phase !== 'relays') return false;
-        phase = 'archive';
-        return true;
-      },
-      transportCrashed() {
-        if (phase !== 'lookout') return false;
-        phase = 'detour';
-        return true;
-      },
-      update(dt, player, interact, { canInteract = true } = {}) {
-        if (!player.alive || !Number.isFinite(dt) || dt <= 0) return null;
-        const pos = player.pos;
-        if (phase === 'archive' || phase === 'beacon') {
-          const recovering = phase === 'archive';
-          const target = recovering ? archive : beacon;
-          const required = recovering ? recoverySeconds : rail ? breakerSeconds : 0;
-          const accessible = canInteract && inside(pos, target, 2.4, 1.8);
-          held = accessible && interact ? held + dt : 0;
-          if (accessible && interact && held >= required) {
-            phase = recovering ? (hasDetour ? 'lookout' : 'beacon') : rail ? 'extract' : 'defend';
-            held = 0;
-          } else if (accessible) {
-            return { prompt: recovering ? 'recover' : 'start', progress: required ? held / required : 0 };
-          }
-        } else if (phase === 'detour') {
-          if (inside(pos, diversion, 4.5, 2.2)) phase = 'beacon';
-        } else if (phase === 'defend') {
-          const inRange = inside(pos, beacon, 6.5, 2.2);
-          if (inRange) uploaded = Math.min(uploadSeconds, uploaded + dt);
-          if (uploaded >= uploadSeconds) phase = 'extract';
-          else return { uploading: inRange, seconds: Math.ceil(uploadSeconds - uploaded) };
-        } else if (phase === 'extract' && inside(pos, extraction.pos, extraction.radius, 3.5)) {
-          phase = 'complete';
-        }
-        return null;
-      },
     };
   };
 

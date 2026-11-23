@@ -9,7 +9,7 @@
   const WRECK_SECONDS = 105;
   const DISC_ROTATION = Math.PI * 2;
 
-  window.createCampaignCrash = (world) => {
+  window.createCampaignCrash = (world, { retainWreck = false } = {}) => {
     const { THREE, scene, fx, events } = world;
     const { BoxGeometry, BufferGeometry, CubicBezierCurve3, CylinderGeometry,
       DataTexture, DoubleSide, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
@@ -794,7 +794,7 @@
         burst();
         if (wreckAge < WRECK_SECONDS) startWreck(wreckAge);
       }
-      if (wreckAge >= WRECK_SECONDS) reset();
+      if (wreckAge >= WRECK_SECONDS && !retainWreck) reset();
     }
 
     return {

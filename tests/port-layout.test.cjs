@@ -15,7 +15,7 @@ const scope = vm.createContext({
   console: { ...console, error: (...message) => diagnostics.push(message.join(' ')) },
 });
 vm.runInContext(html.slice(engineStart, bootStart) + '\nwindow.engine = { d3, il, lt, ob, pv, Eb, Yg };', scope);
-for (const source of ['../port-expansion.js', '../port-rail-yard.js']) {
+for (const source of ['../port-expansion.js', '../port-rail-yard.js', '../port-campaign-rail.js']) {
   vm.runInContext(readFileSync(require.resolve(source), 'utf8'), scope);
 }
 
@@ -90,6 +90,103 @@ test('the night-shift office has a walk-in entrance and solid glazing', () => {
   assert.equal(physics.lineOfSight(vector(-101.25, 1.6, 23.2), exploration.soundPos), true);
   assert.equal(physics.nav.isWalkable(exploration.pos.x, exploration.pos.z), true);
   assert.ok(physics.nav.findPath(yard.playerStart.pos, exploration.pos), 'The player can reach the records');
+});
+
+test('the runway locator, survivor, cargo ramp, and sheltered route form a playable rescue', () => {
+  const { physics, vector, expansion } = buildRail();
+  const { pickup } = expansion;
+  const layout = pickup.rescue;
+  const THREE = scope.window.engine.lt;
+  const scene = new THREE.Scene();
+  const effects = [];
+  const alerts = [];
+  const world = { THREE, scene, physics, fx: {
+    dust: () => effects.push('dust'),
+    sparks: () => effects.push('sparks'),
+    smoke: () => effects.push('smoke'),
+  }, enemies: { alert: pos => alerts.push(pos.clone()) } };
+  for (const { min, max, playerOnly } of [pickup.closure, ...pickup.debris]) {
+    physics.addBox(min, max, { playerOnly });
+  }
+  const mission = scope.window.createRailRescue(world, layout);
+  const player = pos => ({ alive: true, pos, eye: pos.clone().add(vector(0, 1.6, 0)) });
+  const at = (pos, dt = .1, interact = false) => mission.update(dt, player(pos), interact);
+  assert.equal(mission.phase, 'inactive');
+  assert.equal(mission.doorOpen, false);
+  assert.equal(mission.start().length, 2);
+  assert.equal(mission.markers[0].short, 'ELT');
+  const cradle = scene.getObjectByName('rail-transfer-fallen-cradle');
+  assert.ok(cradle.position.y > 2.5);
+  at(layout.start, 1);
+  at(layout.start, 2);
+  assert.ok(cradle.position.y < .5);
+  assert.equal(scene.getObjectByName('rail-emergency-searchlight').visible, true);
+  assert.ok(physics.boxes.some(box => box.tag === 'rail-transfer-cradle'));
+  for (const cue of ['dust', 'sparks', 'smoke']) assert.ok(effects.includes(cue));
+  assert.equal(at(layout.survivor, 3, true).prompt, null);
+  assert.equal(at(layout.locator, .3, true).progress, .5);
+  at(layout.locator);
+  assert.equal(at(layout.locator, .3, true).progress, .5);
+  assert.equal(at(layout.locator, .3, true).radio.length, 2);
+  assert.equal(mission.phase, 'locate');
+  assert.equal(mission.markers[0].short, 'SOS');
+  assert.equal(at(layout.survivor, 1.2, true).radio.length, 2);
+  assert.equal(mission.phase, 'choose');
+  assert.equal(mission.markers.length, 2);
+
+  const fullPath = route => [layout.survivor, ...layout[route].waypoints, layout.handoff];
+  const pathLength = path => path.slice(1).reduce((sum, point, index) => sum + point.distanceTo(path[index]), 0);
+  assert.ok(pathLength(fullPath('maintenance')) > pathLength(fullPath('ramp')) + 8);
+  const doorWest = vector(-78.4, 0, layout.handoff.z + 7.95);
+  const doorEast = vector(-75.5, 0, doorWest.z);
+  assert.equal(physics.nav.clearLine(doorWest, doorEast), false);
+  for (const route of ['ramp', 'maintenance']) {
+    mission.reset({ phase: 'choose' });
+    assert.equal(at(layout[route].control, route === 'maintenance' ? 1.75 : .6, true).radio.length, 2);
+    assert.equal(mission.phase, 'escort');
+    assert.equal(mission.snapshot.route, route);
+    assert.equal(mission.markers[0].short, route === 'ramp' ? 'RMP' : 'M04');
+
+    const beforeWait = mission.survivor.clone();
+    at(layout.handoff, 2.4);
+    assert.equal(mission.status, 'waiting');
+    assert.ok(mission.survivor.equals(beforeWait));
+    assert.equal(at(layout.handoff, 3.1).radio.length, 2, 'a sustained wait gets a spoken reminder');
+    assert.equal(mission.doorOpen, route === 'maintenance');
+    assert.equal(physics.nav.clearLine(doorWest, doorEast), route === 'maintenance');
+
+    mission.reset(mission.snapshot);
+    assert.ok(mission.survivor.equals(layout.survivor));
+    assert.equal(mission.doorOpen, route === 'maintenance');
+    const path = fullPath(route);
+    const midpoint = path[0].clone().lerp(path[1], .47);
+    const obstruction = physics.addBox(midpoint.clone().add(vector(-.44, 0, -.44)),
+      midpoint.clone().add(vector(.44, 1.8, .44)));
+    for (let tick = 0; tick < 32; tick++) at(path[1]);
+    assert.equal(mission.status, 'blocked', 'the survivor waits at a blocked route');
+    const waitingPosition = mission.survivor.clone();
+    for (let tick = 0; tick < 8; tick++) at(path[1]);
+    assert.ok(mission.survivor.equals(waitingPosition));
+    physics.removeBox(obstruction);
+    at(path[1]);
+    assert.equal(mission.status, 'moving', 'the survivor continues when the route clears');
+
+    const beforeAlerts = alerts.length;
+    const searchlightFootprint = scene.getObjectByName('rail-searchlight-footprint');
+    for (let tick = 0; tick < 15; tick++) at(searchlightFootprint.position.clone().setY(0));
+    assert.equal(alerts.length > beforeAlerts, route === 'ramp');
+    mission.reset(mission.snapshot);
+    for (let index = 1; index < path.length; index++) {
+      const start = path[index - 1], end = path[index];
+      const obstructed = Array.from({ length: 21 }, (_, sample) => start.clone().lerp(end, sample / 20))
+        .filter(point => !physics.nav.isWalkable(point.x, point.z)).map(point => point.toArray().join(','));
+      assert.ok(physics.nav.clearLine(start, end), `${route} segment ${index} · ${obstructed.join(' / ')}`);
+      const steps = Math.ceil(start.distanceTo(end) / .22);
+      for (let tick = 1; tick <= steps; tick++) at(start.clone().lerp(end, tick / steps));
+      for (let tick = 0; tick < 18; tick++) at(end);
+    }
+    assert.equal(mission.phase, 'complete', route + ' survivor reached the protected handoff');
+  }
 });
 
 test('legacy skyline props stay beyond the playable annex perimeter in both chapters', async () => {

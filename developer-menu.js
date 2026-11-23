@@ -26,12 +26,13 @@
     indicator.className = 'developer-indicator';
     indicator.hidden = true;
     document.getElementById('app').append(panel, indicator);
+    const refill = () => (world.weapon.refill || world.weapon.reset).call(world.weapon);
 
     function setFlag(key, enabled) {
       if (flags[key] === enabled) return;
       flags[key] = enabled;
       if (key === 'flight') world.player.vel.set(0, 0, 0);
-      if (key === 'infiniteAmmo' && enabled && world.weapon.ammo === 0) world.weapon.reset();
+      if (key === 'infiniteAmmo' && enabled && world.weapon.ammo === 0) refill();
       if (key === 'noEnemies') onEnemies(enabled);
     }
 
@@ -61,7 +62,7 @@
     }
 
     const heal = addAction('Restore health', '恢复生命', () => world.player.heal(world.player.maxHealth));
-    const ammo = addAction('Refill ammunition', '补满弹药', () => world.weapon.reset());
+    const ammo = addAction('Refill ammunition', '补满弹药', refill);
     const gull = addAction('Spawn Gull', '生成海鸥', () => onSpawn('gull'));
     const hound = addAction('Spawn Hound', '生成猎犬', () => onSpawn('hound'));
     const cut = addAction('Cut next relay', '切断下一个中继站', onCut);

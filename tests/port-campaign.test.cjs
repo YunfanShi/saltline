@@ -7,112 +7,7 @@ const browser = { window: {} };
 runInNewContext(readFileSync(require.resolve('../port-campaign.js'), 'utf8'), browser);
 const at = (x, y = 0) => ({ x, y, z: 0 });
 const archive = at(-10);
-const beacon = at(10);
-const extraction = { pos: at(25), radius: 2.5 };
 const player = pos => ({ alive: true, pos });
-const start = options => browser.window.createPortCampaign({ archive, beacon, extraction, ...options });
-
-test('the dispatch archive requires cutting all relays and a continuous nearby interaction', () => {
-  const mission = start();
-  mission.update(20, player(archive), true);
-  assert.equal(mission.phase, 'relays');
-  assert.equal(mission.relaysCut(), true);
-  assert.equal(mission.relaysCut(), false);
-  assert.equal(mission.update(2, player(archive), true).progress, 2 / 3);
-  assert.equal(mission.update(1, player(archive), false).progress, 0);
-  mission.update(2, player(archive), true);
-  mission.update(2, player(at(archive.x, 3)), true);
-  assert.equal(mission.update(1, player(archive), true).progress, 1 / 3);
-  mission.update(2, player(archive), true);
-  assert.equal(mission.phase, 'beacon');
-});
-
-test('upload requires activation and only counts living players within beacon range', () => {
-  const mission = start();
-  mission.relaysCut();
-  mission.update(3, player(archive), true);
-  assert.equal(mission.update(30, player(beacon), false).prompt, 'start');
-  mission.update(30, player(extraction.pos), true);
-  assert.equal(mission.phase, 'beacon');
-  mission.update(1, player(beacon), true);
-  assert.equal(mission.phase, 'defend');
-  assert.equal(mission.update(6, player(beacon), false).seconds, 12);
-  const disconnected = mission.update(25, player(at(beacon.x, 4)), false);
-  assert.equal(disconnected.uploading, false);
-  assert.equal(disconnected.seconds, 12);
-  mission.update(30, { alive: false, pos: beacon }, false);
-  assert.equal(mission.phase, 'defend');
-  mission.update(12, player(beacon), false);
-  assert.equal(mission.phase, 'extract');
-});
-
-test('the boat completes the campaign only after upload and within boarding range', () => {
-  const mission = start();
-  mission.relaysCut();
-  mission.update(999, player(extraction.pos), true);
-  assert.equal(mission.phase, 'archive');
-  mission.update(3, player(archive), true);
-  mission.update(1, player(beacon), true);
-  mission.update(18, player(beacon), false);
-  mission.update(1, player(at(extraction.pos.x, 5)), true);
-  assert.equal(mission.phase, 'extract');
-  mission.update(1, player(extraction.pos), false);
-  assert.equal(mission.phase, 'complete');
-  assert.equal(mission.relaysCut(), false);
-  assert.equal(start().phase, 'relays');
-});
-
-test('chapters can set their recovery and upload durations', () => {
-  const mission = start({ recoverySeconds: 5, uploadSeconds: 12 });
-  assert.equal(mission.uploadSeconds, 12);
-  mission.relaysCut();
-  assert.equal(mission.update(3, player(archive), true).progress, 3 / 5);
-  mission.update(2, player(archive), true);
-  assert.equal(mission.phase, 'beacon');
-  mission.update(1, player(beacon), true);
-  assert.equal(mission.update(6, player(beacon), false).seconds, 6);
-  mission.update(6, player(beacon), false);
-  assert.equal(mission.phase, 'extract');
-});
-
-test('occlusion resets archive recovery and prevents initiating the upload', () => {
-  const mission = start();
-  const occluded = { canInteract: false };
-  mission.relaysCut();
-  mission.update(2, player(archive), true);
-  assert.equal(mission.update(2, player(archive), true, occluded), null);
-  assert.equal(mission.update(2, player(archive), true).progress, 2 / 3);
-  mission.update(1, player(archive), true);
-  assert.equal(mission.update(1, player(beacon), true, occluded), null);
-  assert.equal(mission.phase, 'beacon');
-  mission.update(1, player(beacon), true);
-  mission.update(18, player(beacon), false, occluded);
-  assert.equal(mission.phase, 'extract');
-});
-
-test('the rail chapter starts at the manifest and restores power without a relay or defense phase', () => {
-  const mission = start({ mission: 'rail', recoverySeconds: 1, breakerSeconds: 2 });
-  assert.equal(mission.phase, 'archive');
-  assert.equal(mission.relaysCut(), false);
-  mission.update(3, player(beacon), true);
-  assert.equal(mission.phase, 'archive');
-  assert.equal(mission.update(.5, player(archive), true).progress, .5);
-  mission.update(.5, player(archive), true);
-  assert.equal(mission.phase, 'beacon');
-  assert.equal(mission.update(1, player(beacon), true).progress, .5);
-  mission.update(1, player(beacon), true, { canInteract: false });
-  assert.equal(mission.update(1, player(beacon), true).progress, .5);
-  mission.update(1, player(beacon), true);
-  assert.equal(mission.phase, 'extract');
-  mission.update(.1, player(extraction.pos), false);
-  assert.equal(mission.phase, 'complete');
-});
-
-test('rail checkpoints still restore the manifest, breaker or extraction stage', () => {
-  for (const phase of ['archive', 'beacon', 'extract']) {
-    assert.equal(start({ mission: 'rail', initialPhase: phase }).phase, phase);
-  }
-});
 
 test('ammo caches top up reserve once and remain available if approached with a full reserve', () => {
   const sites = [{ id: 'supply-one', pos: at(0), rounds: 60 }, { id: 'supply-two', pos: at(8), rounds: 30 }];
@@ -174,7 +69,126 @@ test('invalid campaign saves reset to chapter one and storage errors preserve in
   assert.equal(unavailable.next, 'rail');
 });
 
-test('checkpoint saves survive reload, only advance, and clear on restart or chapter completion', () => {
+function campaignStorage(initial = []) {
+  const saved = new Map(initial);
+  return {
+    getItem: key => saved.get(key),
+    setItem: (key, value) => saved.set(key, value),
+    removeItem: key => saved.delete(key),
+  };
+}
+
+test('berth retry restores the alarm, gate and reinforcement state at archive recovery', () => {
+  const storage = campaignStorage();
+  const createProgress = () => browser.window.createPortCampaignProgress(storage);
+  const progress = createProgress();
+  const extract = { phase: 'extract', alarm: true, gateOpen: false, reinforcementCalled: true };
+  assert.equal(progress.saveCheckpoint('rail', { phase: 'search' }), false);
+  assert.equal(progress.saveCheckpoint('berth', { phase: 'archive' }), false);
+  assert.equal(progress.saveCheckpoint('berth', { ...extract, alarm: false }), false);
+  assert.equal(progress.saveCheckpoint('berth', extract), true);
+  assert.equal(progress.saveCheckpoint('berth', { ...extract, gateOpen: true }), false);
+  assert.deepEqual({ ...createProgress().checkpoint('berth') }, extract);
+  assert.equal(Object.isFrozen(progress.checkpoint('berth')), true);
+  progress.clearCheckpoint('berth');
+  assert.equal(createProgress().checkpoint('berth'), null);
+  assert.equal(progress.saveCheckpoint('berth', extract), true);
+  assert.equal(progress.finish('berth'), true);
+  assert.equal(createProgress().checkpoint('berth'), null);
+  assert.equal(createProgress().saveCheckpoint('berth', extract), false);
+  assert.equal(progress.next, 'rail');
+});
+
+test('rail checkpoint advances once per authored stage and preserves the selected route', () => {
+  const storage = campaignStorage();
+  const createProgress = () => browser.window.createPortCampaignProgress(storage);
+  const progress = createProgress();
+  progress.finish('berth');
+  for (const phase of ['lookout', 'search', 'locate', 'choose']) {
+    assert.equal(progress.saveCheckpoint('rail', { phase }), true);
+  }
+  assert.equal(progress.saveCheckpoint('rail', { phase: 'search' }), false);
+  assert.equal(progress.saveCheckpoint('rail', { phase: 'escort', route: 'unknown' }), false);
+  assert.equal(progress.saveCheckpoint('rail', { phase: 'escort', route: 'maintenance' }), true);
+  const reopened = createProgress();
+  assert.equal(reopened.saveCheckpoint('rail', { phase: 'escort', route: 'ramp' }), false);
+  assert.deepEqual({ ...reopened.checkpoint('rail') }, { phase: 'escort', route: 'maintenance' });
+  assert.equal(reopened.finish('rail'), true);
+  assert.equal(createProgress().checkpoint('rail'), null);
+  assert.equal(createProgress().status('rail'), 'complete');
+});
+
+test('legacy completed chapters stay unlocked and unfinished chapters restart from entry', () => {
+  const oldRailKey = 'saltline.campaign.checkpoint.rail';
+  const storage = campaignStorage([
+    ['saltline.campaign.completed.berth', '1'],
+    ['saltline.campaign.checkpoint.berth', 'extract'],
+    [oldRailKey, 'detour'],
+  ]);
+  const createProgress = () => browser.window.createPortCampaignProgress(storage);
+  const progress = createProgress();
+  assert.equal(progress.status('berth'), 'complete');
+  assert.equal(progress.legacyRestart('berth'), false);
+  assert.equal(progress.next, 'rail');
+  assert.equal(progress.legacyRestart('rail'), true);
+  assert.equal(progress.checkpoint('rail'), null);
+  const prelude = browser.window.createRailCampaignPrelude({ archive, initialCheckpoint: progress.checkpoint('rail') });
+  assert.equal(prelude.phase, 'archive');
+  assert.equal(progress.saveCheckpoint('rail', { phase: 'lookout' }), true);
+  assert.equal(createProgress().legacyRestart('rail'), false);
+  progress.clearCheckpoint('rail');
+  assert.equal(storage.getItem(oldRailKey), undefined);
+  assert.equal(createProgress().legacyRestart('rail'), false);
+});
+
+test('checkpoint parse errors use in-page snapshots and storage denial allows an in-page restart', () => {
+  const extract = { phase: 'extract', alarm: false, gateOpen: true, reinforcementCalled: false };
+  const berthKey = 'saltline.campaign.checkpoint.v2.berth';
+  const storage = campaignStorage([[berthKey, '{']]);
+  const progress = browser.window.createPortCampaignProgress(storage);
+  assert.equal(progress.checkpoint('berth'), null);
+  assert.equal(progress.saveCheckpoint('berth', extract), true);
+  storage.setItem(berthKey, '');
+  assert.deepEqual({ ...progress.checkpoint('berth') }, extract);
+  storage.setItem(berthKey, JSON.stringify(extract));
+  storage.removeItem = () => { throw new Error('denied'); };
+  progress.clearCheckpoint('berth');
+  assert.equal(progress.checkpoint('berth'), null);
+  assert.equal(progress.saveCheckpoint('berth', { ...extract, gateOpen: false }), true);
+  assert.equal(progress.checkpoint('berth').gateOpen, false);
+});
+
+test('rail prelude requires a visible manifest and triggers cinematic and rescue transitions once', () => {
+  const prelude = browser.window.createRailCampaignPrelude({ archive, recoverySeconds: 1 });
+  assert.equal(prelude.phase, 'archive');
+  assert.equal(prelude.rescueComplete(), false);
+  assert.equal(prelude.transportCrashed(), false);
+  assert.equal(prelude.update(.5, player(archive), true).progress, .5);
+  assert.equal(prelude.update(.5, player(archive), true, { canInteract: false }), null);
+  assert.equal(prelude.update(.5, player(archive), true).progress, .5);
+  assert.equal(prelude.update(.5, player(archive), true), null);
+  assert.deepEqual({ ...prelude.snapshot }, { phase: 'lookout' });
+  assert.equal(prelude.transportCrashed(), true);
+  assert.equal(prelude.transportCrashed(), false);
+  assert.equal(prelude.snapshot, null);
+  assert.equal(prelude.rescueComplete(), true);
+  assert.equal(prelude.rescueComplete(), false);
+  assert.equal(prelude.phase, 'complete');
+});
+
+test('rail retry skips a finished crash but can resume before the first viewing', () => {
+  const preludeAt = initialCheckpoint => browser.window.createRailCampaignPrelude({ archive, initialCheckpoint });
+  assert.equal(preludeAt({ phase: 'lookout' }).phase, 'lookout');
+  for (const phase of ['search', 'locate', 'choose', 'escort']) {
+    const resumed = preludeAt({ phase, route: 'ramp' });
+    assert.equal(resumed.phase, 'rescue');
+    assert.equal(resumed.transportCrashed(), false);
+  }
+  assert.equal(preludeAt({ phase: 'escort', route: 'invalid' }).phase, 'archive');
+  assert.equal(preludeAt({ phase: 'extract' }).phase, 'archive');
+});
+
+test('a new tab retains the latest valid checkpoint when another tab offers an earlier stage', () => {
   const saved = new Map();
   const storage = {
     getItem: key => saved.get(key),
@@ -183,22 +197,11 @@ test('checkpoint saves survive reload, only advance, and clear on restart or cha
   };
 
   const progress = browser.window.createPortCampaignProgress(storage);
-  progress.saveCheckpoint('rail', 'archive');
-  assert.equal(progress.checkpoint('rail'), null);
-  progress.saveCheckpoint('berth', 'beacon');
-  progress.saveCheckpoint('berth', 'archive');
-  progress.saveCheckpoint('berth', 'defend');
-  const reopened = browser.window.createPortCampaignProgress(storage);
-  assert.equal(reopened.checkpoint('berth'), 'beacon');
-  const resumed = browser.window.createPortCampaign({ archive, beacon, extraction, initialPhase: reopened.checkpoint('berth') });
-  assert.equal(resumed.phase, 'beacon');
-  assert.equal(resumed.relaysCut(), false);
-  reopened.clearCheckpoint('berth');
-  assert.equal(browser.window.createPortCampaignProgress(storage).checkpoint('berth'), null);
-  reopened.saveCheckpoint('berth', 'extract');
-  reopened.finish('berth');
-  assert.equal(reopened.checkpoint('berth'), null);
-  assert.equal(reopened.checkpoint('rail'), null);
+  const secondTab = browser.window.createPortCampaignProgress(storage);
+  progress.finish('berth');
+  progress.saveCheckpoint('rail', { phase: 'choose' });
+  assert.equal(secondTab.saveCheckpoint('rail', { phase: 'locate' }), false);
+  assert.equal(secondTab.checkpoint('rail').phase, 'choose');
 });
 
 test('cinematic playback advances to the exact end and resolves one time', () => {
@@ -242,27 +245,4 @@ test('skipping and cancelling release the director and never re-run the finished
   director.update(20);
   assert.deepEqual(frames, [0, 2, 0]);
   assert.deepEqual(finishes, ['skip', 'cancel']);
-});
-
-test('the rail mission waits for the crash and routes through the diversion before allowing gate power', () => {
-  const diversion = at(-30);
-  const mission = start({ mission: 'rail', diversion });
-  assert.equal(mission.transportCrashed(), false);
-  mission.update(2, player(archive), true);
-  assert.equal(mission.phase, 'lookout');
-  mission.update(6, player(beacon), true);
-  assert.equal(mission.phase, 'lookout');
-  assert.equal(mission.transportCrashed(), true);
-  assert.equal(mission.transportCrashed(), false);
-  assert.equal(mission.phase, 'detour');
-  mission.update(3, player(beacon), true);
-  mission.update(1, player(at(-30, 3)), false);
-  assert.equal(mission.phase, 'detour');
-  mission.update(1, player(diversion), false);
-  assert.equal(mission.phase, 'beacon');
-  mission.update(3, player(beacon), true);
-  assert.equal(mission.phase, 'extract');
-  for (const phase of ['lookout', 'detour', 'beacon', 'extract']) {
-    assert.equal(start({ mission: 'rail', diversion, initialPhase: phase }).phase, phase);
-  }
 });

@@ -52,6 +52,20 @@ test('skipping a frame past the wreck lifetime still delivers the impact and all
   assert.equal(scene.children.length, 0);
 });
 
+test('the rescue keeps the wreck model in place after the crash effects expire', () => {
+  const scene = new THREE.Scene();
+  const crash = createCampaignCrash({ THREE, scene }, { retainWreck: true });
+  crash.launch();
+  crash.update(crash.duration);
+  const wreck = scene.getObjectByName('aircraft-model-wreck');
+  crash.update(180);
+  assert.equal(crash.phase, 'wreck');
+  assert.strictEqual(scene.getObjectByName('aircraft-model-wreck'), wreck);
+  crash.reset();
+  assert.equal(crash.phase, 'idle');
+  assert.equal(scene.children.length, 0);
+});
+
 test('the flight banks across the turn, levels and deploys its wheels by touchdown', () => {
   const scene = new THREE.Scene();
   const crash = createCampaignCrash({ THREE, scene });

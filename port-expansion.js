@@ -194,9 +194,11 @@
     if (rail) {
       const apron = { x: -77, north: -7.35, south: 7.55 };
       const service = { north: 8.15, south: 12.6, center: 10.3 };
+      const maintenance = { north: 16.35, south: 20.15, center: 18.25 };
       fence(apron.x, north, apron.x, apron.north);
       fence(apron.x, apron.south, apron.x, service.north);
-      fence(apron.x, service.south, apron.x, south);
+      fence(apron.x, service.south, apron.x, maintenance.north);
+      fence(apron.x, maintenance.south, apron.x, south);
 
       // Runway edges and the independently routed service road through the customs boundary.
       slab('asphalt', -101, -.045, apron.north + .25, -66, .014, apron.south - .25);
@@ -213,7 +215,7 @@
           box('paint_white', 1.65, .008, .105, x, .025, z);
         }
       }
-      for (const [z, title] of [[apron.north, 'AIR PICKUP'], [service.south, 'SERVICE ROAD']]) {
+      for (const [z, title] of [[apron.north, 'AIR PICKUP'], [service.south, 'CARGO RAMP']]) {
         for (const x of [apron.x - .05, apron.x + .05]) {
           label(title, .21, x, 1.7, z + (z === apron.north ? -1.7 : 1.7),
             x < apron.x ? 'x-' : 'x+', { color: 'white', font: 'stencil', distress: .14 });
@@ -225,6 +227,39 @@
       const manifest = canopy(-94, 15.5, 12, 7.5, 'RAIL CUSTOMS / MANIFESTS');
       const power = canopy(-57, -16, 8, 6, 'GATE POWER');
       const records = shiftOffice();
+      const passage = canopy(-75.2, maintenance.center, 13, 5.5, 'MAINTENANCE / M04');
+      const handoff = canopy(-61.2, service.center, 6.5, 4.3, 'GROUND RESCUE / EAST');
+      for (const z of [maintenance.north, maintenance.south]) {
+        solid('steel_galv', -77.16, 0, z - .13, -76.84, 3.25, z + .13);
+      }
+      box('steel_dark', .36, .36, 4.1, -77, 3.14, maintenance.center);
+      box('hazard_stripes', .033, .15, 3.6, -77.19, 2.97, maintenance.center);
+      label('M04 / POWERED SHUTTER', .19, -77.208, 3.17, maintenance.center,
+        'x-', { color: 'white', font: 'stencil', distress: .12 });
+      solid('corrugated_roof', -81.2, 0, 20.57, -68.9, 3.68, 20.71);
+      solid('corrugated_roof', -76.8, 0, 15.78, -68.9, 3.68, 15.93);
+      solid('corrugated_roof', -64.02, 0, 8.13, -58.38, 2.86, 8.29);
+      solid('corrugated_roof', -57.95, 0, 8.35, -57.79, 2.86, 12.25);
+      box('paint_yellow', 5.05, .02, .095, -61.13, .045, 11.75);
+      for (const z of [8.45, 12.2]) {
+        solid('concrete', -79.2, 0, z - .13, -73.1, .25, z + .13, 'concrete');
+        box('hazard_stripes', 5.95, .017, .22, -76.15, .26, z);
+      }
+      slab('diamond_plate', -79.5, -.015, 8.7, -72.8, .045, 11.94);
+      for (const x of [-79.25, -73.04]) box('paint_yellow', .21, .014, 3.12, x, .055, service.center);
+      for (const z of [6.4, 13.2]) {
+        solid('concrete', -79.52, 0, z - .42, -78.68, .68, z + .42, 'concrete');
+        ibeam('steel_rust', 'y', 6.4, -79.1, 3.74, z, { depth: .45, width: .32 });
+        col(-79.31, .68, z - .16, -78.89, 6.95, z + .16, 'metal');
+      }
+      ibeam('steel_rust', 'z', 7.45, -79.1, 6.86, 9.8, { depth: .58, width: .43 });
+      ibeam('steel_galv', 'z', 7.45, -79.1, 6.39, 9.8, { depth: .24, width: .23 });
+      box('steel_dark', .17, .35, 3.19, -79.31, 6.63, 9.86);
+      label('TRANSFER 04', .25, -79.412, 6.64, 9.86, 'x-',
+        { color: 'white', font: 'stencil', distress: .17 });
+      box('steel_dark', .12, .45, 1.86, -83.51, 1.96, 13.9);
+      label('M04 / POWER', .205, -83.58, 1.96, 13.9, 'x-',
+        { color: 'white', font: 'stencil', distress: .12 });
       terminalFurniture(-94, 14);
       terminalFurniture(-57, -16);
       prop('generator', -54.4, -17.45, .06);
@@ -233,13 +268,13 @@
       prop('sign_post', -63.3, -13.4, 0, { sign: 'hazard_voltage', text: 'GATE CONTROL' });
       prop('forklift', -87, 18.5, -.2, { forksUp: .16 });
       prop('forklift', -74.3, -13.5, Math.PI, { forksUp: .1 });
-      prop('pipe_stack', -72, 20.3, -.01);
+      prop('pipe_stack', -72, 22.9, -.01);
       prop('tarp_cargo', -65.3, 16.1, .2);
       prop('tarp_cargo', -82, -17, .08);
       prop('crate_stack', -99, -11);
       prop('pallet_stack', -85.75, 14.35);
       prop('pallet_stack', -76.3, -11.8);
-      prop('barrel', -70.9, 19.2, .2, { color: 'blue' });
+      prop('barrel', -70.9, 21.35, .2, { color: 'blue' });
       for (const [x, z, color] of [
         [-95, -8, 'white'], [-83, -8.1, 'grey'], [-68.5, -6.5, 'green'],
         [-70.1, 14, 'blue'], [-55.3, 11.1, 'orange'], [-47.5, 16.75, 'grey'],
@@ -250,7 +285,7 @@
       }
       const layout = base([-94, 0, 14], [-57, 0, -16], [
         ['ammo', -91, 16.9], ['health', -59, -15.15],
-      ], [manifest, power, records.interior], [
+      ], [manifest, power, records.interior, passage, handoff], [
         ['yard', -91, -17], ['yard', -80, -12.4], ['yard', -61, -14.1], ['yard', -50, -9.3],
         ['shed', -97.6, 17.9], ['shed', -83.55, 19.5], ['shed', -67, 18.9], ['shed', -49, 12.1],
       ], [['yard', -77, -16], ['shed', -92, 19], ['shed', -53, 18]], [
@@ -273,6 +308,29 @@
             bounds(-80.94, .06, -6.73, -76.63, 2.48, -.73),
             bounds(-77.83, .06, 1.15, -74.43, 2.64, 7.1),
           ],
+          rescue: {
+            start: vector(-94, 0, 9.5),
+            locator: vector(-91, 0, 5.3),
+            survivor: vector(-87.3, 0, 9.85),
+            handoff: vector(-61.15, 0, service.center),
+            door: bounds(-77.16, 0, maintenance.north + .11, -76.84, 2.9, maintenance.south - .11),
+            ramp: {
+              control: vector(-83.4, 0, 9.28),
+              signal: vector(-83.1, 1.6, 8.16),
+              waypoints: [[-81.4, 10.3], [-77, 10.3], [-71.3, 10.3], [-64.8, 10.3]]
+                .map(([x, z]) => vector(x, 0, z)),
+            },
+            maintenance: {
+              control: vector(-84.2, 0, 13.2),
+              signal: vector(-83.5, 1.51, 13.9),
+              waypoints: [[-84.2, 11.9], [-83.25, 16.3], [-81.6, 18.25], [-77, 18.25],
+                [-68.25, 18.25], [-62.5, 17.95], [-61.95, 13.25]].map(([x, z]) => vector(x, 0, z)),
+            },
+            floodlights: [[-97, 5.3], [-91, 6.94], [-84.8, 5.45], [-79.1, 7.9],
+              [-74.3, 6.55], [-68.1, 7.25], [-62, 8.1]].map(([x, z], index) => vector(x, index === 3 ? 6.19 : 5.62, z)),
+            searchlight: vector(-79.1, 6.14, 11.8),
+            transfer: vector(-79.1, 5.86, 8),
+          },
         },
       };
     }

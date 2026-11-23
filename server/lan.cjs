@@ -15,8 +15,9 @@ const ROOT = path.resolve(__dirname, '..');
 const ASSETS = new Set([
   'index.html', 'zh.js',
   'port-campaign.js', 'port-commander.js', 'port-conquest.js', 'port-rail-yard.js', 'port-expansion.js', 'port-campaign-events.js',
+  'port-campaign-berth.js', 'port-campaign-rail.js',
   'port-lan.js',
-  'port-loadout.js', 'port-loadout.css',
+  'port-loadout.js', 'port-loadout.css', 'port-sidearm.js',
   'port-operations.js', 'port-operations.css',
   'developer-menu.js', 'developer-menu.css',
   'art/port-conquest.jpg', 'art/port-breakthrough.jpg', 'art/port-lan.jpg',
