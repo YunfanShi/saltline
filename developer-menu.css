@@ -1,0 +1,75 @@
+.developer-menu {
+  box-sizing: border-box;
+  width: min(35rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  overflow: auto;
+  padding: 1.25rem;
+  color: var(--bone);
+  background: var(--ink-2);
+  border: 1px solid var(--signal);
+  font: 15px/1.5 system-ui, sans-serif;
+}
+
+.developer-menu::backdrop { background: rgb(8 11 13 / 75%); }
+
+.developer-menu header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.developer-menu h2 { margin: 0; font-size: 1.35rem; }
+
+.developer-menu button,
+.developer-toggles label {
+  padding: .5rem .7rem;
+  color: inherit;
+  background: var(--ink);
+  border: 1px solid var(--bone-faint);
+  font: inherit;
+  cursor: pointer;
+}
+
+.developer-menu button:hover:not(:disabled),
+.developer-toggles label:hover { border-color: var(--signal); }
+
+.developer-menu button:disabled { opacity: .45; cursor: default; }
+
+.developer-menu :focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.developer-toggles,
+.developer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.developer-toggles label {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.developer-toggles input { accent-color: var(--signal); }
+.developer-menu p { color: var(--bone-dim); }
+.developer-status { margin-bottom: 0; font-variant-numeric: tabular-nums; }
+
+.developer-indicator {
+  position: absolute;
+  top: calc(4.75rem + var(--sat));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: .25rem .65rem;
+  max-width: 90%;
+  text-align: center;
+  color: var(--signal);
+  background: var(--ink);
+  font: 700 12px/1.4 system-ui, sans-serif;
+  pointer-events: none;
+}
