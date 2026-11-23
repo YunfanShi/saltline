@@ -9,6 +9,7 @@ const MIN_PLAYERS = 2;
 const MAX_ROOMS = 32;
 const HEARTBEAT_MS = 6000;
 const RESERVATION_MS = 30_000;
+const COUNTDOWN_MS = 3000;
 const MAX_BODY_BYTES = 2048;
 const ROOT = path.resolve(__dirname, '..');
 const ASSETS = new Set([
@@ -85,10 +86,27 @@ function migrateHost(room, now) {
   room.hostId = (players.find(player => connected(player, now)) ?? players[0])?.id;
 }
 
+function readyToLock(room, now) {
+  return room.players.size >= MIN_PLAYERS &&
+    [...room.players.values()].every(member => member.ready && connected(member, now));
+}
+
+function advanceCountdown(room, now) {
+  if (room.phase !== 'countdown') return;
+  if (!readyToLock(room, Math.min(now, room.lockAt))) {
+    room.phase = 'lobby';
+    room.lockAt = null;
+  } else if (now >= room.lockAt) {
+    room.phase = 'started';
+    room.lockAt = null;
+  }
+}
+
 function snapshot(room, player, now) {
   return {
     code: room.code,
     phase: room.phase,
+    countdownMs: room.phase === 'countdown' ? room.lockAt - now : null,
     hostId: room.hostId,
     yourId: player.id,
     maxPlayers: MAX_PLAYERS,
@@ -106,6 +124,7 @@ function createLanServer({ clock = Date.now } = {}) {
 
   function sweep(now) {
     for (const [code, room] of rooms) {
+      advanceCountdown(room, now);
       for (const [token, player] of room.players) {
         if (now - player.lastSeen >= HEARTBEAT_MS + RESERVATION_MS) room.players.delete(token);
       }
@@ -134,7 +153,7 @@ function createLanServer({ clock = Date.now } = {}) {
       const name = playerName(body.name);
       let code;
       do { code = randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(code));
-      const room = { code, phase: 'lobby', players: new Map(), hostId: null };
+      const room = { code, phase: 'lobby', lockAt: null, players: new Map(), hostId: null };
       const { token, player } = addPlayer(room, name, now);
       rooms.set(code, room);
       return json(response, 201, { token, room: snapshot(room, player, now) });
@@ -143,6 +162,7 @@ function createLanServer({ clock = Date.now } = {}) {
     const room = rooms.get(rawCode.toUpperCase());
     if (!room) throw new RequestError(404, 'room_not_found');
     if (action === 'join') {
+      if (room.phase === 'countdown') throw new RequestError(409, 'room_countdown');
       if (room.phase !== 'lobby') throw new RequestError(409, 'room_started');
       if (room.players.size >= MAX_PLAYERS) throw new RequestError(409, 'room_full');
       const { token, player } = addPlayer(room, playerName(body.name), now);
@@ -155,22 +175,29 @@ function createLanServer({ clock = Date.now } = {}) {
     player.lastSeen = now;
     if (action === 'leave') {
       room.players.delete(token);
+      if (room.phase === 'countdown') {
+        room.phase = 'lobby';
+        room.lockAt = null;
+      }
       if (room.players.size === 0) rooms.delete(room.code);
       else migrateHost(room, now);
       return json(response, 200, { ok: true });
     }
-    if (action && room.phase !== 'lobby') throw new RequestError(409, 'room_started');
+    if (action && room.phase === 'started') throw new RequestError(409, 'room_started');
     if (action === 'ready') {
       if (typeof body.ready !== 'boolean') throw new RequestError(400, 'invalid_ready');
       player.ready = body.ready;
+      advanceCountdown(room, now);
     }
     if (action === 'start') {
       if (player.id !== room.hostId) throw new RequestError(403, 'host_only');
-      const players = [...room.players.values()];
-      if (players.length < MIN_PLAYERS || !players.every(member => member.ready && connected(member, now))) {
+      if (!readyToLock(room, now)) {
         throw new RequestError(409, 'players_not_ready');
       }
-      room.phase = 'started';
+      if (room.phase === 'lobby') {
+        room.phase = 'countdown';
+        room.lockAt = now + COUNTDOWN_MS;
+      }
     }
     return json(response, 200, { room: snapshot(room, player, now) });
   }

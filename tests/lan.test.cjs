@@ -84,8 +84,20 @@ test('only the host can start a 2–4 player ready room', async t => {
   await lan.action(code, 'ready', host, { ready: true });
   await lan.action(code, 'ready', guest, { ready: true });
   assert.equal((await lan.room(code, host)).body.room.players[1].ready, true);
-  assert.equal((await lan.action(code, 'start', host)).body.room.phase, 'started');
-  assert.equal((await lan.room(code, guest)).body.room.phase, 'started');
+  const { body: { room: countdown } } = await lan.action(code, 'start', host);
+  assert.equal(countdown.phase, 'countdown');
+  assert.equal(countdown.countdownMs, 3000);
+  lan.advance(1750);
+  assert.equal((await lan.action(code, 'start', host)).body.room.countdownMs, 1250);
+  assert.deepEqual(await lan.action(code, 'join', null, { name: 'Another' }), {
+    status: 409, body: { error: 'room_countdown' },
+  });
+  lan.advance(1249);
+  assert.equal((await lan.room(code, guest)).body.room.countdownMs, 1);
+  lan.advance(1);
+  const { body: { room: locked } } = await lan.room(code, guest);
+  assert.equal(locked.phase, 'started');
+  assert.equal(locked.countdownMs, null);
   assert.deepEqual(await lan.action(code, 'join', null, { name: 'Another' }), {
     status: 409, body: { error: 'room_started' },
   });
@@ -143,7 +155,59 @@ test('an expired host token is refused and a remaining player can start the room
   assert.equal((await lan.action(code, 'start', guest)).body.error, 'players_not_ready');
   const { token: another } = await lan.join(code);
   await lan.action(code, 'ready', another, { ready: true });
-  assert.equal((await lan.action(code, 'start', guest)).body.room.phase, 'started');
+  assert.equal((await lan.action(code, 'start', guest)).body.room.phase, 'countdown');
+});
+
+test('a member unreadying or leaving cancels the countdown before lock', async t => {
+  const lan = await launch(t);
+  const { token: host, room: { code } } = await lan.create();
+  const { token: guest, room: { yourId: guestId } } = await lan.join(code);
+  const { token: third } = await lan.join(code, 'Third');
+  for (const token of [host, guest, third]) await lan.action(code, 'ready', token, { ready: true });
+  await lan.action(code, 'start', host);
+  lan.advance(2999);
+  const { body: { room: cancelled } } = await lan.action(code, 'ready', guest, { ready: false });
+  assert.equal(cancelled.phase, 'lobby');
+  assert.equal(cancelled.countdownMs, null);
+  assert.equal(cancelled.players.find(player => player.id === guestId).ready, false);
+  await lan.action(code, 'ready', guest, { ready: true });
+  await lan.action(code, 'start', host);
+  await lan.action(code, 'leave', third);
+  assert.equal((await lan.room(code, guest)).body.room.phase, 'lobby');
+
+  await lan.action(code, 'start', host);
+  await lan.action(code, 'leave', host);
+  const { body: { room: migrated } } = await lan.room(code, guest);
+  assert.equal(migrated.phase, 'lobby');
+  assert.equal(migrated.hostId, guestId);
+});
+
+test('the countdown cancels when a seat goes silent before the deadline', async t => {
+  const lan = await launch(t);
+  const { token: host, room: { code } } = await lan.create();
+  const { token: guest } = await lan.join(code);
+  await lan.action(code, 'ready', host, { ready: true });
+  await lan.action(code, 'ready', guest, { ready: true });
+  lan.advance(4000);
+  assert.equal((await lan.action(code, 'start', host)).body.room.phase, 'countdown');
+  lan.advance(2000);
+  const { body: { room: cancelled } } = await lan.room(code, host);
+  assert.equal(cancelled.phase, 'lobby');
+  assert.equal(cancelled.players[1].connected, false);
+  assert.equal((await lan.room(code, guest)).body.room.phase, 'lobby');
+  assert.equal((await lan.action(code, 'start', host)).body.room.countdownMs, 3000);
+});
+
+test('a countdown that expired while everyone was connected stays locked on late polls', async t => {
+  const lan = await launch(t);
+  const { token: host, room: { code } } = await lan.create();
+  const { token: guest } = await lan.join(code);
+  for (const token of [host, guest]) await lan.action(code, 'ready', token, { ready: true });
+  await lan.action(code, 'start', host);
+  lan.advance(6000);
+  const { body: { room } } = await lan.room(code, host);
+  assert.equal(room.phase, 'started');
+  assert.equal(room.players[1].connected, false);
 });
 
 test('LAN API validates JSON bodies, name length, ready actions and bearer tokens', async t => {

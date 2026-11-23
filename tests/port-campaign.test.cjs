@@ -89,3 +89,71 @@ test('occlusion resets archive recovery and prevents initiating the upload', () 
   mission.update(18, player(beacon), false, occluded);
   assert.equal(mission.phase, 'extract');
 });
+
+test('campaign progress unlocks chapters in order and survives a reload', () => {
+  const saved = new Map();
+  const storage = {
+    getItem: key => saved.get(key),
+    setItem: (key, value) => saved.set(key, value),
+  };
+  const createProgress = () => browser.window.createPortCampaignProgress(storage);
+  const fresh = createProgress();
+  const secondTab = createProgress();
+  assert.equal(secondTab.next, 'berth');
+  assert.equal(fresh.next, 'berth');
+  assert.equal(fresh.status('rail'), 'locked');
+  assert.equal(fresh.finish('rail'), false);
+  assert.equal(fresh.finish('berth'), true);
+  assert.equal(fresh.next, 'rail');
+  assert.equal(fresh.finish('berth'), false);
+
+  const continued = createProgress();
+  assert.equal(continued.status('berth'), 'complete');
+  assert.equal(continued.status('rail'), 'next');
+  assert.equal(continued.finish('rail'), true);
+  assert.equal(continued.finish(undefined), false);
+  assert.equal(secondTab.finish('berth'), false);
+  assert.equal(secondTab.next, null);
+  const completed = createProgress();
+  assert.equal(completed.next, null);
+  assert.equal(completed.status('rail'), 'complete');
+  assert.equal(completed.status('unknown'), 'locked');
+});
+
+test('invalid campaign saves reset to chapter one and storage errors preserve in-page progress', () => {
+  const corrupted = browser.window.createPortCampaignProgress({ getItem: () => '99' });
+  assert.equal(corrupted.next, 'berth');
+  const unavailable = browser.window.createPortCampaignProgress({
+    getItem() { throw new Error('denied'); },
+    setItem() { throw new Error('denied'); },
+  });
+  assert.equal(unavailable.finish('berth'), true);
+  assert.equal(unavailable.next, 'rail');
+});
+
+test('checkpoint saves survive reload, only advance, and clear on restart or chapter completion', () => {
+  const saved = new Map();
+  const storage = {
+    getItem: key => saved.get(key),
+    setItem: (key, value) => saved.set(key, value),
+    removeItem: key => saved.delete(key),
+  };
+
+  const progress = browser.window.createPortCampaignProgress(storage);
+  progress.saveCheckpoint('rail', 'archive');
+  assert.equal(progress.checkpoint('rail'), null);
+  progress.saveCheckpoint('berth', 'beacon');
+  progress.saveCheckpoint('berth', 'archive');
+  progress.saveCheckpoint('berth', 'defend');
+  const reopened = browser.window.createPortCampaignProgress(storage);
+  assert.equal(reopened.checkpoint('berth'), 'beacon');
+  const resumed = browser.window.createPortCampaign({ archive, beacon, extraction, initialPhase: reopened.checkpoint('berth') });
+  assert.equal(resumed.phase, 'beacon');
+  assert.equal(resumed.relaysCut(), false);
+  reopened.clearCheckpoint('berth');
+  assert.equal(browser.window.createPortCampaignProgress(storage).checkpoint('berth'), null);
+  reopened.saveCheckpoint('berth', 'extract');
+  reopened.finish('berth');
+  assert.equal(reopened.checkpoint('berth'), null);
+  assert.equal(reopened.checkpoint('rail'), null);
+});

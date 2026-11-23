@@ -5,6 +5,7 @@
     invalid_name: ['Enter a name of 1–24 characters.', '请输入 1–24 个字符的名字。'],
     room_not_found: ['Room not found or expired.', '房间不存在或已过期。'],
     room_full: ['The room is full.', '房间已满。'],
+    room_countdown: ['The roster countdown is in progress.', '阵容锁定倒计时正在进行。'],
     room_started: ['The roster is locked.', '该房间已锁定阵容。'],
     invalid_token: ['Your seat has expired.', '你的席位已过期。'],
     host_only: ['Only the host can lock the roster.', '只有房主可以锁定阵容。'],
@@ -26,6 +27,7 @@
     <section data-lobby hidden>
       <h3 data-room></h3>
       <ul data-players></ul>
+      <p role="status" data-countdown hidden></p>
       <div class="developer-actions">
         <button type="button" data-ready></button><button type="button" data-start></button>
         <button type="button" data-share></button><button type="button" data-leave></button>
@@ -45,6 +47,9 @@
   let generation = 0;
   let timer;
   let status = null;
+  let countdownTimer;
+  let countdownEnd = 0;
+  let countdownCancelled = false;
 
   try {
     const saved = JSON.parse(sessionStorage.getItem(key));
@@ -57,6 +62,33 @@
       if (seat) sessionStorage.setItem(key, JSON.stringify(seat));
       else sessionStorage.removeItem(key);
     } catch { /* The seat remains available while this page is open. */ }
+  }
+
+  function acceptRoom(next) {
+    countdownCancelled = next?.phase === 'lobby' &&
+      (room?.phase === 'countdown' || countdownCancelled);
+    room = next;
+    countdownEnd = performance.now() + (room?.countdownMs ?? 0);
+  }
+
+  function renderCountdown() {
+    clearTimeout(countdownTimer);
+    const label = find('[data-countdown]');
+    let message = '';
+    if (room?.phase === 'countdown') {
+      const remaining = Math.max(0, countdownEnd - performance.now());
+      const seconds = Math.ceil(remaining / 1000);
+      message = seconds
+        ? t(`Locking the roster in ${seconds}…`, `${seconds} 秒后锁定阵容…`)
+        : t('Waiting for server confirmation…', '等待服务器确认…');
+      if (remaining && dialog.open) countdownTimer = setTimeout(renderCountdown, remaining - (seconds - 1) * 1000 + 1);
+    } else if (room?.phase === 'started') {
+      message = t('The roster is locked.', '阵容已锁定。');
+    } else if (countdownCancelled) {
+      message = t('Roster countdown cancelled.', '阵容锁定倒计时已取消。');
+    }
+    label.hidden = !message;
+    if (label.textContent !== message) label.textContent = message;
   }
 
   function render() {
@@ -73,6 +105,7 @@
       '当前预览支持组队与准备。合作战役仍在开发中。');
     find('[data-status]').textContent = status ? t(...status) : '';
     for (const btn of dialog.querySelectorAll('[data-create], [data-join], [data-leave]')) btn.disabled = busy;
+    renderCountdown();
     if (!room) return;
     find('[data-room]').textContent = t('Room ', '房间 ') + room.code;
     const roster = find('[data-players]');
@@ -94,9 +127,10 @@
     ready.textContent = own?.ready ? t('Cancel ready', '取消准备') : t('Ready', '准备');
     ready.disabled = busy || room.phase === 'started';
     const start = find('[data-start]');
-    start.textContent = room.phase === 'started' ? t('Roster locked', '阵容已锁定') : t('Lock roster', '锁定阵容');
+    start.textContent = room.phase === 'started' ? t('Roster locked', '阵容已锁定') :
+      room.phase === 'countdown' ? t('Locking roster', '正在锁定') : t('Lock roster', '锁定阵容');
     start.hidden = room.hostId !== room.yourId;
-    start.disabled = busy || room.phase === 'started' || room.players.length < 2 ||
+    start.disabled = busy || room.phase !== 'lobby' || room.players.length < 2 ||
       room.players.some(player => !player.ready || !player.connected);
     find('[data-share]').textContent = t('Share room link', '分享房间链接');
     find('[data-leave]').textContent = t('Leave room', '离开房间');
@@ -133,13 +167,13 @@
     try {
       const next = await request('/' + encodeURIComponent(current.code));
       if (current !== seat || pendingGeneration !== generation) return;
-      room = next.room;
+      acceptRoom(next.room);
       if (status === errors.offline) status = null;
     } catch (error) {
       if (current !== seat || pendingGeneration !== generation) return;
       status = errors[error.message] ?? errors.offline;
       if (error.message === 'invalid_token' || error.message === 'room_not_found') {
-        room = null;
+        acceptRoom(null);
         remember(null);
       }
     } finally {
@@ -173,7 +207,7 @@
     return action(async () => {
       if (join && !/^[A-F0-9]{6}$/.test(tokenCode)) throw new Error('room_not_found');
       const next = await request(join ? '/' + encodeURIComponent(tokenCode) + '/join' : '', 'POST', { name: name.value.trim() });
-      room = next.room;
+      acceptRoom(next.room);
       remember({ code: room.code, token: next.token });
     });
   }
@@ -181,7 +215,7 @@
   function change(operation, body) {
     return action(async () => {
       const next = await request('/' + encodeURIComponent(room.code) + '/' + operation, 'POST', body);
-      room = next.room;
+      acceptRoom(next.room);
     });
   }
 
@@ -193,7 +227,7 @@
   find('[data-start]').addEventListener('click', () => change('start'));
   find('[data-leave]').addEventListener('click', () => action(async () => {
     await request('/' + encodeURIComponent(room.code) + '/leave', 'POST');
-    room = null;
+    acceptRoom(null);
     remember(null);
   }));
   find('[data-share]').addEventListener('click', async () => {
@@ -208,10 +242,11 @@
     render();
   });
   find('[data-close]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => clearTimeout(countdownTimer));
   document.addEventListener('click', event => {
     if (event.target.closest?.('#port-lan-open') && !dialog.open) {
-      render();
       dialog.showModal();
+      render();
     }
   });
   window.addEventListener('keydown', event => {
@@ -224,8 +259,8 @@
   }, true);
   document.addEventListener('saltline:localechange', render);
   if (codeFromLink && !new URL(location.href).searchParams.has('autostart')) {
-    render();
     dialog.showModal();
+    render();
   }
   if (seat) poll();
 })();

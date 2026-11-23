@@ -2,6 +2,67 @@
 (() => {
   const RECOVERY_SECONDS = 3;
   const UPLOAD_SECONDS = 18;
+  const CHAPTERS = ['berth', 'rail'];
+  const CHECKPOINTS = ['archive', 'beacon', 'extract'];
+  const saveKey = id => 'saltline.campaign.completed.' + id;
+  const checkpointKey = id => 'saltline.campaign.checkpoint.' + id;
+
+  window.createPortCampaignProgress = (storage) => {
+    let completed = 0;
+    try { storage ??= window.localStorage; }
+    catch { /* Progress is still available in this page. */ }
+    function readProgress() {
+      try {
+        while (completed < CHAPTERS.length && storage?.getItem(saveKey(CHAPTERS[completed])) === '1') completed++;
+      } catch { /* Keep the progress already known to this page. */ }
+    }
+    const checkpoints = new Map();
+    function checkpoint(id) {
+      readProgress();
+      if (!id || id !== CHAPTERS[completed]) return null;
+      try {
+        const saved = storage?.getItem(checkpointKey(id));
+        if (CHECKPOINTS.indexOf(saved) > CHECKPOINTS.indexOf(checkpoints.get(id))) checkpoints.set(id, saved);
+      } catch { /* Use the checkpoint already available in this page. */ }
+      return checkpoints.get(id) ?? null;
+    }
+    function clearCheckpoint(id) {
+      checkpoints.delete(id);
+      try { storage?.removeItem(checkpointKey(id)); }
+      catch { /* Clear the in-page checkpoint even when storage is denied. */ }
+    }
+
+    return {
+      get next() {
+        readProgress();
+        return CHAPTERS[completed] ?? null;
+      },
+      status(id) {
+        readProgress();
+        const index = CHAPTERS.indexOf(id);
+        if (index === -1 || index > completed) return 'locked';
+        return index < completed ? 'complete' : 'next';
+      },
+      checkpoint,
+      saveCheckpoint(id, phase) {
+        const previous = checkpoint(id);
+        if (!id || id !== CHAPTERS[completed] || CHECKPOINTS.indexOf(phase) <= CHECKPOINTS.indexOf(previous)) return;
+        checkpoints.set(id, phase);
+        try { storage?.setItem(checkpointKey(id), phase); }
+        catch { /* The player can still retry from this checkpoint in this page. */ }
+      },
+      clearCheckpoint,
+      finish(id) {
+        readProgress();
+        if (!id || id !== CHAPTERS[completed]) return false;
+        completed++;
+        clearCheckpoint(id);
+        try { storage?.setItem(saveKey(id), '1'); }
+        catch { /* Keep the current page playable if storage is denied. */ }
+        return true;
+      },
+    };
+  };
 
   function inside(position, target, radius, height) {
     return Math.abs(position.y - target.y) <= height &&
@@ -10,9 +71,9 @@
 
   window.createPortCampaign = ({
     archive, beacon, extraction,
-    recoverySeconds = RECOVERY_SECONDS, uploadSeconds = UPLOAD_SECONDS,
+    recoverySeconds = RECOVERY_SECONDS, uploadSeconds = UPLOAD_SECONDS, initialPhase,
   }) => {
-    let phase = 'relays';
+    let phase = CHECKPOINTS.includes(initialPhase) ? initialPhase : 'relays';
     let recovered = 0;
     let uploaded = 0;
 
