@@ -1,0 +1,44 @@
+.port-operations {
+  position: absolute;
+  z-index: 12;
+  right: max(14px, env(safe-area-inset-right));
+  top: max(96px, calc(env(safe-area-inset-top) + 82px));
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  max-width: calc(100vw - 28px);
+  pointer-events: none;
+  color: #e8e4da;
+}
+.port-operations[hidden], .port-operations-map[hidden] { display: none; }
+.port-operations-map {
+  width: min(460px, calc(100vw - 28px), 69vh);
+  height: auto;
+  border: 1px solid #73858d;
+  box-shadow: 0 8px 24px #0009;
+}
+.port-operations-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  font: 600 13px system-ui, sans-serif;
+}
+.port-operations-bar button,
+.port-operations-bar span {
+  border: 1px solid #586c76;
+  background: #10191ee8;
+  color: #e8e4da;
+  padding: 5px 8px;
+  font: inherit;
+}
+.port-operations-bar button { cursor: pointer; pointer-events: auto; }
+.port-operations-bar button:disabled { cursor: default; opacity: .54; }
+@media (max-width: 650px) {
+  .port-operations { top: max(105px, calc(env(safe-area-inset-top) + 100px)); }
+  .port-operations-bar { max-width: 250px; font-size: 12px; }
+}
+
+.port-multiple-actions { margin-top: 16px; }
+.port-multiple-actions[hidden] { display: none; }
+.port-multiple-actions .m-actions { margin-top: 7px; }

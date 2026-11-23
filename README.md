@@ -4,11 +4,14 @@ A small browser first-person shooter: one level in a rainy container port. Cut t
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.1.0
+## Saltline fork 0.2.0
 
-- **港口征服 / Port Conquest** uses the original port and machine enemies with IRONFRONT-style territory control and team tickets. Approach a relay to capture it, clear machines from contested points, and hold more points to drain the opposing team. The round starts at 40 tickets per side and runs for at most four minutes.
-- **部署 / Deploy** opens the original relay sabotage mission. The menus and common prompts default to Chinese. Switch back to English in Settings.
-- See [the integration report](docs/PORT_CONQUEST_010.docx) for scope and verification.
+- **BATTLE** opens the original single-player relay sabotage campaign.
+- **MULTIPLE** opens the AI battle menu. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure three sectors in order. LAN multiplayer is planned.
+- Choose Support, Medic, Recon or Engineer before entering an AI battle. Activate their abilities with **X** or the on-screen button.
+- Press **M** for the tactical map. Spend support points with **5** for recon, **6** for reinforcement at a nearby objective, or **7** for field supplies. Safe captured ground can provide forward redeployment.
+- The interface defaults to Simplified Chinese, with English available in Settings.
+- See the [operations report](docs/PORT_OPERATIONS_020.docx) for scope, controls and verification.
 
 ## Original demo
 https://realcodebear.github.io/saltline-fable-5.2/
@@ -34,6 +37,6 @@ python3 -m http.server 8731
 
 Then open http://localhost:8731 and click the page to capture the mouse and start the sound.
 
-The original renderer and mission are bundled in `index.html`. Port Conquest and the language layer load from `port-conquest.js` and `zh.js`. Fonts use Google Fonts with local fallbacks.
+The original renderer and mission are bundled in `index.html`. The AI battle rules, tactical map, class abilities and language layer load as separate local assets. Fonts use Google Fonts with local fallbacks.
 
-Run the conquest rule checks with `node --test tests/port-conquest.test.cjs`.
+Run the battle and class rule checks with `node --test tests/*.test.cjs`.
