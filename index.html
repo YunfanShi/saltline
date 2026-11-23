@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Saltline</title>
-<meta name="application-version" content="0.6.0">
+<meta name="application-version" content="0.7.0">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500&family=Barlow+Condensed:wght@400;500;600&display=swap">
@@ -6207,22 +6207,53 @@ vObjP = position; vONrm = normal; vWNrm = normalize(mat3(modelMatrix) * normal);
         <button class="port-menu-back" type="button" data-act="home"><span aria-hidden="true">←</span><span>Main menu</span></button>
         <span class="port-mode-wordmark" aria-hidden="true">SALTLINE</span>
       </header>
-      <div class="port-mode-body">
-        <div class="port-mode-lead">
-          <h2 class="m-h" id="port-multiplayer-title">Multiplayer</h2>
-          <section id="port-multiple-actions" aria-labelledby="port-battles-title">
-            <h3 id="port-battles-title">AI port battles</h3>
-            <div class="m-actions port-match-list">
-              <button class="btn primary" data-act="conquest"><strong>Port Conquest</strong><span>Capture objectives and drain enemy tickets.</span></button>
-              <button class="btn" data-act="breakthrough"><strong>Port Breakthrough</strong><span>Advance through three sectors in order.</span></button>
-            </div>
-          </section>
+      <div class="port-match-board">
+        <h2 class="m-h" id="port-multiplayer-title">Multiplayer</h2>
+        <fieldset class="port-match-grid">
+          <legend class="port-screen-reader">Choose a mode</legend>
+          <label class="port-match-choice">
+            <input type="radio" name="port-mode" value="conquest" aria-labelledby="port-tile-conquest" aria-describedby="port-tile-conquest-info" checked>
+            <span class="port-match-tile">
+              <img src="./art/port-conquest.jpg" alt="" draggable="false">
+              <span class="port-tile-copy">
+                <span class="port-tile-type">AI port battle</span>
+                <strong id="port-tile-conquest">Port Conquest</strong>
+                <span id="port-tile-conquest-info">Capture objectives and drain enemy tickets.</span>
+              </span>
+            </span>
+          </label>
+          <label class="port-match-choice">
+            <input type="radio" name="port-mode" value="breakthrough" aria-labelledby="port-tile-breakthrough" aria-describedby="port-tile-breakthrough-info">
+            <span class="port-match-tile">
+              <img src="./art/port-breakthrough.jpg" alt="" draggable="false">
+              <span class="port-tile-copy">
+                <span class="port-tile-type">AI port battle</span>
+                <strong id="port-tile-breakthrough">Port Breakthrough</strong>
+                <span id="port-tile-breakthrough-info">Advance through three sectors in order.</span>
+              </span>
+            </span>
+          </label>
+          <label class="port-match-choice">
+            <input type="radio" name="port-mode" value="lan" aria-labelledby="port-tile-lan" aria-describedby="port-tile-lan-info">
+            <span class="port-match-tile">
+              <img src="./art/port-lan.jpg" alt="" draggable="false">
+              <span class="port-tile-copy">
+                <span class="port-tile-type">Local network</span>
+                <strong id="port-tile-lan">LAN staging room</strong>
+                <span id="port-tile-lan-info">Set up a LAN room for 2–4 players.</span>
+              </span>
+            </span>
+          </label>
+        </fieldset>
+        <div class="port-match-dock">
+          <div id="port-multiple-actions">
+            <div class="m-actions"><button class="btn primary" type="button" data-act="deploy-mode">Deploy</button></div>
+          </div>
+          <div id="port-mode-lan-actions" hidden>
+            <p>Cooperative missions are still in development.</p>
+            <button class="btn primary" id="port-lan-open" type="button">Open staging room</button>
+          </div>
         </div>
-        <section class="port-lan-brief" aria-labelledby="port-lan-section-title">
-          <h3 id="port-lan-section-title">Local network</h3>
-          <p class="port-mode-description">Set up a LAN room for 2–4 players.</p>
-          <div class="m-actions"><button class="btn" id="port-lan-open">LAN staging room</button></div>
-        </section>
       </div>
     </section>
 
@@ -6295,15 +6326,17 @@ vObjP = position; vONrm = normal; vWNrm = normalize(mat3(modelMatrix) * normal);
     </div>
 
     <div class="loc-card" aria-hidden="true"><i></i><b>Saltline Terminal \xB7 Berth 4 \xB7 05:42</b><span>Port Authority Breach Unit \u2014 one breacher, no backup</span></div>
-  `,t.appendChild(s);let o=U=>s.querySelector(U),r=U=>[...s.querySelectorAll(U)],a=o(".panel"),l=o(".loc-card"),c=U=>s.querySelector(`[data-f="${U}"]`),u=o("#s-sens"),h=o("#s-vol"),f=o("#s-fov"),p="none",d=null;function v(U){if((!U||U==="sens")&&(i.input.sensitivity=n.sens),(!U||U==="invertY")&&(i.input.invertY=n.invertY),!U||U==="volume")try{i.audio&&i.audio.setVolume&&i.audio.setVolume(n.volume)}catch(T){console.error(T)}if((!U||U==="fov")&&i.player&&i.player.setFov&&i.player.setFov(n.fov),U==="quality"||!U&&n.quality!=="auto"&&!i.params.shot&&!i.params.q&&n.quality!==(i.quality&&i.quality.name)){let T=Pr[n.quality];if(T)try{i.render&&i.render.setQuality?i.render.setQuality({...T}):i.quality={...T}}catch(D){console.error("[game] setQuality failed",D)}}}function g(){let U=n.quality==="auto"?i.quality&&i.quality.name:n.quality;for(let D of r(".seg button"))D.setAttribute("aria-pressed",String(D.dataset.q===U));u.value=n.sens,h.value=Math.round(n.volume*100),f.value=n.fov,o('[data-o="sens"]').textContent=n.sens.toFixed(2)+"\xD7",o('[data-o="vol"]').textContent=Math.round(n.volume*100)+"%",o('[data-o="fov"]').textContent=Math.round(n.fov)+"\xB0";let T=o('[data-act="invert"]');T.setAttribute("aria-pressed",String(n.invertY)),T.querySelector("span").textContent=n.invertY?"On":"Off",c("qnote").textContent=n.quality==="auto"?`Quality was picked for this device (${U||"default"}). Lower it if the frame rate struggles.`:"Quality changes apply at once; shadows and reflections may take a moment to rebuild."}u.addEventListener("input",()=>{n.sens=+u.value,v("sens"),g(),Wf(n)}),h.addEventListener("input",()=>{n.volume=+h.value/100,v("volume"),g(),Wf(n)}),f.addEventListener("input",()=>{n.fov=+f.value,v("fov"),g(),Wf(n)});let x=o('[data-row="fs"]'),y=o("#fs-t"),b=()=>document.fullscreenElement||document.webkitFullscreenElement||null,m=document.getElementById("app")||document.documentElement;m&&(m.requestFullscreen||m.webkitRequestFullscreen)&&document.fullscreenEnabled!==!1&&document.webkitFullscreenEnabled!==!1||(x.hidden=!0);function _(){y.textContent="Fullscreen is not available here"}function M(){try{if(b()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}let U=(m.requestFullscreen||m.webkitRequestFullscreen).call(m);U&&U.catch&&U.catch(_)}catch{_()}}let E=()=>{y.textContent=b()?"Exit fullscreen":"Enter fullscreen"};document.addEventListener("fullscreenchange",E),document.addEventListener("webkitfullscreenchange",E);function w(U){d=document.activeElement,a.hidden=!1,s.classList.add("panel-open"),z(U||"settings");try{a.focus({preventScroll:!0})}catch{}}function S(){return a.hidden?!1:(a.hidden=!0,s.classList.remove("panel-open"),d&&d.focus&&s.contains(d)?d.focus():H(),!0)}function z(U){for(let T of r(".tab"))T.setAttribute("aria-selected",String(T.dataset.tab===U));for(let T of r(".panel-b"))T.hidden=T.dataset.pane!==U}function H(){let screen=s.querySelector(`.m-screen[data-s="${p}"]`);if(!screen)return;let U=screen.querySelector(".btn.primary:not([hidden]):not(:disabled)")||screen.querySelector("button:not([hidden]):not(:disabled)");if(U)try{U.focus({preventScroll:!0})}catch{}}s.addEventListener("click",U=>{let T=U.target.closest("button");if(!T||!s.contains(T))return;if(i.events.emit("ui:click",{}),T.dataset.q){n.quality=T.dataset.q,v("quality"),g(),Wf(n);return}if(T.dataset.tab){z(T.dataset.tab);return}let D=T.dataset.act;D==="settings"?w("settings"):D==="controls"?w("controls"):D==="close-panel"?S():D==="invert"?(n.invertY=!n.invertY,v("invertY"),g(),Wf(n)):D==="fullscreen"?M():D&&e[D]&&e[D](U)}),s.addEventListener("mouseover",U=>{let T=U.target.closest("button");T&&U.relatedTarget&&!T.contains(U.relatedTarget)&&i.events.emit("ui:hover",{})}),s.addEventListener("keydown",U=>{if(U.code==="Escape"&&!a.hidden&&(S(),U.stopPropagation(),U.preventDefault()),U.code==="Tab"&&!a.hidden){let T=[...a.querySelectorAll("button, input")].filter(G=>G.offsetParent!==null);if(!T.length)return;let D=T[0],C=T[T.length-1];U.shiftKey&&document.activeElement===D?(C.focus(),U.preventDefault()):!U.shiftKey&&document.activeElement===C&&(D.focus(),U.preventDefault())}});let O=U=>(U=Math.max(0,Math.floor(U)),String(Math.floor(U/60)).padStart(2,"0")+":"+String(U%60).padStart(2,"0")),q={root:s,settings:n,fmtTime:O,get screen(){return p},get panelOpen(){return!a.hidden},closePanel:S,show(U){U!==p&&(p=U,s.dataset.screen=U,S(),s.classList.toggle("open",U!=="none"),U!=="none"?(g(),setTimeout(H,30)):document.activeElement&&s.contains(document.activeElement)&&document.activeElement.blur())},locationCard(U){l.classList.toggle("on",!!U)},setLookMode(U){c("lookmode").textContent=U||""},setDead({time:U,relays:T,total:D}){c("dead-time").textContent=O(U),c("dead-relays").textContent=`${T}/${D}`},setDebrief({time:U,accuracy:T,kills:D,retries:C,rating:G}){c("time").textContent=O(U),c("acc").textContent=T==null?"\u2014":Math.round(T*100)+"%",c("kills").textContent=String(D),c("retries").textContent=String(C),c("rating").textContent=G},applySettings:v};return g(),q}var Yi={introSeconds:3.5,retryIntroSeconds:1.3,interactRange:2.2,interactFacing:.45,cutSeconds:2.4,patrol:{gull:2,hound:1},waves:[{gull:3,hound:1},{gull:3,hound:2},{gull:4,hound:3}],maxAlive:9,spawnStagger:.85,spawnFar:18,pursuitEvery:7,pursuitMinAlive:4,pursuitExtra:5,titleSpeed:1.15,titleFov:50},jC=["NORTH","NORTH-EAST","EAST","SOUTH-EAST","SOUTH","SOUTH-WEST","WEST","NORTH-WEST"],_l={intro:"Breacher, this is Control. The Harbormaster holds the berth. Cut its three uplinks \u2014 yard, shed, quay.",contact:"It has seen you. Gulls fly, Hounds walk. Put them down.",cut:["First relay down. It logged the last order before the blackout. That order came from shore.","Second relay down. The emergency gate was held shut even after the crew called for help."],low:"You are hit hard. Get behind steel and breathe.",done:"Breacher is aboard. The archive made it out with you."};function mM(i){let e=i.render&&i.render.post||{},t=typeof e.saturation=="number"?e.saturation:1,n=i.player,s=i.level,o=i.hud,r=i.input,a=(P,V,...Y)=>{try{if(P&&typeof P[V]=="function")return P[V](...Y)}catch(L){console.error(`[game] ${V} threw`,L)}},l=pM(i,{
+  `,t.appendChild(s);let o=U=>s.querySelector(U),r=U=>[...s.querySelectorAll(U)],a=o(".panel"),l=o(".loc-card"),c=U=>s.querySelector(`[data-f="${U}"]`),u=o("#s-sens"),h=o("#s-vol"),f=o("#s-fov"),p="none",d=null;function v(U){if((!U||U==="sens")&&(i.input.sensitivity=n.sens),(!U||U==="invertY")&&(i.input.invertY=n.invertY),!U||U==="volume")try{i.audio&&i.audio.setVolume&&i.audio.setVolume(n.volume)}catch(T){console.error(T)}if((!U||U==="fov")&&i.player&&i.player.setFov&&i.player.setFov(n.fov),U==="quality"||!U&&n.quality!=="auto"&&!i.params.shot&&!i.params.q&&n.quality!==(i.quality&&i.quality.name)){let T=Pr[n.quality];if(T)try{i.render&&i.render.setQuality?i.render.setQuality({...T}):i.quality={...T}}catch(D){console.error("[game] setQuality failed",D)}}}function g(){let U=n.quality==="auto"?i.quality&&i.quality.name:n.quality;for(let D of r(".seg button"))D.setAttribute("aria-pressed",String(D.dataset.q===U));u.value=n.sens,h.value=Math.round(n.volume*100),f.value=n.fov,o('[data-o="sens"]').textContent=n.sens.toFixed(2)+"\xD7",o('[data-o="vol"]').textContent=Math.round(n.volume*100)+"%",o('[data-o="fov"]').textContent=Math.round(n.fov)+"\xB0";let T=o('[data-act="invert"]');T.setAttribute("aria-pressed",String(n.invertY)),T.querySelector("span").textContent=n.invertY?"On":"Off",c("qnote").textContent=n.quality==="auto"?`Quality was picked for this device (${U||"default"}). Lower it if the frame rate struggles.`:"Quality changes apply at once; shadows and reflections may take a moment to rebuild."}u.addEventListener("input",()=>{n.sens=+u.value,v("sens"),g(),Wf(n)}),h.addEventListener("input",()=>{n.volume=+h.value/100,v("volume"),g(),Wf(n)}),f.addEventListener("input",()=>{n.fov=+f.value,v("fov"),g(),Wf(n)});let x=o('[data-row="fs"]'),y=o("#fs-t"),b=()=>document.fullscreenElement||document.webkitFullscreenElement||null,m=document.getElementById("app")||document.documentElement;m&&(m.requestFullscreen||m.webkitRequestFullscreen)&&document.fullscreenEnabled!==!1&&document.webkitFullscreenEnabled!==!1||(x.hidden=!0);function _(){y.textContent="Fullscreen is not available here"}function M(){try{if(b()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);return}let U=(m.requestFullscreen||m.webkitRequestFullscreen).call(m);U&&U.catch&&U.catch(_)}catch{_()}}let E=()=>{y.textContent=b()?"Exit fullscreen":"Enter fullscreen"};document.addEventListener("fullscreenchange",E),document.addEventListener("webkitfullscreenchange",E);function w(U){d=document.activeElement,a.hidden=!1,s.classList.add("panel-open"),z(U||"settings");try{a.focus({preventScroll:!0})}catch{}}function S(){return a.hidden?!1:(a.hidden=!0,s.classList.remove("panel-open"),d&&d.focus&&s.contains(d)?d.focus():H(),!0)}function z(U){for(let T of r(".tab"))T.setAttribute("aria-selected",String(T.dataset.tab===U));for(let T of r(".panel-b"))T.hidden=T.dataset.pane!==U}function H(){let screen=s.querySelector(`.m-screen[data-s="${p}"]`);if(!screen)return;let U=screen.querySelector(".port-match-choice input:checked")||screen.querySelector(".btn.primary:not([hidden]):not(:disabled)")||screen.querySelector("button:not([hidden]):not(:disabled)");if(U)try{U.focus({preventScroll:!0})}catch{}}s.addEventListener("click",U=>{let T=U.target.closest("button");if(!T||!s.contains(T))return;if(i.events.emit("ui:click",{}),T.dataset.q){n.quality=T.dataset.q,v("quality"),g(),Wf(n);return}if(T.dataset.tab){z(T.dataset.tab);return}let D=T.dataset.act;D==="settings"?w("settings"):D==="controls"?w("controls"):D==="close-panel"?S():D==="invert"?(n.invertY=!n.invertY,v("invertY"),g(),Wf(n)):D==="fullscreen"?M():D&&e[D]&&e[D](U)}),s.addEventListener("mouseover",U=>{let T=U.target.closest("button");T&&U.relatedTarget&&!T.contains(U.relatedTarget)&&i.events.emit("ui:hover",{})}),s.addEventListener("keydown",U=>{if(U.code==="Escape"&&!a.hidden&&(S(),U.stopPropagation(),U.preventDefault()),U.code==="Tab"&&!a.hidden){let T=[...a.querySelectorAll("button, input")].filter(G=>G.offsetParent!==null);if(!T.length)return;let D=T[0],C=T[T.length-1];U.shiftKey&&document.activeElement===D?(C.focus(),U.preventDefault()):!U.shiftKey&&document.activeElement===C&&(D.focus(),U.preventDefault())}});let O=U=>(U=Math.max(0,Math.floor(U)),String(Math.floor(U/60)).padStart(2,"0")+":"+String(U%60).padStart(2,"0")),q={root:s,settings:n,fmtTime:O,get screen(){return p},get panelOpen(){return!a.hidden},closePanel:S,show(U){U!==p&&(p=U,s.dataset.screen=U,S(),s.classList.toggle("open",U!=="none"),U!=="none"?(g(),setTimeout(H,30)):document.activeElement&&s.contains(document.activeElement)&&document.activeElement.blur())},locationCard(U){l.classList.toggle("on",!!U)},setLookMode(U){c("lookmode").textContent=U||""},setDead({time:U,relays:T,total:D}){c("dead-time").textContent=O(U),c("dead-relays").textContent=`${T}/${D}`},setDebrief({time:U,accuracy:T,kills:D,retries:C,rating:G}){c("time").textContent=O(U),c("acc").textContent=T==null?"\u2014":Math.round(T*100)+"%",c("kills").textContent=String(D),c("retries").textContent=String(C),c("rating").textContent=G},applySettings:v};return g(),q}var Yi={introSeconds:3.5,retryIntroSeconds:1.3,interactRange:2.2,interactFacing:.45,cutSeconds:2.4,patrol:{gull:2,hound:1},waves:[{gull:3,hound:1},{gull:3,hound:2},{gull:4,hound:3}],maxAlive:9,spawnStagger:.85,spawnFar:18,pursuitEvery:7,pursuitMinAlive:4,pursuitExtra:5,titleSpeed:1.15,titleFov:50},jC=["NORTH","NORTH-EAST","EAST","SOUTH-EAST","SOUTH","SOUTH-WEST","WEST","NORTH-WEST"],_l={intro:"Breacher, this is Control. The Harbormaster holds the berth. Cut its three uplinks \u2014 yard, shed, quay.",contact:"It has seen you. Gulls fly, Hounds walk. Put them down.",cut:["First relay down. It logged the last order before the blackout. That order came from shore.","Second relay down. The emergency gate was held shut even after the crew called for help."],low:"You are hit hard. Get behind steel and breathe.",done:"Breacher is aboard. The archive made it out with you."};function mM(i){let e=i.render&&i.render.post||{},t=typeof e.saturation=="number"?e.saturation:1,n=i.player,s=i.level,o=i.hud,r=i.input,a=(P,V,...Y)=>{try{if(P&&typeof P[V]=="function")return P[V](...Y)}catch(L){console.error(`[game] ${V} threw`,L)}},l=pM(i,{
  campaign(){renderCampaignMenu();l.show("campaign")},
  multiple(){if(railChapter)openMenu("multiplayer");else l.show("multiplayer")},
  home(){l.show("title")},
  "continue-campaign"(){if(i.campaignSave.next)beginChapter(i.campaignSave.next)},
  "replay-berth"(){beginChapter("berth")},
  "replay-rail"(){beginChapter("rail")},
- conquest(){startOperation("conquest")},
- breakthrough(){startOperation("breakthrough")},
+ "deploy-mode"(){
+  const selected=modePicker.querySelector("input:checked").value;
+  if(selected==="conquest"||selected==="breakthrough")startOperation(selected);
+ },
  retitle(){openMenu(mode==="mission"?"campaign":"multiplayer")},
  resume(){j(!0)},restart(){if(mode==="mission")i.campaignSave.clearCheckpoint(currentChapter);a(i.audio,"resume"),r.requestLock(),c.retries++,U({quick:!0,keepRetries:!0,skipIntro:mode!=="mission"})},retry(){a(i.audio,"resume"),r.requestLock(),c.retries++,U({quick:!0,keepRetries:!0,skipIntro:mode!=="mission"})},redeploy(){a(i.audio,"resume"),r.requestLock(),U({quick:!0,skipIntro:mode!=="mission"})}});l.applySettings();let mode=s.chapter!=="rail"&&["conquest","breakthrough"].includes(i.params.mode)?i.params.mode:"mission",conquest=null,conquestLabel="";let c={time:0,retries:0,relays:[],cut:0,allCut:!1,queue:[],waveHot:0,alertT:0,pursuitT:0,pursuitLeft:0,contactSaid:!1,lowSaid:!1,extractHint:0,intensity:.15,used:new Map},u=0,h=Yi.introSeconds,f=!1,p=!1,d=0,v=0,g=!1,x="",y=.8,b=new W,m=new W,A=()=>s&&s.objectives||[],_={state:"title",flow:Yi,run:c,menus:l,get conquest(){return conquest},get campaign(){return campaign},start(P={}){U({skipIntro:!!P.skipIntro,quick:!!P.quick})},pause(){G()},resume(){j(!1)},update:B,debugCut(){let P=c.relays.find(V=>!V.cut);P&&me(P)}};function suspendBattleInput(){
   g=false;
@@ -6321,6 +6354,17 @@ const operations=window.createPortOperations({
   world:i,onSupport:callSupport,onOpen:suspendBattleInput,onClose:resumeBattleInput
 });
 let battleSettings=operations.battleSettings();
+const modePicker=l.root.querySelector(".port-match-grid");
+const battleActions=l.root.querySelector("#port-multiple-actions");
+const lanActions=l.root.querySelector("#port-mode-lan-actions");
+function updateModePicker(){
+ const forLAN=modePicker.querySelector("input:checked").value==="lan";
+ battleActions.hidden=forLAN;
+ lanActions.hidden=!forLAN;
+}
+if(i.params.room)modePicker.querySelector('[value="lan"]').checked=true;
+modePicker.addEventListener("change",updateModePicker);
+updateModePicker();
 const difficultyProfiles={
   easy:{gulls:-1,hounds:0,cap:6,stagger:1.3},
   normal:{gulls:0,hounds:0,cap:Yi.maxAlive,stagger:Yi.spawnStagger},

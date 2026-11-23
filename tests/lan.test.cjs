@@ -50,8 +50,9 @@ test('LAN serves Saltline assets without exposing repository or server files', a
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, /<title>Saltline<\/title>/);
-  const assets = [...html.matchAll(/<(script|link)\b[^>]*?\b(?:src|href)="([^"]+)"/g)].map(([, tag, src]) => ({
-    expectedType: tag === 'script' ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8',
+  const assetTypes = { script: 'text/javascript; charset=utf-8', link: 'text/css; charset=utf-8', img: 'image/jpeg' };
+  const assets = [...html.matchAll(/<(script|link|img)\b[^>]*?\b(?:src|href)="([^"]+)"/g)].map(([, tag, src]) => ({
+    expectedType: assetTypes[tag],
     url: new URL(src, page.url),
   })).filter(asset => asset.url.origin === origin);
   assert.ok(assets.length > 0);

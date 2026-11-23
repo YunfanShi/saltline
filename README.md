@@ -4,10 +4,10 @@ A small browser first-person shooter set in a rainy industrial port. Cut three u
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.6.0
+## Saltline fork 0.7.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
-- **Multiplayer** opens a separate page for local AI battles and LAN staging. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure three sectors in order. The LAN staging room is available when launched with the local server.
+- **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure three sectors in order. The LAN staging room is available when launched with the local server.
 - Set enemy pressure, starting tickets and the time limit before deploying. These settings apply only to port battles.
 - Choose Support, Medic, Recon or Engineer before entering an AI battle. Activate their abilities with **X** or the on-screen button.
 - Press **M** for the tactical map. Spend support points with **5** for recon, **6** for reinforcement at a nearby objective, or **7** for field supplies. Safe captured ground can provide forward redeployment.

@@ -19,11 +19,13 @@ const ASSETS = new Set([
   'port-loadout.js', 'port-loadout.css',
   'port-operations.js', 'port-operations.css',
   'developer-menu.js', 'developer-menu.css',
+  'art/port-conquest.jpg', 'art/port-breakthrough.jpg', 'art/port-lan.jpg',
 ]);
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
+  '.jpg': 'image/jpeg',
 };
 
 class RequestError extends Error {

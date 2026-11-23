@@ -130,38 +130,131 @@
 }
 .campaign-chapters [data-progress="next"] .campaign-chapter-control { color: var(--signal); }
 
-#port-battles-title { margin: 1.2rem 0 .5rem; }
-.port-match-list { display: grid; gap: 1px; }
-.port-match-list .btn {
-  display: grid;
-  gap: .35rem;
-  justify-items: start;
+.port-match-board {
   width: 100%;
-  padding: .87rem 1rem;
-  text-align: left;
-  background: #0b1014d9;
+  max-width: 1280px;
+  margin: auto;
+  padding: clamp(26px, 5vh, 58px) 0 1rem;
+}
+.port-match-board .m-h {
+  margin: 0 0 clamp(16px, 3vh, 28px) !important;
+  font-size: clamp(42px, 6vw, 88px) !important;
+  line-height: .92 !important;
+  letter-spacing: .055em;
+  text-shadow: 0 4px 20px #000a;
+}
+.port-match-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.36fr) repeat(2, minmax(0, 1fr));
+  gap: clamp(8px, 1.2vw, 16px);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   border: 0;
-  border-left: 3px solid var(--bone-faint);
-  color: var(--bone);
 }
-.port-match-list .btn.primary {
-  padding: .87rem 1rem;
-  background: #151d22ee;
-  color: var(--bone);
+.port-screen-reader,
+.port-match-choice input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.port-match-choice { position: relative; min-width: 0; cursor: pointer; }
+.port-match-tile {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: end;
+  min-height: clamp(190px, 34vh, 350px);
+  overflow: hidden;
+  padding: clamp(.8rem, 1.75vw, 1.5rem);
+  border: 1px solid #9eacb15c;
+  background: #19242b;
+  box-shadow: 0 12px 28px #0005;
+  transition: border-color .16s, box-shadow .16s;
+}
+.port-match-tile img,
+.port-match-tile::after {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.port-match-tile img {
+  z-index: -2;
+  object-fit: cover;
+  object-position: center 51%;
+  filter: brightness(.78) saturate(.83);
+  transition: filter .18s;
+}
+.port-match-tile::after {
+  z-index: -1;
+  content: "";
+  background: linear-gradient(0deg, #05080bf7 2%, #05080ba8 36%, #05080b15 77%);
+}
+.port-match-choice:hover img,
+.port-match-choice input:checked + .port-match-tile img { filter: brightness(1) saturate(.96); }
+.port-match-choice:hover .port-match-tile { border-color: #cbd2d6; }
+.port-match-choice input:checked + .port-match-tile {
   border-color: var(--signal);
-  letter-spacing: .22em;
+  box-shadow: inset 0 -3px var(--signal), 0 12px 28px #0006;
 }
-.port-match-list .btn:hover,
-.port-match-list .btn.primary:hover { background: #212e35; border-left-color: var(--signal); }
-.port-match-list .btn strong { font: 750 1.03rem/1.2 system-ui, sans-serif; }
-.port-match-list .btn span {
-  font: 400 .8rem/1.4 system-ui, sans-serif;
-  color: var(--bone-dim);
-  letter-spacing: 0;
-  text-transform: none;
+.port-match-choice input:focus-visible + .port-match-tile { outline: 2px solid var(--bone); outline-offset: 3px; }
+.port-tile-copy {
+  display: grid;
+  gap: .33rem;
+  text-shadow: 0 2px 10px #000d;
 }
-.port-lan-brief { padding: 1.05rem; background: #080b0eab; border-top: 1px solid var(--line); }
-.port-lan-brief h3 { margin-bottom: .25rem; }
+.port-tile-copy strong {
+  font: 800 clamp(23px, 3vw, 44px)/1.02 var(--f-display);
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+.port-tile-copy span { color: #e0e3e2; font: 500 13px/1.3 system-ui, sans-serif; }
+.port-tile-copy .port-tile-type {
+  color: #b9c4c7;
+  font: 600 11px/1.2 var(--f-label);
+  letter-spacing: .17em;
+  text-transform: uppercase;
+}
+
+.port-match-dock {
+  margin-top: clamp(12px, 2vh, 22px);
+  padding: .85rem clamp(.8rem, 1.7vw, 1.5rem);
+  border-top: 1px solid #9eacb15c;
+  background: #080d11eb;
+}
+#port-multiple-actions,
+#port-mode-lan-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .65rem clamp(18px, 3vw, 42px);
+}
+#port-multiple-actions[hidden],
+#port-mode-lan-actions[hidden] { display: none; }
+.port-match-dock .m-actions { margin: 0 0 0 auto; }
+.port-match-dock .port-battle-settings,
+.port-match-dock .port-loadout-picker { margin: 0; }
+.port-match-dock .port-loadout-picker { flex: 1; min-width: 180px; }
+.port-match-dock .port-loadout-picker select { min-height: 30px; }
+#port-mode-lan-actions p { flex: 1; color: var(--bone-dim); font: 14px/1.45 system-ui, sans-serif; }
+
+@media (max-width: 590px) {
+  .port-match-board { padding-top: 1rem; }
+  .port-match-grid { grid-template-columns: 1fr; }
+  .port-match-tile { min-height: 112px; padding: .65rem .8rem; }
+  .port-match-tile::after { background: linear-gradient(90deg, #05080bed, #05080b67 63%, #05080b15); }
+  .port-tile-copy { gap: .25rem; }
+  .port-tile-copy strong { font-size: 28px; }
+  .port-match-dock .m-actions { width: 100%; }
+  .port-match-dock button { width: 100%; }
+}
+
 .port-mode-page [hidden],
 #campaign-next[hidden] { display: none; }
 
