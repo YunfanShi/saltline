@@ -200,3 +200,69 @@ test('checkpoint saves survive reload, only advance, and clear on restart or cha
   assert.equal(reopened.checkpoint('berth'), null);
   assert.equal(reopened.checkpoint('rail'), null);
 });
+
+test('cinematic playback advances to the exact end and resolves one time', () => {
+  const director = browser.window.createPortCinematicDirector();
+  const frames = [];
+  const finishes = [];
+  const sequence = {
+    id: 'transport', duration: 12.5,
+    onFrame: (time, dt) => frames.push([time, dt]),
+    onFinish: reason => finishes.push(reason),
+  };
+  assert.equal(director.play(sequence), true);
+  assert.equal(director.play(sequence), false);
+  assert.equal(director.id, 'transport');
+  assert.equal(director.active, true);
+  director.update(-1);
+  director.update(4);
+  director.update(20);
+  assert.deepEqual(frames, [[0, 0], [4, 4], [12.5, 8.5]]);
+  assert.deepEqual(finishes, ['complete']);
+  assert.equal(director.active, false);
+  assert.equal(director.skip(), false);
+  assert.equal(director.cancel(), false);
+});
+
+test('skipping and cancelling release the director and never re-run the finished sequence', () => {
+  const director = browser.window.createPortCinematicDirector();
+  const frames = [];
+  const finishes = [];
+  const sequence = {
+    id: 'transport', duration: 12,
+    onFrame: time => frames.push(time),
+    onFinish: reason => finishes.push(reason),
+  };
+  director.play(sequence);
+  director.update(2);
+  assert.equal(director.skip(), true);
+  director.update(20);
+  director.play(sequence);
+  assert.equal(director.cancel(), true);
+  director.update(20);
+  assert.deepEqual(frames, [0, 2, 0]);
+  assert.deepEqual(finishes, ['skip', 'cancel']);
+});
+
+test('the rail mission waits for the crash and routes through the diversion before allowing gate power', () => {
+  const diversion = at(-30);
+  const mission = start({ mission: 'rail', diversion });
+  assert.equal(mission.transportCrashed(), false);
+  mission.update(2, player(archive), true);
+  assert.equal(mission.phase, 'lookout');
+  mission.update(6, player(beacon), true);
+  assert.equal(mission.phase, 'lookout');
+  assert.equal(mission.transportCrashed(), true);
+  assert.equal(mission.transportCrashed(), false);
+  assert.equal(mission.phase, 'detour');
+  mission.update(3, player(beacon), true);
+  mission.update(1, player(at(-30, 3)), false);
+  assert.equal(mission.phase, 'detour');
+  mission.update(1, player(diversion), false);
+  assert.equal(mission.phase, 'beacon');
+  mission.update(3, player(beacon), true);
+  assert.equal(mission.phase, 'extract');
+  for (const phase of ['lookout', 'detour', 'beacon', 'extract']) {
+    assert.equal(start({ mission: 'rail', diversion, initialPhase: phase }).phase, phase);
+  }
+});

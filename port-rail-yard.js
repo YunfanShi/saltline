@@ -85,20 +85,19 @@
           col(postX - .13, .68, postZ - .13, postX + .13, roof, postZ + .13, 'metal');
           box('hazard_stripes', .3, .42, .3, postX, .9, postZ);
         }
-        ibeam('steel_galv', 'z', z1 - z0 + .6, postX, roof - .22, z);
+        ibeam('steel_galv', 'z', z1 - z0 + .6, postX, roof - .175, z, { depth: .24, width: .16 });
       }
       for (const beamZ of [z0, z, z1]) {
-        ibeam('steel_galv', 'x', x1 - x0 + .8, x, roof - .19, beamZ);
+        ibeam('steel_galv', 'x', x1 - x0 + .8, x, roof - .175, beamZ, { depth: .24, width: .16 });
       }
       box('corrugated_roof', x1 - x0 + 1.1, .11, z1 - z0 + 1.15, x, roof, z);
       box('steel_dark', x1 - x0 + 1.1, .36, .095, x, roof - .1, z0 - .55);
-      const sign = label(title, .24, x, roof - .085, z0 - .602,
+      label(title, .24, x, roof - .085, z0 - .602, 'z-',
         { color: 'white', font: 'stencil', distress: .18 });
-      if (sign) sign.rotation.y = Math.PI;
       col(x0 - .55, roof - .07, z0 - .58, x1 + .55, roof + .07, z1 + .58, 'metal', { noNav: true });
       for (const lightX of [x0 + 1.35, x1 - 1.35]) {
-        box('steel_dark', .8, .12, .22, lightX, roof - .36, z);
-        box(builder.G.mats.emissive(0xffe7bd, 2.1), .68, .025, .14, lightX, roof - .437, z);
+        box('steel_dark', .8, .12, .22, lightX, roof - .355, z);
+        box(builder.G.mats.emissive(0xffe7bd, 2.1), .68, .025, .14, lightX, roof - .4275, z);
       }
     }
 
@@ -134,7 +133,7 @@
     fence(-37.6, -27.5, 28.5, -27.5);
     fence(-37.6, 27.5, 23.15, 27.5);
     fence(26.85, 27.5, 28.5, 27.5);
-    for (const [start, end] of [[-27.5, -19], [-13, 2], [8, 16], [23, 27.5]]) {
+    for (const [start, end] of [[-27.5, 2], [8, 16], [23, 27.5]]) {
       fence(-37.6, start, -37.6, end);
     }
     fence(28.5, -27.5, 28.5, 27.5);
@@ -144,9 +143,8 @@
       solid('steel_dark', x - .12, 0, 27.38, x + .12, 3.04, 27.62);
     }
     box('steel_dark', 3.72, .39, .15, 25, 2.83, 27.5);
-    const exitSign = label('SERVICE GATE', .24, 25, 2.83, 27.419,
+    label('SERVICE GATE', .24, 25, 2.83, 27.419, 'z-',
       { color: 'white', font: 'stencil', distress: .16 });
-    if (exitSign) exitSign.rotation.y = Math.PI;
     box(builder.G.mats.emissive(0xffe7bd, 2.1), .34, .12, .09, 25, 2.49, 27.377);
 
     for (const z of [-22, -17.4]) track(z);
@@ -176,7 +174,13 @@
     }
     decal('arrow', 2.6, -23.9, .023, 2.4, 'y+', 0);
     decal('arrow', 2.6, 1.5, .023, 2.4, 'y+', 0);
-    for (const z of [-16, 5, 19.5]) decal('arrow', 2.1, -34, .023, z, 'y+', 0);
+    decal('arrow', 2.1, -34, .023, 5, 'y+');
+    // The service entry leads to the examination bay along a separate marked lane.
+    for (const z of [17.05, 21.95]) {
+      for (let x = -36.2; x <= -24.4; x += 2.3) box('paint_yellow', 1.25, .01, .1, x, .026, z);
+    }
+    decal('arrow', 2.1, -34, .023, 19.5, 'y+');
+    prop('sign_post', -36.15, 16.4, halfTurn, { sign: 'hazard_general', text: 'EXAMINATION / SERVICE' });
     for (const x of [-28, 11]) {
       for (let z = -15.25; z < -3.5; z += 2) box('paint_white', .11, .008, .95, x, .022, z);
     }

@@ -43,14 +43,14 @@
         }
       }
       for (const beamZ of [z0, z, z1]) {
-        ibeam('steel_galv', 'x', width + .4, x, roof - .14, beamZ);
+        ibeam('steel_galv', 'x', width + .4, x, roof - .13, beamZ, { depth: .26, width: .16 });
       }
       solid('corrugated_roof', x0 - .46, roof, z0 - .46, x1 + .46, roof + .09, z1 + .46,
         'metal', { noNav: true });
       box('steel_dark', width + .92, .36, .09, x, roof - .03, z1 + .46);
-      label(title, .22, x, roof - .018, z1 + .506, { color: 'white', font: 'stencil', distress: .16 });
-      box('steel_dark', .78, .1, .21, x, roof - .29, z);
-      box(builder.G.mats.emissive(0xffe7bd, 2), .66, .024, .15, x, roof - .351, z);
+      label(title, .22, x, roof - .018, z1 + .506, 'z+', { color: 'white', font: 'stencil', distress: .16 });
+      box('steel_dark', .78, .1, .21, x, roof - .31, z);
+      box(builder.G.mats.emissive(0xffe7bd, 2), .66, .024, .15, x, roof - .372, z);
       slab('concrete', x0 - .25, -.12, z0 - .25, x1 + .25, .022, z1 + .25);
       return { min: vector(x0, 0, z0), max: vector(x1, roof, z1) };
     }
@@ -65,17 +65,20 @@
       box('paint_red', .015, .19, 1.9, x - .149, .96, z);
     }
 
-    function siding(z) {
-      slab('concrete_dirty', -106.3, -.06, z - 1.45, -42.3, .012, z + 1.45);
-      for (let x = -105.85; x < -42.65; x += .7) {
+    function siding(z, end) {
+      const start = -106.3;
+      const center = (start + end) / 2;
+      const length = end - start - .5;
+      slab('concrete_dirty', start, -.06, z - 1.45, end, .012, z + 1.45);
+      for (let x = start + .45; x < end - .35; x += .7) {
         box('wood_dark', .22, .085, 2.48, x, .047, z);
       }
       for (const side of [-1, 1]) {
         const railZ = z + side * .75;
-        ibeam('steel_rust', 'x', 63.5, -74.35, .1, railZ, { depth: .13, width: .13, tf: .022, tw: .047 });
-        box('steel_dark', 63.5, .022, .075, -74.35, .174, railZ);
+        ibeam('steel_rust', 'x', length, center, .1, railZ, { depth: .13, width: .13, tf: .022, tw: .047 });
+        box('steel_dark', length, .022, .075, center, .174, railZ);
       }
-      bufferStop(-43.45, z);
+      bufferStop(end - 1.15, z);
     }
 
     function inspectionCar(x, z) {
@@ -117,10 +120,10 @@
     fence(-106.7, north, seamX, north);
     fence(-106.7, south, seamX, south);
     fence(-106.7, north, -106.7, south);
-    roadLane(5);
-    roadLane(-16, -54.4);
+    roadLane(5, rail ? -62 : undefined);
+    if (!rail) roadLane(-16, -54.4);
     roadLane(19.5, -43.7);
-    for (const [x, z] of [[-102, 2], [-88, 8.5], [-67, 1.6], [-47, 9.1]]) prop('light_mast', x, z);
+    for (const [x, z] of [[-102, 2], [-88, rail ? 12.3 : 8.5], [-67, 1.6], [-47, 9.1]]) prop('light_mast', x, z);
     for (const [x, z] of [[-101, 7.8], [-85, 7.8], [-64, 2.15], [-48, 1.85]]) prop('jersey_barrier', x, z);
     for (const [x, z] of [[-40.5, 2.25], [-40.5, 7.75], [-45.5, 2.25], [-45.5, 7.75]]) prop('bollard_post', x, z);
 
@@ -138,7 +141,35 @@
     });
 
     if (rail) {
-      siding(-24.25);
+      const apron = { x: -77, north: -7.35, south: 7.55 };
+      const service = { north: 8.15, south: 12.6, center: 10.3 };
+      fence(apron.x, north, apron.x, apron.north);
+      fence(apron.x, apron.south, apron.x, service.north);
+      fence(apron.x, service.south, apron.x, south);
+
+      // Runway edges and the independently routed service road through the customs boundary.
+      slab('asphalt', -101, -.045, apron.north + .25, -66, .014, apron.south - .25);
+      for (let x = -100; x < -66; x += 4) {
+        box('paint_white', 2.2, .008, .13, x, .024, .6);
+      }
+      for (const x of [-89, -84, -81, -72, -68]) {
+        for (const z of [apron.north + .48, apron.south - .48]) {
+          box('paint_yellow', 1.85, .01, .12, x, .025, z);
+        }
+      }
+      for (let x = -89; x < -62; x += 2.75) {
+        for (const z of [service.north + .4, service.south - .4]) {
+          box('paint_white', 1.65, .008, .105, x, .025, z);
+        }
+      }
+      for (const [z, title] of [[apron.north, 'AIR PICKUP'], [service.south, 'SERVICE ROAD']]) {
+        for (const x of [apron.x - .05, apron.x + .05]) {
+          label(title, .21, x, 1.7, z + (z === apron.north ? -1.7 : 1.7),
+            x < apron.x ? 'x-' : 'x+', { color: 'white', font: 'stencil', distress: .14 });
+        }
+        box('steel_dark', .09, .41, 2.5, apron.x, 1.7, z + (z === apron.north ? -1.7 : 1.7));
+      }
+      siding(-24.25, -78.6);
       inspectionCar(-87, -24.25);
       const manifest = canopy(-94, 15.5, 12, 7.5, 'RAIL CUSTOMS / MANIFESTS');
       const power = canopy(-57, -16, 8, 6, 'GATE POWER');
@@ -151,7 +182,7 @@
       prop('forklift', -87, 18.5, -.2, { forksUp: .16 });
       prop('forklift', -74.3, -13.5, Math.PI, { forksUp: .1 });
       prop('pipe_stack', -72, 20.3, -.01);
-      prop('tarp_cargo', -66.4, 15.5, .2);
+      prop('tarp_cargo', -65.3, 16.1, .2);
       prop('tarp_cargo', -82, -17, .08);
       prop('crate_stack', -99, -11);
       prop('pallet_stack', -85.75, 14.35);
@@ -159,13 +190,13 @@
       prop('barrel', -70.9, 19.2, .2, { color: 'blue' });
       for (const [x, z, color] of [
         [-95, -8, 'white'], [-83, -8.1, 'grey'], [-68.5, -6.5, 'green'],
-        [-68, 11.1, 'blue'], [-55.3, 11.1, 'orange'], [-47.5, 16.75, 'grey'],
+        [-70.1, 14, 'blue'], [-55.3, 11.1, 'orange'], [-47.5, 16.75, 'grey'],
       ]) stack(x, z, [[20, color]], 0, .1);
       for (const x of [-101, -97, -93, -89, -85]) box('paint_yellow', .1, .012, 3.8, x, .029, -17.3);
       for (const [x, z] of [[-101.5, 16.05], [-89, 20.1], [-80.3, -11.5], [-51.4, -12.85]]) {
         prop('jersey_barrier', x, z);
       }
-      return base([-94, 0, 14], [-57, 0, -16], [
+      const layout = base([-94, 0, 14], [-57, 0, -16], [
         ['ammo', -91, 16.9], ['health', -59, -15.15],
       ], [manifest, power], [
         ['yard', -91, -17], ['yard', -80, -12.4], ['yard', -61, -14.1], ['yard', -50, -9.3],
@@ -175,6 +206,22 @@
         [-80.4, -12.3], [-69.8, -7.9], [-65.1, 15.45], [-58.9, -17.35],
         [-52.8, -15.4], [-51, -12.1], [-46.25, 16.25],
       ]);
+      const bounds = (x0, y0, z0, x1, y1, z1) => ({ min: vector(x0, y0, z0), max: vector(x1, y1, z1) });
+      return {
+        ...layout,
+        pickup: {
+          impact: vector(apron.x, .94, .6),
+          approach: { west: vector(-85, 0, .6), east: vector(-69, 0, .6) },
+          diversion: { west: vector(-85, 0, service.center), east: vector(-69, 0, service.center) },
+          closure: { ...bounds(-77.8, 0, apron.north, -76.2, 2.5, apron.south), playerOnly: true },
+          debris: [
+            bounds(-79.8, 0, -.72, -73.04, 2.05, 1.91),
+            bounds(-83.56, .06, -1.74, -80.35, 3.17, 2.27),
+            bounds(-80.94, .06, -6.73, -76.63, 2.48, -.73),
+            bounds(-77.83, .06, 1.15, -74.43, 2.64, 7.1),
+          ],
+        },
+      };
     }
 
     const dispatch = canopy(-88.5, -11.7, 11.3, 7.6, 'BERTH DISPATCH / CARGO RELEASE');

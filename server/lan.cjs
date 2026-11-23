@@ -14,7 +14,7 @@ const MAX_BODY_BYTES = 2048;
 const ROOT = path.resolve(__dirname, '..');
 const ASSETS = new Set([
   'index.html', 'zh.js',
-  'port-campaign.js', 'port-conquest.js', 'port-rail-yard.js', 'port-expansion.js', 'port-campaign-events.js',
+  'port-campaign.js', 'port-commander.js', 'port-conquest.js', 'port-rail-yard.js', 'port-expansion.js', 'port-campaign-events.js',
   'port-lan.js',
   'port-loadout.js', 'port-loadout.css',
   'port-operations.js', 'port-operations.css',
