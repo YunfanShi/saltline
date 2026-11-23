@@ -14,12 +14,12 @@ const scope = vm.createContext({
   window: {}, performance, AbortController,
   console: { ...console, error: (...message) => diagnostics.push(message.join(' ')) },
 });
-vm.runInContext(html.slice(engineStart, bootStart) + '\nwindow.engine = { d3, il, lt, ob, Yg };', scope);
+vm.runInContext(html.slice(engineStart, bootStart) + '\nwindow.engine = { d3, il, lt, ob, pv, Eb, Yg };', scope);
 for (const source of ['../port-expansion.js', '../port-rail-yard.js']) {
   vm.runInContext(readFileSync(require.resolve(source), 'utf8'), scope);
 }
 
-test('the Rail wreck closes the pickup apron and preserves the marked service road', () => {
+function buildRail() {
   const { d3, il, lt, ob, Yg } = scope.window.engine;
   const materials = new Map();
   function material(name) {
@@ -36,10 +36,15 @@ test('the Rail wreck closes the pickup apron and preserves the marked service ro
   world.props = Yg(world);
   const builder = ob(world);
   const yard = scope.window.createRailYardLayout(builder, vector);
-  const { pickup, campaignPoints, supplies } = scope.window.createPortExpansion(builder, vector, { rail: true });
+  const expansion = scope.window.createPortExpansion(builder, vector, { rail: true });
   assert.deepEqual(diagnostics, [], 'All modeled props use their authored geometry and collision');
   physics.build();
+  return { physics, vector, yard, expansion };
+}
 
+test('the Rail wreck closes the pickup apron and preserves the marked service road', () => {
+  const { physics, vector, yard, expansion } = buildRail();
+  const { pickup, campaignPoints, supplies } = expansion;
   assert.equal(physics.nav.clearLine(vector(-39, 0, -16), vector(-36, 0, -16)), false);
   for (const z of [5, 19.5]) {
     assert.equal(physics.nav.clearLine(vector(-39, 0, z), vector(-36, 0, z)), true);
@@ -64,4 +69,55 @@ test('the Rail wreck closes the pickup apron and preserves the marked service ro
 
   for (const collider of wreck) physics.removeBox(collider);
   assert.equal(physics.nav.clearLine(pickup.approach.west, pickup.approach.east), true);
+});
+
+test('the night-shift office has a walk-in entrance and solid glazing', () => {
+  const { physics, vector, yard, expansion } = buildRail();
+  const { exploration } = expansion;
+  const walkSouth = x => {
+    const position = vector(x, 0, 19.5);
+    for (let step = 0; step < 30; step++) {
+      physics.moveCapsule(position, vector(0, 0, 2.2), 1 / 30);
+    }
+    return position;
+  };
+
+  assert.ok(walkSouth(-103.5).z > 21.6, 'The capsule walks through the open door');
+  assert.ok(walkSouth(-100.65).z < 20, 'The capsule cannot pass through the office front');
+  const glass = physics.raycast(vector(-100.65, 1.6, 19.5), vector(0, 0, 1), 5);
+  assert.equal(glass?.surface, 'glass', 'An eye-level ray contacts the visible window');
+  assert.equal(physics.lineOfSight(vector(-100.65, 1.6, 19.5), exploration.soundPos), false);
+  assert.equal(physics.lineOfSight(vector(-101.25, 1.6, 23.2), exploration.soundPos), true);
+  assert.equal(physics.nav.isWalkable(exploration.pos.x, exploration.pos.z), true);
+  assert.ok(physics.nav.findPath(yard.playerStart.pos, exploration.pos), 'The player can reach the records');
+});
+
+test('legacy skyline props stay beyond the playable annex perimeter in both chapters', async () => {
+  const { lt, pv, Eb } = scope.window.engine;
+  const material = new lt.MeshStandardMaterial({ side: lt.DoubleSide, vertexColors: true });
+  const mark = () => ({ material, aspect: 2 });
+  const buildBackdrop = chapter => ({
+    level: { chapter }, scene: new lt.Scene(),
+    mats: { get: () => material, emissive: () => material, label: mark, decal: mark },
+  });
+  const probes = [
+    [-61.2, -2.5, -1, 27.5],  // North container rows.
+    [-90.5, 12, 1, 15.5],   // South container rows.
+    [-110.5, -21.8, 1, 49], // West crane leg.
+    [-67.5, -21.2, -1, 6],  // North light mast.
+    [-84, 23, 1, 4.5],      // South light mast.
+  ];
+  function hits(skyline) {
+    skyline.updateMatrixWorld(true);
+    return probes.map(([x, z, direction, distance]) =>
+      new lt.Raycaster(new lt.Vector3(x, 1.65, z), new lt.Vector3(0, 0, direction), 0, distance)
+        .intersectObject(skyline, true).length > 0);
+  }
+
+  const legacy = Eb(buildBackdrop('rail'), { only: 'sky' });
+  assert.deepEqual(hits(legacy.skyline), [true, true, true, true, true], 'The probes strike old skyline triangles');
+  for (const chapter of ['berth', 'rail']) {
+    const gameplay = await pv(buildBackdrop(chapter));
+    assert.deepEqual(hits(gameplay.skyline), [false, false, false, false, false], chapter);
+  }
 });

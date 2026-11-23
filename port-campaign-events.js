@@ -12,7 +12,7 @@
   window.createCampaignCrash = (world) => {
     const { THREE, scene, fx, events } = world;
     const { BoxGeometry, BufferGeometry, CubicBezierCurve3, CylinderGeometry,
-      DoubleSide, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
+      DataTexture, DoubleSide, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
       RingGeometry, Vector3 } = THREE;
     const point = (x, y, z) => new Vector3(x, y, z);
     const viewingSpot = point(-94, 0, 9.5);
@@ -50,6 +50,102 @@
     let nextTrail = 0;
     let elapsed = 0;
     let emitters = [];
+    const finishesByPart = new Map();
+
+    // The UVs follow the skin around each cross-section, then along the airframe or span.
+    // Paint, the tiny joint relief, and the change in gloss therefore stay registered.
+    function airframeFinish(kind) {
+      const width = kind === 'fuselage' ? 512 : 256;
+      const height = width;
+      const color = new Uint8Array(width * height * 4);
+      const surface = new Uint8Array(color.length);
+      const intervals = kind === 'fuselage'
+        ? [[.17, .0, 1], [.29, .27, .73], [.39, .02, .98], [.55, .19, .81], [.72, 0, 1], [.93, 0, 1]]
+        : kind === 'wing'
+          ? [[.246, .055, .94], [.52, .12, .87], [.738, .10, .91], [.865, .2, .80]]
+          : [[.21, .032, .967], [.39, 0, 1], [.71, .04, .96], [.875, 0, 1]];
+      const serial = [
+        '111 100 000 111 111', '100 100 000 001 001', '111 100 111 111 010',
+        '001 100 000 100 010', '111 111 000 111 100',
+      ].map(row => row.replaceAll(' ', '0'));
+      let seed = 1142;
+      for (let y = 0; y < height; y++) {
+        const v = (y + .5) / height;
+        const joint = intervals.find(([station]) => Math.abs(v - station) < .005);
+        for (let x = 0; x < width; x++) {
+          const u = (x + .5) / width;
+          const side = Math.sin(u * DISC_ROTATION);
+          const sideUV = u < .25 || u > .75 ? u > .75 ? u - 1 : u : .5 - u;
+          const camber = Math.min(u, 1 - u);
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          const grain = (seed >>> 24) / 255 - .5;
+          const crossSeam = joint && u >= joint[1] && u < joint[2] ? Math.abs(v - joint[0]) : 1;
+          const alongSeam = kind === 'fuselage' ? Math.min(Math.abs(u - .185), Math.abs(u - .315),
+            Math.abs(u - .618), Math.abs(u - .882)) : kind === 'wing' ? Math.min(
+            Math.abs(camber - .105), v > .28 && v < .949 ? Math.abs(camber - .347) : 1)
+            : Math.min(Math.abs(u - .125), Math.abs(u - .385), Math.abs(u - .615), Math.abs(u - .875));
+          const lateralJoint = kind === 'fuselage' && (v < .24 || v > .81) ? 1 : alongSeam;
+          const seam = Math.min(crossSeam * height, lateralJoint * width);
+          const rivet = (crossSeam * height > 1.4 && crossSeam * height < 2.7 && x % 9 < 2) ||
+            (lateralJoint * width > 1.1 && lateralJoint * width < 2.2 && y % 8 < 2);
+          let pigment;
+          let roughness;
+          if (kind === 'fuselage') {
+            const upsweep = .30 * Math.max(0, (1 - v * 6)) ** 2;
+            const waterline = -.35 + upsweep - .20 * Math.max(0, (v - .87) / .13) ** 1.6;
+            pigment = side < waterline - .08 ? [61, 85, 88] :
+              side < waterline ? [180, 107, 49] : [194, 200, 185];
+            roughness = side < waterline - .08 ? 185 : 163;
+            if (v > .977) pigment = [67, 78, 76];
+            if (v > .364 && v < .557 && sideUV > -.041 && sideUV < -.003) {
+              const letter = serial[Math.floor((sideUV + .041) / .038 * 5)];
+              const along = (v - .364) / .193;
+              const column = Math.floor((u > .25 && u < .75 ? along : 1 - along) * 19);
+              if (letter?.[column] === '1') pigment = [64, 82, 80];
+            }
+          } else if (kind === 'wing') {
+            pigment = camber < .054 ? [142, 156, 150] : u < .5 ? [182, 189, 176] : [151, 166, 158];
+            if (v > .86 && v < .895 && camber > .082 && camber < .352) pigment = [177, 106, 50];
+            roughness = camber < .054 ? 128 : 172;
+          } else {
+            pigment = v > .917 ? [133, 148, 144] : side < -.3 ? [74, 97, 99] : [181, 188, 176];
+            const slots = v > .47 && v < .69 && Math.abs(sideUV) < .076 && y % 7 < 3;
+            if (slots) pigment = [71, 80, 69];
+            roughness = v > .917 ? 125 : 166;
+          }
+          const wear = Math.sin(u * 111 + Math.sin(v * 76)) * Math.sin(v * 143 + Math.cos(u * 64));
+          const streak = Math.max(0, Math.sin(u * 179 + Math.cos(u * 50))) ** 8 *
+            Math.max(0, Math.sin(v * 50 + 1.7)) ** 3;
+          const weather = grain * 10 + wear * 4 - streak * (kind === 'nacelle' ? 15 : 8);
+          const change = weather - (seam < .8 ? 20 : 0) + (rivet ? 9 : 0);
+          const offset = (y * width + x) * 4;
+          color[offset] = pigment[0] + change;
+          color[offset + 1] = pigment[1] + change - streak * 2;
+          color[offset + 2] = pigment[2] + change - streak * 4;
+          color[offset + 3] = 255;
+          surface[offset] = seam < .8 ? 103 : rivet ? 152 : 128 + grain * 8;
+          surface[offset + 1] = roughness + wear * 16 + streak * 20;
+          surface[offset + 2] = 255;
+          surface[offset + 3] = 255;
+        }
+      }
+
+      function texture(pixels, colorSpace) {
+        const result = new DataTexture(pixels, width, height);
+        result.colorSpace = colorSpace;
+        result.wrapS = THREE.RepeatWrapping;
+        result.magFilter = THREE.LinearFilter;
+        result.minFilter = THREE.LinearMipmapLinearFilter;
+        result.generateMipmaps = true;
+        result.anisotropy = 4;
+        result.needsUpdate = true;
+        return result;
+      }
+
+      const map = texture(color, THREE.SRGBColorSpace);
+      const bumpMap = texture(surface, THREE.NoColorSpace);
+      return { map, bumpMap, roughnessMap: bumpMap, bumpScale: .003 };
+    }
 
     function buildAircraft(state) {
       const root = new Group();
@@ -62,8 +158,13 @@
         return surface;
       }
       const paint = (color, roughness = .72, metalness = .22) => material({ color, roughness, metalness });
-      const skin = paint(0x65716e);
-      const wingSkin = paint(0x53635e);
+      function finish(kind, color) {
+        if (!finishesByPart.has(kind)) finishesByPart.set(kind, airframeFinish(kind));
+        return material({ ...finishesByPart.get(kind), color, roughness: .84, metalness: .18 });
+      }
+      const skin = finish('fuselage', 0x7e8982);
+      const wingSkin = finish('wing', 0x718077);
+      const cowl = finish('nacelle', 0x697870);
       const panel = paint(0x43524e);
       const belly = paint(0x565d59);
       const trim = paint(0xcba56a);
@@ -71,7 +172,7 @@
       const metal = paint(0x828781, .48, .53);
       const steel = paint(0x36403d, .57, .58);
       const rubber = paint(0x242624, .91, .03);
-      const glass = material({ color: 0x263d4a, roughness: .24, metalness: .36,
+      const glass = material({ color: 0x365766, roughness: .21, metalness: .31,
         emissive: 0x263d4a, emissiveIntensity: .23 });
       const portLight = material({ color: 0xff624a }, true);
       const starboardLight = material({ color: 0x94e9b1 }, true);
@@ -80,7 +181,7 @@
       const tipBlur = material({ color: 0xd7ba7e, transparent: true, opacity: .11,
         depthWrite: false, side: DoubleSide }, true);
       const wreck = material({ color: 0x3c362b, roughness: .95, metalness: .09 });
-      const finishes = [skin, wingSkin, panel, belly];
+      const finishes = [skin, wingSkin, cowl, panel, belly];
       const originalFinishes = finishes.map(surface => surface.color.clone());
       const soot = new THREE.Color(0x302924);
 
@@ -113,7 +214,7 @@
 
       // Connect elliptical cross sections to give the fuselage and flight surfaces real volume.
       function loft(sections, sampleSection, surface, parent, segments = 28, start = 0,
-        span = DISC_ROTATION, reverse = false) {
+        span = DISC_ROTATION, reverse = false, uvRange = null) {
         const vertices = [];
         const uv = [];
         const indices = [];
@@ -122,7 +223,12 @@
           for (let index = 0; index <= segments; index++) {
             const angle = start + span * index / segments;
             vertices.push(...sampleSection(section, Math.cos(angle), Math.sin(angle)));
-            uv.push(index / segments, row / (sections.length - 1));
+            const ordinate = section[0];
+            if (uvRange) {
+              uv.push(angle / DISC_ROTATION, (ordinate - uvRange[0]) / (uvRange[1] - uvRange[0]));
+            } else {
+              uv.push(index / segments, row / (sections.length - 1));
+            }
           }
         }
         for (let row = 0; row < sections.length - 1; row++) {
@@ -140,6 +246,19 @@
         geometry.setAttribute('uv', new Float32BufferAttribute(uv, 2));
         geometry.setIndex(indices);
         geometry.computeVertexNormals();
+        if (span === DISC_ROTATION) {
+          // Keep separate UVs at the wrap while lighting both copies of the edge equally.
+          const normals = geometry.attributes.normal;
+          const first = new Vector3();
+          const last = new Vector3();
+          for (let row = 0; row < sections.length; row++) {
+            const a = row * stride;
+            const b = a + segments;
+            first.fromBufferAttribute(normals, a).add(last.fromBufferAttribute(normals, b)).normalize();
+            normals.setXYZ(a, first.x, first.y, first.z);
+            normals.setXYZ(b, first.x, first.y, first.z);
+          }
+        }
         return mesh(geometry, surface, 0, 0, 0, parent);
       }
 
@@ -154,15 +273,17 @@
         [-1.34, 0, 1.02, 1.035], [1.45, 0, 1.02, 1.035],
         [2.05, -.005, .995, 1.02], [2.42, -.025, .945, .97],
         [2.88, -.075, .828, .852], [3.25, -.15, .69, .67],
-        [3.62, -.22, .50, .45], [3.91, -.23, .29, .26], [4.03, -.23, .008, .008],
+        [3.51, -.20, .557, .516], [3.62, -.22, .50, .45],
+        [3.77, -.228, .411, .367], [3.91, -.23, .29, .26],
+        [3.978, -.23, .195, .174], [4.012, -.23, .113, .101],
+        [4.026, -.23, .045, .04], [4.03, -.23, .008, .008],
       ];
+      const cockpit = cabin.filter(([z]) => z >= 2.42 && z <= 3.51);
       const body = group('aircraft-fuselage', 0, 0, 0);
       const lowerSurface = loft(cabin.map(([z, y, x, h, seam]) => [z, y, x + .006, h + .008, seam]),
         bodyPoint, belly, body, 14, Math.PI + .27, Math.PI - .54);
       lowerSurface.name = 'aircraft-belly';
-      loft(cabin, bodyPoint, skin, body);
-      loft(cabin.slice(-3).map(([z, y, x, h]) => [z, y, x + .003, h + .003]),
-        bodyPoint, panel, body);
+      loft(cabin, bodyPoint, skin, body, 64, 0, DISC_ROTATION, false, [-2.44, 4.03]);
       const doorOutline = [[-2.015, .02, 1.008, 1.018], [-1.3, 0, 1.028, 1.043]];
       for (const base of [-.03, Math.PI - .42]) {
         for (const edge of [0, .42]) {
@@ -177,7 +298,7 @@
       loft([
         [-2.64, .27, .014, .014], [-2.46, .24, .18, .20], [-2.12, .20, .31, .31],
         [-1.55, .14, .51, .47], [-.80, .064, .73, .67], [0, 0, .86, .88, 1],
-      ], bodyPoint, skin, tail);
+      ], bodyPoint, skin, tail, 64, 0, DISC_ROTATION, false, [-5.08, 1.39]);
       if (wrecked) {
         const tornBulkhead = group('aircraft-fractured-cabin', 0, .03, -2.44, body);
         loft([[0, 0, .86, .88, 1], [.17, 0, .80, .82, .32], [.38, 0, .80, .82], [.46, 0, .024, .024]],
@@ -204,7 +325,8 @@
       const foilPoint = ([span, centerY, centerZ, halfChord, thickness], cosine, sine) =>
         [span, centerY + thickness * sine * (1 + .23 * cosine), centerZ + halfChord * cosine];
       const mainFoil = [
-        [0, 0, .06, 1.58, .24], [1.1, .025, .01, 1.47, .215],
+        [0, -.067, .045, 1.69, .324], [.42, -.02, .04, 1.61, .273],
+        [.82, .012, .025, 1.51, .235], [1.1, .025, .01, 1.47, .215],
         [2.32, .10, -.06, 1.32, .176], [4.13, .20, -.16, .99, .127],
         [5.27, .29, -.28, .75, .08], [5.80, .33, -.51, .37, .047],
         [5.92, .34, -.55, .034, .008],
@@ -216,17 +338,32 @@
       ];
       const fin = group('aircraft-vertical-stabilizer', 0, .30, -1.55, tail);
       fin.rotation.z = Math.PI / 2;
-      loft([
+      const finFoil = [
         [0, 0, .01, 1.11, .15], [.39, 0, -.12, .93, .13], [1.0, 0, -.35, .63, .10],
         [1.66, 0, -.61, .36, .064], [1.89, 0, -.65, .23, .039], [1.94, 0, -.68, .022, .006],
-      ], foilPoint, panel, fin, 22, 0, DISC_ROTATION, true);
+      ];
+      loft(finFoil, foilPoint, wingSkin, fin, 32, 0, DISC_ROTATION, true, [0, 1.94]);
+      const rudder = finFoil.slice(1, 5).map(([x, y, z, chord, thickness]) =>
+        [x, y, z - .01, chord + .008, thickness + .005]);
+      loft(rudder, foilPoint, panel, fin, 12, 2.67, .94, true);
+      loft([
+        [1.47, 0, -.535, .442, .081], [1.61, 0, -.590, .386, .074],
+      ], foilPoint, stencil, fin, 32, 0, DISC_ROTATION, true);
+      const antenna = block(.042, .15, .23, 0, 1.06, 1.32, panel, body);
+      antenna.rotation.x = -.52;
 
       const wings = [];
       const wheels = [];
       function strut(parent, x, y, z, dual) {
         const bay = group('aircraft-landing-gear', x, y, z, parent);
         const leg = new CylinderGeometry(.052, .072, .44, 12);
-        mesh(leg, metal, 0, -.22, 0, bay);
+        mesh(leg, steel, 0, -.18, 0, bay);
+        mesh(new CylinderGeometry(.036, .036, .24, 12), metal, 0, -.36, 0, bay);
+        const rocker = block(.135, .055, .06, 0, -.32, .039, metal, bay);
+        rocker.rotation.x = -.48;
+        const fork = mesh(new CylinderGeometry(.051, .051, dual ? .35 : .13, 14),
+          steel, 0, -.49, 0, bay);
+        fork.rotation.z = Math.PI / 2;
         const brace = mesh(new CylinderGeometry(.025, .035, .33, 9), steel, 0, -.15, -.11, bay);
         brace.rotation.x = .68;
         for (const axle of dual ? [-.099, .099] : [0]) {
@@ -236,6 +373,10 @@
           const hub = mesh(new CylinderGeometry(.089, .089, .025, 16),
             metal, axle * 1.7, -.49, 0, bay);
           hub.rotation.z = Math.PI / 2;
+          const side = axle < 0 ? -1 : 1;
+          const inset = mesh(new CylinderGeometry(.054, .054, .022, 12), steel,
+            axle + side * (dual ? .083 : .069), -.49, 0, bay);
+          inset.rotation.z = Math.PI / 2;
         }
         wheels.push(bay);
       }
@@ -246,12 +387,15 @@
         const damagedWing = isRight && state === 'damaged';
         const horizontal = group('aircraft-horizontal-stabilizer', 0, .29, -1.87, tail);
         horizontal.scale.x = side;
-        loft(tailFoil, foilPoint, wingSkin, horizontal, 20, 0, DISC_ROTATION, true);
+        loft(tailFoil, foilPoint, wingSkin, horizontal, 20, 0, DISC_ROTATION, true, [0, 2.23]);
 
-        for (const [start, span] of (isRight ? [[.28, .30], [.64, .34], [1.04, .40]] :
-          [[Math.PI - .58, .30], [Math.PI - .98, .34], [Math.PI - 1.44, .40]])) {
-          const windowSections = cabin.slice(5, 8).map(([z, y, x, h]) => [z, y, x + .014, h + .014]);
-          loft(windowSections, bodyPoint, glass, body, 5, start, span);
+        for (const [first, last, start, span] of [[0, 2, .39, .34], [1, 3, .79, .33], [1, 3, 1.18, .33]]) {
+          const angle = isRight ? start : Math.PI - start - span;
+          const profiles = cockpit.slice(first, last + 1);
+          const raised = lift => profiles.map(([z, y, x, h]) => [z, y, x + lift, h + lift]);
+          loft(raised(.013), bodyPoint, steel, body, 10, angle - .023, span + .046);
+          const glazing = loft(raised(.018), bodyPoint, glass, body, 10, angle, span);
+          glazing.name = 'aircraft-cockpit-glazing';
         }
         for (const z of [-1.62, -.98, -.34, .30, .94, 1.59]) {
           const pane = cylinder(.108, .111, .045, side * .982, .235, z, glass, body);
@@ -267,17 +411,12 @@
         const wing = group(isRight ? 'aircraft-starboard-wing' : 'aircraft-port-wing',
           side * .42, .64, .30);
         wing.scale.x = side;
-        const fairing = [
-          [0, -.085, .03, 1.71, .36], [.4, -.025, .04, 1.63, .27],
-          [.85, .022, .025, 1.50, .21],
-        ];
-        loft(fairing, foilPoint, skin, wing, 24, 0, DISC_ROTATION, true);
         if (damagedWing) {
           const tornTip = ([span, y, z, chord, thickness, torn = 0], cosine, sine) =>
             [span + torn * (.25 * cosine + .12 * Math.sin(Math.atan2(sine, cosine) * 5)),
               y + thickness * sine * (1 + .23 * cosine), z + chord * cosine];
-          loft([...mainFoil.slice(0, 5), [5.37, .31, -.32, .57, .071, 1]],
-            tornTip, wingSkin, wing, 24, 0, DISC_ROTATION, true);
+          loft([...mainFoil.slice(0, -2), [5.37, .31, -.32, .57, .071, 1]],
+            tornTip, wingSkin, wing, 40, 0, DISC_ROTATION, true, [0, 5.92]);
           loft([[5.21, .27, -.30, .49, .025], [5.37, .31, -.32, .57, .071, 1]],
             tornTip, wreck, wing, 24, 0, DISC_ROTATION);
           for (const [z, angle] of [[-.63, -.23], [-.21, .18], [.14, .30]]) {
@@ -285,16 +424,16 @@
             spar.rotation.y = angle;
           }
         } else {
-          loft(mainFoil, foilPoint, wingSkin, wing, 24, 0, DISC_ROTATION, true);
+          loft(mainFoil, foilPoint, wingSkin, wing, 40, 0, DISC_ROTATION, true, [0, 5.92]);
         }
         const wingStencil = [[4.41, .222, -.19, .94, .126], [4.62, .244, -.21, .897, .117]];
         loft(wingStencil, foilPoint, stencil, wing, 16, .48, 2.08, true);
-        const aileronSeam = mainFoil.slice(3, 6).map(([x, y, z, chord, thickness]) =>
+        const aileronSeam = mainFoil.slice(-4, -1).map(([x, y, z, chord, thickness]) =>
           [x, y, z - .008, chord, thickness + .006]);
         if (!damagedWing) {
           loft(aileronSeam, foilPoint, panel, wing, 2, 2.50, .045, true);
         }
-        loft(mainFoil.slice(2, 5).map(([x, y, z, chord, thickness]) => [x, y - .009, z - .008,
+        loft(mainFoil.slice(-5, -2).map(([x, y, z, chord, thickness]) => [x, y - .009, z - .008,
           chord + .02, thickness + .006]), foilPoint, panel, wing, 8, 2.58, 1.18, true);
         if (!damagedWing) {
           mesh(new THREE.SphereGeometry(.105, 12, 8), isRight ? starboardLight : portLight,
@@ -308,7 +447,7 @@
           [1.09, 0, .456, .451], [1.11, 0, .295, .295], [1.02, 0, .22, .22],
         ];
         if (damagedWing) {
-          loft(nacelle, bodyPoint, panel, engine, 28, .87, DISC_ROTATION - 1.32);
+          loft(nacelle, bodyPoint, cowl, engine, 40, .87, DISC_ROTATION - 1.32, false, [-1.71, 1.11]);
           loft(nacelle.map(([z, y, x, h]) => [z, y, x * .84, h * .70]),
             bodyPoint, wreck, engine, 12, -.45, 1.32);
           const peeledCowling = loft(nacelle.slice(3, 6), bodyPoint, metal, engine, 10, -.19, .57);
@@ -318,11 +457,13 @@
             cylinder(.454, .454, .024, 0, 0, z, steel, engine).scale.z = .91;
           }
         } else {
-          loft(nacelle, bodyPoint, panel, engine);
+          loft(nacelle, bodyPoint, cowl, engine, 48, 0, DISC_ROTATION, false, [-1.71, 1.11]);
         }
         cylinder(.395, .423, .105, 0, 0, .976, steel, engine);
         cylinder(.28, .37, .079, 0, 0, 1.037, metal, engine);
-        cylinder(.27, .30, .37, .27, -.38, -.83, steel, engine).scale.set(.33, 1, .44);
+        const exhaustSide = .37;
+        cylinder(.19, .15, .53, exhaustSide, -.32, -.86, metal, engine).scale.set(.57, 1, .77);
+        cylinder(.107, .13, .028, exhaustSide, -.32, -1.135, steel, engine).scale.set(.59, 1, .77);
         strut(engine, 0, -.43, -.23, true);
         const propeller = group('aircraft-propeller', 0, 0, 1.15, engine);
         cylinder(.072, .218, .365, 0, 0, .135, metal, propeller);
@@ -330,10 +471,15 @@
         for (let index = 0; index < (damagedWing ? 3 : 4); index++) {
           const blade = group('aircraft-propeller-blade', 0, 0, 0, blades);
           blade.rotation.z = index * DISC_ROTATION / 4;
-          const bladeSpar = block(.144, 1.02, .035, .052, .641, -.015, steel, blade);
-          bladeSpar.rotation.z = -.095;
-          const tip = block(.126, .136, .038, .104, 1.198, -.015, trim, blade);
-          tip.rotation.z = -.095;
+          const bladeSections = [
+            [.15, .008, .014, .091, .032], [.33, .018, .025, .133, .039],
+            [.70, .052, .019, .112, .028], [1.04, .096, .008, .083, .018],
+            [1.17, .119, .006, .057, .013], [1.26, .129, .01, .009, .005],
+          ];
+          const bladePoint = ([radius, x, z, chord, thickness], cosine, sine) =>
+            [x + chord * cosine, radius, z + thickness * sine - chord * cosine * (.39 - radius * .23)];
+          loft(bladeSections.slice(0, 5), bladePoint, steel, blade, 12, 0, DISC_ROTATION, true);
+          loft(bladeSections.slice(-2), bladePoint, trim, blade, 12, 0, DISC_ROTATION, true);
         }
         const disc = group('aircraft-propeller-disc', 0, 0, 0, propeller);
         mesh(new RingGeometry(.18, 1.26, 36), blur, 0, 0, -.005, disc, false);
@@ -397,13 +543,18 @@
       scene.remove(missile);
       scene.remove(transport);
       releaseAircraft();
+      for (const { map, bumpMap } of finishesByPart.values()) {
+        map.dispose();
+        bumpMap.dispose();
+      }
+      finishesByPart.clear();
       elapsed = 0;
       nextTrail = 0;
       nextMissileSmoke = 0;
       direction.set(1, 0, 0);
     }
 
-    function launch() {
+    function launch({ silent = false } = {}) {
       if (aircraft) return false;
       flightPose(hitPose, DAMAGE_SECONDS);
       missileHit.copy(hitPose.localToWorld(point(2.83, .20, -.89)));
@@ -411,6 +562,7 @@
       showAircraft('intact');
       scene.add(transport);
       fly(0);
+      if (!silent) events?.emit?.('campaign:aircraft-approach', { pos: transport.position.clone() });
       return true;
     }
 
@@ -475,6 +627,7 @@
 
     function airburst() {
       scene.remove(missile);
+      events?.emit?.('campaign:missile-hit', { pos: missileHit.clone() });
       if (fx?.explosion && !fx.stub) fx.explosion(missileHit, 1.4);
       else events?.emit?.('explosion', { pos: missileHit.clone(), size: 1.4 });
       fx?.sparks?.(missileHit, point(-1, -.2, -.15), 20);
@@ -575,6 +728,7 @@
 
     function burst() {
       const epicenter = point(impact.x + .46, .65, impact.z - 1.34);
+      events?.emit?.('campaign:aircraft-impact', { pos: epicenter.clone() });
       if (fx?.explosion && !fx.stub) fx.explosion(epicenter, 3.7);
       else events?.emit?.('explosion', { pos: epicenter, size: 3.7 });
       for (const side of [-1, 1]) {
@@ -607,6 +761,9 @@
       if (!aircraft || !Number.isFinite(dt) || dt <= 0) return;
       const previous = elapsed;
       elapsed += dt;
+      if (previous < MISSILE_SECONDS && elapsed >= MISSILE_SECONDS) {
+        events?.emit?.('campaign:missile-launch', { pos: missileStart.clone() });
+      }
       if (previous < DAMAGE_SECONDS && elapsed >= DAMAGE_SECONDS) {
         showAircraft('damaged');
         airburst();

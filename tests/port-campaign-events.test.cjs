@@ -141,7 +141,7 @@ test('a large update expires old fire instead of starting it at full duration', 
   });
   crash.launch();
   crash.update(crash.duration + 74);
-  assert.deepEqual(events, ['explosion', 'explosion']);
+  assert.equal(events.filter(event => event === 'explosion').length, 2);
   assert.deepEqual(emitters, [{ kind: 'smolder', ttl: 11, scale: 2.35 }]);
   assert.equal(crash.phase, 'wreck');
 });
@@ -149,9 +149,12 @@ test('a large update expires old fire instead of starting it at full duration', 
 test('a visible incoming missile swaps the intact model only when it hits', () => {
   const scene = new THREE.Scene();
   const bursts = [];
-  const crash = createCampaignCrash({ THREE, scene, fx: {
-    explosion(pos, size) { bursts.push({ pos: pos.clone(), size }); },
-  } });
+  const cues = [];
+  const crash = createCampaignCrash({
+    THREE, scene,
+    events: { emit(name, { pos }) { cues.push({ name, pos }); } },
+    fx: { explosion(pos, size) { bursts.push({ pos: pos.clone(), size }); } },
+  });
   crash.launch();
   const transport = scene.getObjectByName('rail-campaign-aircraft');
   assert.equal(transport.children[0].name, 'aircraft-model-intact');
@@ -173,4 +176,67 @@ test('a visible incoming missile swaps the intact model only when it hits', () =
   crash.update(1.45);
   assert.equal(transport.children[0].name, 'aircraft-model-wreck');
   assert.ok(bursts[1].size > bursts[0].size);
+  assert.deepEqual(cues.map(({ name }) => name), [
+    'campaign:aircraft-approach', 'campaign:missile-launch', 'campaign:missile-hit',
+    'campaign:aircraft-touchdown', 'campaign:aircraft-impact',
+  ]);
+  assert.ok(cues[1].pos.distanceTo(cues[2].pos) > 10);
+  assert.ok(cues[2].pos.distanceTo(bursts[0].pos) < .001);
+  assert.ok(cues[4].pos.distanceTo(bursts[1].pos) < .001);
+
+  crash.reset();
+  crash.launch({ silent: true });
+  crash.skip({ silent: true });
+  assert.equal(cues.length, 5);
+});
+
+test('the airframe finish and smooth UV wraps survive model swaps and reset', () => {
+  const scene = new THREE.Scene();
+  const crash = createCampaignCrash({ THREE, scene });
+  crash.launch({ silent: true });
+  const fuselage = () => scene.getObjectByName('aircraft-fuselage');
+  const skin = () => fuselage().children.find(part => part.material?.bumpMap);
+  const original = skin().material;
+  let disposed = 0;
+  for (const texture of [original.map, original.bumpMap]) {
+    texture.addEventListener('dispose', () => disposed++);
+    assert.equal(texture.image.width, 512);
+    assert.equal(texture.generateMipmaps, true);
+  }
+  assert.equal(original.map.colorSpace, THREE.SRGBColorSpace);
+  assert.equal(original.roughnessMap, original.bumpMap);
+
+  function assertSmoothWrap(part) {
+    const { position, normal, uv } = part.geometry.attributes;
+    const first = new THREE.Vector3();
+    const last = new THREE.Vector3();
+    let start = 0;
+    for (let end = 1; end < uv.count; end++) {
+      if (uv.getX(end) !== 1) continue;
+      assert.equal(uv.getX(start), 0);
+      assert.equal(uv.getY(start), uv.getY(end));
+      assert.ok(first.fromBufferAttribute(position, start).distanceTo(last.fromBufferAttribute(position, end)) < 1e-6);
+      assert.ok(first.fromBufferAttribute(normal, start).distanceTo(last.fromBufferAttribute(normal, end)) < 1e-6);
+      start = end + 1;
+    }
+    assert.equal(start, uv.count);
+  }
+
+  assertSmoothWrap(skin());
+  const portWing = scene.getObjectByName('aircraft-port-wing');
+  const wingSkin = portWing.children.find(part => part.material?.bumpMap);
+  assertSmoothWrap(wingSkin);
+
+  const glazingCount = () => fuselage().children.filter(part => part.name === 'aircraft-cockpit-glazing').length;
+  assert.equal(glazingCount(), 6);
+  crash.update(1.2);
+  assert.equal(skin().material.map, original.map);
+  assert.equal(skin().material.bumpMap, original.bumpMap);
+  assert.equal(glazingCount(), 6);
+  crash.skip({ silent: true });
+  assert.equal(skin().material.map, original.map);
+  assert.equal(glazingCount(), 6);
+  assert.equal(disposed, 0);
+  crash.reset();
+  assert.equal(disposed, 2);
 });

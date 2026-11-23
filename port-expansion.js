@@ -113,6 +113,57 @@
       prop('floodlight_stand', x + 2.2, z - 1.6, Math.PI);
     }
 
+    function shiftOffice() {
+      const west = -105;
+      const east = -99;
+      const front = 20.2;
+      const back = 26.1;
+      const ceiling = 3.02;
+      const wall = 'corrugated_roof';
+      const frame = 'steel_galv';
+      slab('concrete_dirty', west, -.08, front, east, .02, back);
+      solid(wall, west, 0, front, west + .14, ceiling, back);
+      solid(wall, east - .14, 0, front, east, ceiling, back);
+      solid(wall, west, 0, back - .14, east, ceiling, back);
+      solid(wall, west, 0, front, -104.55, ceiling, front + .14);
+      solid(wall, -102.55, 0, front, east, 1.03, front + .14);
+      solid(wall, -104.55, 2.31, front, east, ceiling, front + .14);
+      solid('glass_dirty', -102.42, 1.03, front + .05, east - .14, 2.31, front + .10, 'glass');
+      for (const x of [-104.55, -102.52, -101.28, -100.12, east - .14]) {
+        solid(frame, x - .035, x === -104.55 || x === -102.52 ? 0 : 1.01, front - .02,
+          x + .035, 2.34, front + .16);
+      }
+      box(frame, 3.58, .1, .2, -100.77, 1.05, front + .04);
+      box(frame, 5.56, .1, .2, -101.77, 2.31, front + .04);
+      solid('corrugated_roof', west - .22, ceiling, front - .35, east + .22, ceiling + .1, back + .22,
+        'metal', { noNav: true });
+      box('steel_dark', 1.91, .26, .04, -103.5, 2.69, front - .025);
+      label('SHIFT OFFICE', .17, -103.5, 2.69, front - .047, 'z-', { color: 'white', font: 'stencil' });
+
+      // The last shift left its dispatch log next to a closed reserve locker.
+      solid('steel_dark', -102.6, 0, 25.22, -100.13, .99, 25.9);
+      box('wood_dark', 2.53, .09, .72, -101.37, 1.005, 25.55);
+      for (const y of [.23, .48, .74]) {
+        box(frame, 2.35, .012, .025, -101.36, y, 25.21);
+        box(frame, .28, .047, .06, -100.41, y + .09, 25.19);
+      }
+      box('paint_white', .43, .04, .32, -101.27, 1.065, 25.31, { r: [0, -.14, 0] });
+      box('steel_dark', .42, .09, .29, -100.95, 1.085, 25.66);
+      box('rubber', .4, .07, .09, -100.95, 1.16, 25.59);
+      prop('crate_wood', -103.69, 25.18, turn);
+      box(frame, 1.28, .09, .27, -102, 2.87, 23.7);
+      box(builder.G.mats.emissive(0xffe0ad, 2.3), 1.18, .025, .20, -102, 2.81, 23.7);
+      return {
+        interior: { min: vector(west, 0, front), max: vector(east, ceiling, back) },
+        exploration: {
+          id: 'night-shift-record',
+          pos: vector(-101.25, 0, 24.4),
+          ammo: 60,
+          soundPos: vector(-100.95, 1.05, 24.8),
+        },
+      };
+    }
+
     // Meet the existing perimeter at its actual corner on each chapter.
     const seamX = rail ? -37.6 : -38;
     const north = rail ? -27.5 : -30;
@@ -173,6 +224,7 @@
       inspectionCar(-87, -24.25);
       const manifest = canopy(-94, 15.5, 12, 7.5, 'RAIL CUSTOMS / MANIFESTS');
       const power = canopy(-57, -16, 8, 6, 'GATE POWER');
+      const records = shiftOffice();
       terminalFurniture(-94, 14);
       terminalFurniture(-57, -16);
       prop('generator', -54.4, -17.45, .06);
@@ -198,7 +250,7 @@
       }
       const layout = base([-94, 0, 14], [-57, 0, -16], [
         ['ammo', -91, 16.9], ['health', -59, -15.15],
-      ], [manifest, power], [
+      ], [manifest, power, records.interior], [
         ['yard', -91, -17], ['yard', -80, -12.4], ['yard', -61, -14.1], ['yard', -50, -9.3],
         ['shed', -97.6, 17.9], ['shed', -83.55, 19.5], ['shed', -67, 18.9], ['shed', -49, 12.1],
       ], [['yard', -77, -16], ['shed', -92, 19], ['shed', -53, 18]], [
@@ -209,6 +261,7 @@
       const bounds = (x0, y0, z0, x1, y1, z1) => ({ min: vector(x0, y0, z0), max: vector(x1, y1, z1) });
       return {
         ...layout,
+        exploration: records.exploration,
         pickup: {
           impact: vector(apron.x, .94, .6),
           approach: { west: vector(-85, 0, .6), east: vector(-69, 0, .6) },

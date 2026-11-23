@@ -4,7 +4,7 @@ A small browser first-person shooter set in a rainy industrial port. Cut three u
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.9.0
+## Saltline fork 0.10.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
 - **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure four sectors in order, beginning at West Dispatch. The LAN staging room is available when launched with the local server.
@@ -29,7 +29,9 @@ At Berth 4, cut the three uplinks, then follow **LOG** to West Dispatch and hold
 
 In **Rail Inspection Yard**, follow **LOG** to the west customs terminal and inspect the signed manifest, then go to **AIR** outside the canopy. A missile hits the approaching transport and the crash blocks the pickup lane. Follow **ALT** through the maintenance lane, then **PWR** to restore gate power and **EX** to leave by road. Campaign cinematics play through before returning control.
 
-Spoken commander lines use an English voice when the browser has a local English speech voice installed. Captions follow the interface language and remain available on browsers without compatible speech. The master volume also controls radio narration.
+Commander speech uses the best English voice offered by the browser. On desktop Microsoft Edge it prefers Microsoft Natural voices when available. The browser may use its online speech service for those voices. The game sends only its fixed campaign lines to the browser speech API. If speech is unavailable, captions still follow the interface language. With speech enabled, captions appear when the utterance starts and clear when it ends. Master volume controls narration and scene audio.
+
+In the west rail annex, follow the southern service lane to the night-shift office. Hold **E** at the log to read the evacuation note and collect up to 60 rounds, depending on reserve capacity. The inspection is optional and can be repeated after redeployment.
 
 Campaign rounds start with two patrol units. The Berth 4 upload can call a short reinforcement wave. Walk up to the marked ammunition crates to top up reserves. When running low, **AM** points to an available crate nearby.
 
