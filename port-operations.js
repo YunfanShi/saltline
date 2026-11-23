@@ -4,9 +4,46 @@
     { key: '6', type: 'reinforce', en: 'Reinforce', zh: '增援' },
     { key: '7', type: 'supply', en: 'Supply', zh: '补给' },
   ];
+  const REQUISITIONS = [
+    ...SUPPORT,
+    { type: 'smoke', en: 'Smoke barrage', zh: '烟幕支援' },
+    { type: 'artillery', en: 'Artillery', zh: '炮击支援' },
+  ];
   const t = (english, chinese) => window.SaltlineLocale?.t(english, chinese) ?? english;
 
-  window.createPortOperations = ({ world, onSupport }) => {
+  window.createPortOperations = ({ world, onSupport, onOpen, onClose }) => {
+    let round = null;
+    const settings = document.createElement('fieldset');
+    settings.className = 'port-battle-settings';
+    settings.dataset.noLocalize = '';
+    const config = [
+      ['difficulty', ['AI', '敌人强度'], [
+        ['easy', 'Easy', '简单'], ['normal', 'Normal', '普通'], ['hard', 'Hard', '困难'],
+      ], 'normal'],
+      ['startingTickets', ['Tickets', '兵力票'], [['25', '25', '25'], ['40', '40', '40'], ['70', '70', '70']], '40'],
+      ['duration', ['Time limit', '时间上限'], [
+        ['180', '3 min', '3 分钟'], ['240', '4 min', '4 分钟'], ['360', '6 min', '6 分钟'],
+      ], '240'],
+    ].map(([key, name, options, selected]) => {
+      const field = document.createElement('label');
+      const title = document.createElement('span');
+      const select = document.createElement('select');
+      for (const [value] of options) select.append(new Option('', value));
+      select.value = selected;
+      field.append(title, select);
+      settings.append(field);
+      return { key, name, options, title, select };
+    });
+    document.querySelector('#port-multiple-actions .m-actions').before(settings);
+
+    function localizeSettings() {
+      for (const { name, options, title, select } of config) {
+        title.textContent = t(...name);
+        for (const [index, [, en, zh]] of options.entries()) select.options[index].textContent = t(en, zh);
+      }
+      requisitionButton.textContent = t('Q Support', 'Q 征用');
+    }
+
     const panel = document.createElement('section');
     panel.className = 'port-operations';
     panel.dataset.noLocalize = '';
@@ -23,7 +60,10 @@
     mapButton.setAttribute('aria-expanded', 'false');
     const buttons = new Map();
     const credits = document.createElement('span');
-    bar.append(mapButton, credits);
+    const requisitionButton = document.createElement('button');
+    requisitionButton.type = 'button';
+    requisitionButton.setAttribute('aria-haspopup', 'dialog');
+    bar.append(mapButton, requisitionButton, credits);
     for (const support of SUPPORT) {
       const button = document.createElement('button');
       button.type = 'button';
@@ -33,6 +73,135 @@
     }
     panel.append(map, bar);
     document.getElementById('app').append(panel);
+
+    const requisition = document.createElement('dialog');
+    requisition.className = 'developer-menu port-requisition';
+    requisition.setAttribute('aria-labelledby', 'port-requisition-title');
+    requisition.innerHTML = `
+      <header><h2 id="port-requisition-title"></h2><button type="button" data-resume autofocus></button></header>
+      <p data-rp></p>
+      <label><span data-target-label></span> <select aria-describedby="port-support-help"></select></label>
+      <p id="port-support-help"></p>
+      <div class="developer-actions"></div>
+      <p role="status" data-result></p>`;
+    const target = requisition.querySelector('select');
+    const requisitionActions = requisition.querySelector('.developer-actions');
+    const resume = requisition.querySelector('[data-resume]');
+    const message = requisition.querySelector('[data-result]');
+    const score = document.createElement('section');
+    score.className = 'port-scoreboard';
+    score.hidden = true;
+    score.innerHTML = '<h2></h2><dl></dl>';
+    const scoreRows = [
+      ['Remaining time', '剩余时间', game => window.portConquestLabel(game).time],
+      ['Blue tickets', '蓝方兵力票', game => Math.ceil(game.tickets.blue)],
+      ['Red tickets', '红方兵力票', game => Math.ceil(game.tickets.red)],
+      ['Sectors remaining', '剩余区域', game => game.tickets.red],
+      ['Kills', '击毁', game => game.kills],
+      ['Deaths', '阵亡', game => game.deaths],
+      ['Captures', '占领', game => game.captures],
+      ['Support points', '支援点', game => game.supportPoints],
+    ].map(([en, zh, value]) => {
+      const term = document.createElement('dt');
+      const detail = document.createElement('dd');
+      score.querySelector('dl').append(term, detail);
+      return { en, zh, value, term, detail };
+    });
+    document.getElementById('app').append(requisition, score);
+
+    const requisitionButtons = REQUISITIONS.map(item => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.support = item.type;
+      button.addEventListener('click', () => {
+        const ok = onSupport(item.type, target.value);
+        message.textContent = ok ? t('Support called', '已呼叫支援') : t('Unavailable here', '当前位置无法使用');
+        renderRequisitions();
+      });
+      requisitionActions.append(button);
+      return { ...item, button };
+    });
+    localizeSettings();
+
+    function renderRequisitions() {
+      requisition.querySelector('h2').textContent = t('Requisition', '征用支援');
+      resume.textContent = t('Resume', '继续游戏');
+      requisition.querySelector('[data-rp]').textContent = t('Support points ', '支援点 ') + round.supportPoints;
+      requisition.querySelector('[data-target-label]').textContent = t('Target objective', '目标据点');
+      requisition.querySelector('#port-support-help').textContent = t(
+        'Smoke blocks enemy sight for 22 s. Artillery strikes a non-friendly objective four times after a 5 s warning.',
+        '烟幕遮挡敌人视线 22 秒。炮击警告 5 秒后，对非友方控制据点发起四轮打击。');
+      const point = round.points.find(entry => entry.id === target.value);
+      for (const { type, en, zh, button } of requisitionButtons) {
+        const cost = round.supportCosts[type];
+        button.textContent = t(en, zh) + ' · ' + cost;
+        button.disabled = round.supportPoints < cost || round.support[type + 'Until'] > round.elapsed ||
+          (type === 'smoke' || type === 'artillery') && !point ||
+          type === 'artillery' && point?.owner === 'blue';
+      }
+    }
+
+    let recapture = false;
+    function openRequisitions() {
+      if (!round || !world.player.alive || world.developer?.open || requisition.open) return;
+      const available = round.points.filter(point => !point.locked);
+      target.replaceChildren(...available.map(point => new Option(point.short, point.id)));
+      target.value = (round.activePoint ?? round.near(world.player.pos) ?? available[0])?.id ?? '';
+      message.textContent = '';
+      renderRequisitions();
+      recapture = world.input.locked;
+      requisition.showModal();
+      score.hidden = true;
+      onOpen();
+    }
+    function closeRequisitions() {
+      if (!requisition.open) return;
+      requisition.close();
+      onClose(recapture);
+    }
+    target.addEventListener('change', renderRequisitions);
+    resume.addEventListener('click', closeRequisitions);
+    requisition.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeRequisitions();
+    });
+    requisitionButton.addEventListener('click', openRequisitions);
+    document.addEventListener('saltline:localechange', localizeSettings);
+
+    function renderScore() {
+      score.querySelector('h2').textContent = t('Battle scoreboard', '战局计分板');
+      const breakthrough = round.mode === 'breakthrough';
+      for (const { en, zh, value, term, detail } of scoreRows) {
+        term.hidden = detail.hidden = breakthrough ? en === 'Red tickets' : en === 'Sectors remaining';
+        term.textContent = t(en, zh);
+        detail.textContent = value(round);
+      }
+    }
+    window.addEventListener('keydown', event => {
+      if (requisition.open) {
+        event.stopImmediatePropagation();
+        if (event.code === 'KeyQ' || event.code === 'Escape') {
+          event.preventDefault();
+          if (!event.repeat) closeRequisitions();
+        }
+        return;
+      }
+      if (!round || world.developer?.open || event.ctrlKey || event.altKey || event.metaKey ||
+        event.target?.closest?.('input,select,textarea,button,[contenteditable]')) return;
+      if (event.code === 'KeyQ' && world.player.alive) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!event.repeat) openRequisitions();
+      } else if (event.code === 'Tab' && !event.shiftKey) {
+        event.preventDefault();
+        if (score.hidden) {
+          renderScore();
+          score.hidden = false;
+        }
+      }
+    }, true);
+    window.addEventListener('keyup', event => { if (event.code === 'Tab') score.hidden = true; });
+    window.addEventListener('blur', () => { score.hidden = true; });
 
     const context = map.getContext('2d');
     const base = document.createElement('canvas');
@@ -78,7 +247,6 @@
     mapButton.addEventListener('click', toggleMap);
     panel.addEventListener('pointerdown', event => event.stopPropagation());
     let lastUpdate = -Infinity;
-    let round = null;
     let active = false;
 
     function keydown(event) {
@@ -104,11 +272,18 @@
     }
 
     return {
+      get requisitionOpen() { return requisition.open; },
+      battleSettings() {
+        const values = Object.fromEntries(config.map(({ key, select }) => [key, select.value]));
+        return { difficulty: values.difficulty, startingTickets: Number(values.startingTickets), duration: Number(values.duration) };
+      },
       show(next) {
         active = Boolean(next);
         panel.hidden = !active;
         if (!active) {
           map.hidden = true;
+          score.hidden = true;
+          closeRequisitions();
           mapButton.setAttribute('aria-expanded', 'false');
         }
         if (round !== next) lastUpdate = -Infinity;
@@ -117,6 +292,7 @@
       update(game, player, enemies) {
         if (!active || game.elapsed < lastUpdate + .12) return;
         lastUpdate = game.elapsed;
+        if (!score.hidden) renderScore();
         mapButton.textContent = t('M Map', 'M 地图');
         const support = game.support;
         credits.textContent = t('RP ', '支援点 ') + game.supportPoints;
@@ -141,6 +317,8 @@
         if (support.reinforceUntil > game.elapsed && support.reinforcePosition) {
           dot(support.reinforcePosition, '#9afdde', 5);
         }
+        if (support.smokeUntil > game.elapsed) dot(support.smokePosition, '#cbd3d9', 10);
+        if (support.artillery?.remaining) dot(support.artillery.position, '#ffb347', 10);
         const [x, y] = dot(player.pos, '#64d5ff', 5);
         const yaw = player.yaw || 0;
         context.beginPath();context.moveTo(x, y);

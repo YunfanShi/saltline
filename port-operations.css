@@ -42,3 +42,45 @@
 .port-multiple-actions { margin-top: 16px; }
 .port-multiple-actions[hidden] { display: none; }
 .port-multiple-actions .m-actions { margin-top: 7px; }
+
+.port-battle-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem .8rem;
+  margin: .6rem 0;
+  padding: 0;
+  border: 0;
+  font: 600 .8rem system-ui, sans-serif;
+}
+
+.port-battle-settings label { display: grid; gap: .25rem; }
+.port-battle-settings select,
+.port-requisition select {
+  padding: .35rem;
+  border: 1px solid var(--bone-faint);
+  color: var(--bone);
+  background: var(--ink);
+  font: inherit;
+}
+
+.port-requisition [data-result] { min-height: 1.5em; margin-bottom: 0; }
+
+.port-scoreboard {
+  position: absolute;
+  z-index: 22;
+  top: 18%;
+  left: 50%;
+  width: min(29rem, calc(100% - 2rem));
+  max-height: 74%;
+  transform: translateX(-50%);
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid var(--signal);
+  color: var(--bone);
+  background: #10191eed;
+  font: 600 .95rem system-ui, sans-serif;
+  pointer-events: none;
+}
+.port-scoreboard h2 { margin: 0 0 .8rem; font-size: 1.2rem; }
+.port-scoreboard dl { display: grid; grid-template-columns: 1fr auto; gap: .5rem 1rem; margin: 0; }
+.port-scoreboard dd { margin: 0; color: var(--signal); font-variant-numeric: tabular-nums; }

@@ -137,3 +137,64 @@ test('allies help secure sectors and support calls spend earned points', () => {
   game.casualty();
   assert.equal(game.useSupport('mark'), false);
 });
+
+test('battle settings apply independently to Conquest and Breakthrough', () => {
+  const short = start({ duration: 180, startingTickets: 25 });
+  assert.equal(short.remaining, 180);
+  assert.equal(short.tickets.blue, 25);
+  assert.equal(short.tickets.red, 25);
+  short.update(8, unit(30), []);
+  short.update(180, unit(125), []);
+  assert.equal(short.elapsed, 180);
+  assert.equal(short.winner, 'draw');
+
+  const long = start({ mode: 'breakthrough', duration: 360, startingTickets: 70 });
+  assert.equal(long.tickets.red, 3);
+  assert.equal(long.tickets.blue, 70);
+  long.update(359, unit(125), []);
+  assert.equal(long.winner, null);
+  long.update(1, unit(125), []);
+  assert.equal(long.winner, 'red');
+
+  const invalid = start({ duration: 0, startingTickets: Infinity });
+  assert.equal(invalid.remaining, 240);
+  assert.equal(invalid.tickets.blue, 40);
+});
+
+test('targeted smoke blocks sight at the same elevation for 22 seconds', () => {
+  const game = start({ mode: 'breakthrough' });
+  const [first, second] = game.points;
+  game.killedMachine();
+  assert.equal(game.useSupport('smoke', at(0), second.id), false);
+  assert.equal(game.supportPoints, 4);
+  assert.equal(game.useSupport('smoke', at(0), first.id), true);
+  assert.equal(game.supportPoints, 0);
+  assert.equal(game.smokeBlocks(at(-8, 1.5), at(8, 1.5)), true);
+  assert.equal(game.smokeBlocks(at(-8, 9), at(8, 9)), false);
+  assert.equal(game.smokeBlocks(at(8, 1.5), at(15, 1.5)), false);
+  game.update(22, unit(125), []);
+  assert.equal(game.smokeBlocks(at(-8, 1.5), at(8, 1.5)), false);
+});
+
+test('artillery rejects friendly targets and delivers four impacts exactly once after the warning', () => {
+  const game = start();
+  const [hostile, friendly] = game.points;
+  game.update(8, unit(30), []);
+  assert.equal(friendly.owner, 'blue');
+  assert.equal(game.captures, 1);
+  game.killedMachine();
+  assert.equal(game.kills, 1);
+  assert.equal(game.supportPoints, 7);
+  assert.equal(game.useSupport('artillery', at(0), friendly.id), false);
+  assert.equal(game.supportPoints, 7);
+  assert.equal(game.useSupport('artillery', at(0), hostile.id), true);
+  assert.equal(game.supportPoints, 0);
+  game.update(4.5, unit(125), []);
+  assert.equal(game.takeArtilleryImpacts().length, 0);
+  game.update(.5, unit(125), []);
+  assert.equal(game.takeArtilleryImpacts()[0], hostile.pos);
+  assert.equal(game.takeArtilleryImpacts().length, 0);
+  game.update(9, unit(125), []);
+  assert.equal(game.takeArtilleryImpacts().length, 3);
+  assert.equal(game.takeArtilleryImpacts().length, 0);
+});

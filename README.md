@@ -4,14 +4,19 @@ A small browser first-person shooter: one level in a rainy container port. Cut t
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.3.0
+## Saltline fork 0.4.0
 
 - **BATTLE** opens the original single-player relay sabotage campaign.
 - **MULTIPLE** opens the AI battle menu. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure three sectors in order. LAN multiplayer is planned.
+- Set enemy pressure, starting tickets and the time limit before deploying. These settings apply only to port battles.
 - Choose Support, Medic, Recon or Engineer before entering an AI battle. Activate their abilities with **X** or the on-screen button.
 - Press **M** for the tactical map. Spend support points with **5** for recon, **6** for reinforcement at a nearby objective, or **7** for field supplies. Safe captured ground can provide forward redeployment.
+- Press **Q** to pause and open Requisition. Select an objective for smoke or artillery. Smoke blocks enemy line of sight for 22 seconds. Artillery strikes an objective that is not held by Blue four times after a five-second warning. Walls provide cover from the strikes.
+- Hold **Tab** for the battle scoreboard. It shows time, tickets or remaining sectors, kills, deaths, captures and support points.
 - The interface defaults to Simplified Chinese, with English available in Settings.
 - See the [operations report](docs/PORT_OPERATIONS_020.docx) for scope, controls and verification.
+
+The battle settings, requisition menu and scoreboard adapt systems from [IRONFRONT 0.21.0](https://github.com/YunfanShi/IRONFRONT/tree/1afb5fae0be9dc5770778d952b65d43875064ab9) for Saltline's port. Vehicles, larger maps, squad AI and LAN rooms still await integration.
 
 ## Developer menu
 

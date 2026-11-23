@@ -5,24 +5,28 @@
   const DURATION = 240;
   const START_TICKETS = 40;
   const SUPPORT_CAP = 12;
-  const SUPPORTS = Object.freeze({ mark: 2, reinforce: 4, supply: 3 });
-  const SUPPORT_DURATION = { mark: 15, reinforce: 18, supply: 3 };
+  const SUPPORTS = Object.freeze({ mark: 2, reinforce: 4, supply: 3, smoke: 4, artillery: 7 });
+  const SUPPORT_DURATION = { mark: 15, reinforce: 18, supply: 3, smoke: 22, artillery: 35 };
+  const SMOKE_RADIUS = 6;
 
   function nearby(position, point) {
     return Math.abs(position.y - point.y) <= HEIGHT &&
       Math.hypot(position.x - point.x, position.z - point.z) < RADIUS;
   }
 
-  window.createPortConquest = (relays, { mode = 'conquest' } = {}) => {
+  window.createPortConquest = (relays, { mode = 'conquest', duration = DURATION, startingTickets = START_TICKETS } = {}) => {
+    if (![180, 240, 360].includes(duration)) duration = DURATION;
+    if (![25, 40, 70].includes(startingTickets)) startingTickets = START_TICKETS;
     const breakthrough = mode === 'breakthrough';
     const points = relays.map(({ id, short, o }, index) => ({
       id, short, pos: o.pos, control: breakthrough || index === 0 ? -100 : 0,
       owner: breakthrough || index === 0 ? 'red' : null, contested: false,
       locked: breakthrough && index > 0, secured: false
     }));
-    const tickets = { blue: START_TICKETS, red: breakthrough ? points.length : START_TICKETS };
+    const tickets = { blue: startingTickets, red: breakthrough ? points.length : startingTickets };
     const support = {
-      markUntil: 0, reinforceUntil: 0, supplyUntil: 0, reinforcePosition: null
+      markUntil: 0, reinforceUntil: 0, supplyUntil: 0, reinforcePosition: null,
+      smokeUntil: 0, smokePosition: null, artilleryUntil: 0, artillery: null,
     };
     let sector = 0;
     let supportPoints = 3;
@@ -30,17 +34,19 @@
     let winner = null;
     let respawnAt = null;
     let deaths = 0;
+    let kills = 0;
+    let captures = 0;
 
     function finish() {
       if (breakthrough) {
         if (sector >= points.length) winner = 'blue';
-        else if (!tickets.blue || elapsed >= DURATION) winner = 'red';
+        else if (!tickets.blue || elapsed >= duration) winner = 'red';
         return;
       }
       if (!tickets.blue && !tickets.red) winner = 'draw';
       else if (!tickets.blue) winner = 'red';
       else if (!tickets.red) winner = 'blue';
-      else if (elapsed >= DURATION) {
+      else if (elapsed >= duration) {
         winner = tickets.blue === tickets.red ? 'draw' : tickets.blue > tickets.red ? 'blue' : 'red';
       }
     }
@@ -56,12 +62,14 @@
       get activePoint() { return breakthrough && !winner ? points[sector] ?? null : null; },
       get supportPoints() { return supportPoints; },
       get elapsed() { return elapsed; },
-      get remaining() { return Math.max(0, DURATION - elapsed); },
+      get remaining() { return Math.max(0, duration - elapsed); },
       get winner() { return winner; },
       get deaths() { return deaths; },
+      get kills() { return kills; },
+      get captures() { return captures; },
       get respawning() { return respawnAt !== null; },
       near(position) { return points.find(point => nearby(position, point.pos)); },
-      useSupport(kind, position) {
+      useSupport(kind, position, targetId) {
         if (winner || respawnAt !== null || !Object.hasOwn(SUPPORTS, kind)) return false;
         const durationKey = kind + 'Until';
         if (supportPoints < SUPPORTS[kind] || support[durationKey] > elapsed) return false;
@@ -70,9 +78,37 @@
           if (!point) return false;
           support.reinforcePosition = point.pos;
         }
+        if (kind === 'smoke' || kind === 'artillery') {
+          const point = points.find(candidate => candidate.id === targetId && !candidate.locked);
+          if (!point || kind === 'artillery' && point.owner === 'blue') return false;
+          if (kind === 'smoke') support.smokePosition = point.pos;
+          else support.artillery = { position: point.pos, next: elapsed + 5, remaining: 4 };
+        }
         supportPoints -= SUPPORTS[kind];
         support[durationKey] = elapsed + SUPPORT_DURATION[kind];
         return true;
+      },
+      smokeBlocks(from, to) {
+        if (elapsed >= support.smokeUntil) return false;
+        const point = support.smokePosition;
+        const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+        const length = dx * dx + dy * dy + dz * dz;
+        const height = point.y + 1.5;
+        const projection = length ? ((point.x - from.x) * dx + (height - from.y) * dy +
+          (point.z - from.z) * dz) / length : 0;
+        const t = Math.min(1, Math.max(0, projection));
+        return Math.hypot(from.x + t * dx - point.x, from.y + t * dy - height,
+          from.z + t * dz - point.z) < SMOKE_RADIUS;
+      },
+      takeArtilleryImpacts() {
+        const barrage = support.artillery;
+        const impacts = [];
+        while (!winner && barrage?.remaining && elapsed >= barrage.next) {
+          impacts.push(barrage.position);
+          barrage.remaining--;
+          barrage.next += 3;
+        }
+        return impacts;
       },
       casualty() {
         if (winner || respawnAt !== null) return;
@@ -83,6 +119,7 @@
       },
       killedMachine() {
         if (winner) return;
+        kills++;
         awardSupport(1);
         if (!breakthrough) tickets.red = Math.max(0, tickets.red - 1);
         finish();
@@ -90,9 +127,9 @@
       update(dt, player, machines, allies = []) {
         if (winner || !Number.isFinite(dt) || dt <= 0) return { captures: [], respawn: false };
         const previousElapsed = elapsed;
-        if (breakthrough) dt = Math.min(dt, DURATION - previousElapsed);
+        dt = Math.min(dt, duration - previousElapsed);
         elapsed += dt;
-        const captures = [];
+        const capturedPoints = [];
         for (const point of breakthrough ? [points[sector]] : points) {
           const fullPresence = (player.alive && player.pos && nearby(player.pos, point.pos)) ||
             allies.some(ally => ally.alive && ally.pos && nearby(ally.pos, point.pos));
@@ -109,7 +146,8 @@
           if (point.control >= 99.999) point.owner = 'blue';
           if (point.control <= -99.999) point.owner = 'red';
           if (point.owner === 'blue' && before !== 'blue') {
-            captures.push(point);
+            capturedPoints.push(point);
+            captures++;
             awardSupport(3);
             if (breakthrough) {
               point.secured = true;
@@ -127,7 +165,7 @@
         finish();
         const respawn = !winner && respawnAt !== null && elapsed >= respawnAt;
         if (respawn) respawnAt = null;
-        return { captures, respawn };
+        return { captures: capturedPoints, respawn };
       }
     };
   };
