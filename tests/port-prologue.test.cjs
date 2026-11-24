@@ -186,3 +186,18 @@ test('resupply in story or range repeats only after a fresh interaction', () => 
     assert.equal(progress.phase, expectedPhase);
   }
 });
+
+test('flight timing follows visible wall time at low frame rates and pauses while hidden', () => {
+  const window = {};
+  runInNewContext(readFileSync(require.resolve('../port-prologue-flight.js'), 'utf8'), { window });
+  let time = 0;
+  const clock = window.createPortFlightClock(() => time);
+  time = 800;
+  assert.equal(clock.step(true), .8);
+  time = 3400;
+  assert.equal(clock.step(false), 0);
+  time = 5000;
+  clock.reset();
+  time = 6200;
+  assert.equal(clock.step(true), 1.2);
+});

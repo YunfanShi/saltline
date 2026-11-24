@@ -1,5 +1,18 @@
 /* Camera cues for the fictional SAR transport and the playable Berth 4 arrival. */
 (() => {
+  window.createPortFlightClock = (now = () => performance.now()) => {
+    let last = now();
+    return {
+      reset() { last = now(); },
+      step(visible) {
+        const current = now();
+        const delta = Math.max(0, (current - last) / 1000);
+        last = current;
+        return visible ? delta : 0;
+      },
+    };
+  };
+
   window.createPortPrologueFlight = (world, aircraft, landing) => {
     const { THREE } = world;
     const { root, anchors } = aircraft;

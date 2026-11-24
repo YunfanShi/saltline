@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Saltline</title>
-<meta name="application-version" content="0.13.0">
+<meta name="application-version" content="0.13.1">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500&family=Barlow+Condensed:wght@400;500;600&display=swap">
@@ -6628,6 +6628,9 @@ function activateBerthAlarm({target,reinforcement}){
  storyRadio(["Port Control is locking down the waterfront. Patrols are moving toward the boat.","港务控制楼正在封锁临水区。巡逻队正往接应艇方向移动。"],7);
 }
 const cinematic=window.createPortCinematicDirector();
+const flightClock=window.createPortFlightClock();
+const scriptedFlight=new Set(["hq-departure","berth-arrival","berth-descent"]);
+listen(document,"visibilitychange",()=>flightClock.reset());
 on("campaign:missile-launch",({pos})=>{
  if(cinematic.active)i.audio.play?.("rail_missile_pass",{pos,ref:14,gain:.76,jitter:0});
 });
@@ -6694,6 +6697,7 @@ function runCinematic(id,duration,onFrame,onFinish=()=>{},{handoff=false}={}){
  const pose={position:camera.position.clone(),rotation:camera.quaternion.clone(),fov:camera.fov};
  const weaponVisible=i.params.noweapon?false:true;
  const wasEnabled=n.enabled;
+ flightClock.reset();
  filmLook.yaw=filmLook.pitch=0;
  filmHandOff=handoff;
  o.clearRadio?.();
@@ -7597,7 +7601,9 @@ function B(P){
  campaignOverview.update();
  slate?.update();
  if(cinematic.active){
-  if(!document.hidden)cinematic.update(P);
+  const visible=!document.hidden;
+  if(scriptedFlight.has(cinematic.id))cinematic.update(flightClock.step(visible));
+  else if(visible)cinematic.update(P);
   return false;
  }
  if(arrivalState==="waiting"&&_.state==="playing"){
