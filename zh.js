@@ -118,6 +118,8 @@
     'Fire': '开火',
     'Aim': '瞄准',
     'Reload': '换弹',
+    'The Missing List': '失联名单',
+    'Campaign chapters': '战役章节',
     'Campaign weapons': '战役武器',
     'Swap campaign weapon': '切换战役武器',
     'Rifle ·': '步枪 ·',

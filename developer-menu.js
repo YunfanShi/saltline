@@ -118,7 +118,7 @@
       event.preventDefault();
       close();
     });
-    document.addEventListener('saltline:localechange', refresh);
+    document.addEventListener('saltline:localechange', refresh, { signal: world.chapterSignal });
     window.addEventListener('keydown', event => {
       const shortcut = (event.code === 'Backquote' || event.key === '`' || event.key === '~' || event.key === '～') &&
         !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing &&
@@ -134,7 +134,7 @@
           if (!event.repeat) close();
         }
       }
-    }, true);
+    }, world.chapterSignal ? { capture: true, signal: world.chapterSignal } : true);
 
     return {
       flags,

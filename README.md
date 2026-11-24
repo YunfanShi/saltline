@@ -4,7 +4,7 @@ A small browser first-person shooter set in a rainy industrial port. Recover evi
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.11.0
+## Saltline fork 0.12.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
 - **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure four sectors in order, beginning at West Dispatch. The LAN staging room is available when launched with the local server.
@@ -21,13 +21,25 @@ The battle settings, requisition menu and scoreboard adapt systems from [IRONFRO
 
 ## Campaign
 
-Choose **Campaign → Start campaign** to deploy at Berth 4. Chapters unlock in story order after extraction. Choose **Continue story** from the debrief or Campaign page to start the next chapter. Retry or choose **Resume from checkpoint** to pick up the current chapter. **Restart chapter** clears its checkpoint. Completed chapters can be replayed. Saves from earlier versions keep completed chapters and restart any unfinished chapter at its new entrance.
+**The Missing List** follows the hunt for seventeen workers whose port records show them already evacuated. Open **Campaign** to start or continue. A chapter ends with a first-person handoff and advances automatically in the same page. From the campaign menu, select a completed chapter to replay it without changing the story save.
 
-Both maps extend 68 metres west. Three crossings connect West Dispatch to Berth 4. The rail annex has separate truck and pedestrian crossings into the inspection yard.
+The game saves mission checkpoints and chapter handoffs separately. If you leave during a handoff, **Continue campaign** resumes the ending and then loads the next chapter. Already finished chapters from earlier versions remain unlocked.
 
-At **Berth 4**, use the waterside maintenance approach or open the truck gate from the loading-road guard console. Keep clear of patrols and searchlights if you want a quiet run. An alarm sends patrols toward the escape boat and calls one reinforcement. Take the freight dossier from Port Control and board at the south quay ladder.
+| Chapter | Main task |
+| --- | --- |
+| Berth 4 | Practice at the optional range, check the duty board, cross to West Dispatch and confirm the conflicting records before returning to the boat. |
+| Rail Inspection Yard | Reach the lookout, track the wreck survivor and escort him via the cargo ramp or maintenance lane. |
+| Old Drydock | Reconstruct the tug route and climb out as the dock floods. |
+| Tide Gate | Cross the exposed gantry and reunite with Mara after the barge collision. |
+| Outer Anchorage | Board the listing platform and evacuate all seventeen workers in groups. |
+| Return to Harbor | Guide the nurse from the cold store to the improvised clinic. |
+| Night Shift Record | Find the night-shift evidence and put the calls in order. |
+| Last Pilotage | Get Harris and the evidence across the cut-off pier to the pilot station. |
+| Reopening | Walk the original quay, return the boots and cast off. |
 
-At **Rail Inspection Yard**, read the signed manifest at west customs and move to the transport lookout. After the crash, follow the survivor's signals and escort them out. The cargo ramp is shorter and exposed. The maintenance route takes longer and requires restoring shutter power. The survivor waits if you leave them behind or their route is blocked. Campaign cinematics play through before returning control.
+Berth 4 starts at the original port entrance. The training lane has three reactive targets, with the rifle and sidearm available from the start. You can practice switching, aiming and reloading or head straight for the duty board.
+
+At Berth 4, hold **Tab** to open the field terminal. Use the arrow keys to highlight a document, **Space** to select it and **Enter** to compare the pair. Touch users can open **Evidence** and tap the documents. The game continues while the terminal is open.
 
 Commander speech uses the best English voice offered by the browser. On desktop Microsoft Edge it prefers Microsoft Natural voices when available. The browser may use its online speech service for those voices. The game sends only its fixed campaign lines to the browser speech API. If speech is unavailable, captions still follow the interface language. With speech enabled, captions appear when the utterance starts and clear when it ends. Master volume controls narration and scene audio.
 

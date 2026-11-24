@@ -15,11 +15,16 @@ const ROOT = path.resolve(__dirname, '..');
 const ASSETS = new Set([
   'index.html', 'zh.js',
   'port-campaign.js', 'port-commander.js', 'port-conquest.js', 'port-rail-yard.js', 'port-expansion.js', 'port-campaign-events.js',
+  'port-campaign-ui.js', 'port-campaign-ui.css', 'port-campaign-runtime.js',
+  'port-campaign-continuation-layout.js', 'port-campaign-continuation.js',
   'port-campaign-berth.js', 'port-campaign-rail.js',
   'port-lan.js',
   'port-loadout.js', 'port-loadout.css', 'port-sidearm.js',
   'port-operations.js', 'port-operations.css',
   'developer-menu.js', 'developer-menu.css',
+  'art/campaign-berth.jpg', 'art/campaign-rail.jpg', 'art/campaign-drydock.jpg', 'art/campaign-tidegate.jpg',
+  'art/campaign-anchorage.jpg', 'art/campaign-return-harbor.jpg', 'art/campaign-night-record.jpg',
+  'art/campaign-last-pilot.jpg', 'art/campaign-reopen.jpg',
   'art/port-conquest.jpg', 'art/port-breakthrough.jpg', 'art/port-lan.jpg',
 ]);
 const CONTENT_TYPES = {

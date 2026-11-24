@@ -174,7 +174,7 @@
       closeRequisitions();
     });
     requisitionButton.addEventListener('click', openRequisitions);
-    document.addEventListener('saltline:localechange', localizeSettings);
+    document.addEventListener('saltline:localechange', localizeSettings, { signal: world.chapterSignal });
 
     function renderScore() {
       score.querySelector('h2').textContent = t('Battle scoreboard', '战局计分板');
@@ -207,9 +207,9 @@
           score.hidden = false;
         }
       }
-    }, true);
-    window.addEventListener('keyup', event => { if (event.code === 'Tab') score.hidden = true; });
-    window.addEventListener('blur', () => { score.hidden = true; });
+    }, { capture: true, signal: world.chapterSignal });
+    window.addEventListener('keyup', event => { if (event.code === 'Tab') score.hidden = true; }, { signal: world.chapterSignal });
+    window.addEventListener('blur', () => { score.hidden = true; }, { signal: world.chapterSignal });
 
     const context = map.getContext('2d');
     const base = document.createElement('canvas');
@@ -265,7 +265,7 @@
         onSupport(item.type);
       }
     }
-    document.addEventListener('keydown', keydown);
+    document.addEventListener('keydown', keydown, { signal: world.chapterSignal });
 
     function dot(position, color, radius) {
       const [x, y] = project(position);

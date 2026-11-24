@@ -196,11 +196,11 @@
         if (event.code !== 'KeyX' || event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isPlaying()) return;
         event.preventDefault();
         activate();
-      });
+      }, { signal: game.chapterSignal });
       doc.addEventListener('saltline:localechange', () => {
         renderPicker();
         renderHud();
-      });
+      }, { signal: game.chapterSignal });
     }
 
     if (doc && !game.params?.bench && !game.params?.shot && !game.params?.autostart) mount();

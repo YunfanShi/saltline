@@ -4,7 +4,7 @@ const { performance } = require('node:perf_hooks');
 const { before, beforeEach, test } = require('node:test');
 const vm = require('node:vm');
 
-let world, layout, campaign, vector;
+let world, layout, extendedLayout, campaign, vector, createBerth;
 const alarms = [];
 const dt = 1 / 30;
 
@@ -33,14 +33,18 @@ before(() => {
   world.physics = d3(world);
   world.props = Yg(world);
   const builder = ob(world);
-  scope.window.createPortExpansion(builder, vector, { rail: false });
+  const expansion = scope.window.createPortExpansion(builder, vector, { rail: false });
   hR(builder);
   fR(builder);
   ab(builder);
   const quay = cb(builder);
   layout = scope.window.createPortBerthLayout(builder, vector, { extraction: { pos: quay.extraction, radius: 2.5 } });
+  extendedLayout = scope.window.createPortBerthLayout(builder, vector, {
+    extraction: layout.extraction, dispatchPoint: expansion.campaignPoints.archive,
+  });
   world.physics.build();
-  campaign = scope.window.createPortBerthChapter(world, layout, { onAlarm: event => alarms.push(event) });
+  createBerth = scope.window.createPortBerthChapter;
+  campaign = createBerth(world, layout, { onAlarm: event => alarms.push(event) });
 });
 
 beforeEach(() => {
@@ -139,4 +143,57 @@ test('an alerted dossier checkpoint restores the route and alarm without calling
   assert.equal(layout.model.visible, false);
   assert.equal(world.physics.lineOfSight(west, east), true);
   assert.equal(campaign.update(1, playerAt(layout.archive), true), null);
+});
+
+test('the story dossier must be verified before the quay can conclude the chapter', () => {
+  campaign.show(false);
+  const chapter = createBerth(world, layout, { requiresEvidence: true });
+  chapter.show(true);
+  try {
+    const player = playerAt(layout.archive);
+    for (let frame = 0; frame < 38; frame++) chapter.update(dt, player, true);
+    assert.equal(chapter.phase, 'verify');
+    assert.equal(chapter.checkpoint.phase, 'verify');
+    const snapshot = chapter.checkpoint;
+    const ladder = playerAt(layout.extraction.pos);
+    chapter.update(dt, ladder, false);
+    assert.equal(chapter.phase, 'verify');
+    chapter.reset(snapshot);
+    assert.equal(chapter.resumePosition, layout.archive);
+    assert.equal(chapter.confirmEvidence(), true);
+    assert.equal(chapter.confirmEvidence(), false);
+    chapter.update(dt, ladder, false);
+    assert.equal(chapter.phase, 'complete');
+  } finally {
+    chapter.show(false);
+  }
+});
+
+test('the expanded first chapter starts at the training lane and collects the originals across the yard', () => {
+  campaign.show(false);
+  const chapter = createBerth(world, extendedLayout, { requiresEvidence: true });
+  chapter.show(true);
+  try {
+    const start = playerAt(extendedLayout.playerStart.pos);
+    assert.equal(start.pos.x, -32);
+    assert.equal(chapter.phase, 'entry');
+    assert.equal(chapter.gateOpen, true);
+    assert.equal(extendedLayout.gate.visible, false);
+    const target = extendedLayout.training[0];
+    const dir = target.center.clone().sub(start.eye).normalize();
+    assert.equal(chapter.trainingHit({ origin: start.eye, dir }), true);
+    assert.equal(chapter.trainingHit({ origin: start.eye, dir }), false);
+    const dispatch = playerAt(extendedLayout.dispatchPoint);
+    const board = playerAt(extendedLayout.archive);
+    assert.ok(board.pos.distanceTo(dispatch.pos) > 100);
+    for (let frame = 0; frame < 40; frame++) chapter.update(dt, board, true);
+    assert.equal(chapter.phase, 'archive');
+    for (let frame = 0; frame < 40; frame++) chapter.update(dt, dispatch, true);
+    assert.equal(chapter.phase, 'verify');
+    assert.equal(chapter.confirmEvidence(), true);
+    chapter.update(dt, playerAt(extendedLayout.extraction.pos), false);
+    assert.equal(chapter.phase, 'complete');
+  } finally {
+    chapter.show(false);
+  }
 });
