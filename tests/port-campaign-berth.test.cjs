@@ -169,7 +169,7 @@ test('the story dossier must be verified before the quay can conclude the chapte
   }
 });
 
-test('the expanded first chapter starts at the training lane and collects the originals across the yard', () => {
+test('the expanded first chapter keeps the landing entrance and collects the originals across the yard', () => {
   campaign.show(false);
   const chapter = createBerth(world, extendedLayout, { requiresEvidence: true });
   chapter.show(true);
@@ -179,10 +179,8 @@ test('the expanded first chapter starts at the training lane and collects the or
     assert.equal(chapter.phase, 'entry');
     assert.equal(chapter.gateOpen, true);
     assert.equal(extendedLayout.gate.visible, false);
-    const target = extendedLayout.training[0];
-    const dir = target.center.clone().sub(start.eye).normalize();
-    assert.equal(chapter.trainingHit({ origin: start.eye, dir }), true);
-    assert.equal(chapter.trainingHit({ origin: start.eye, dir }), false);
+    assert.equal(chapter.markers()[0].id, 'entry');
+    assert.equal(chapter.markers().some(marker => marker.id === 'range'), false);
     const dispatch = playerAt(extendedLayout.dispatchPoint);
     const board = playerAt(extendedLayout.archive);
     assert.ok(board.pos.distanceTo(dispatch.pos) > 100);

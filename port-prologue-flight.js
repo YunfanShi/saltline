@@ -1,0 +1,88 @@
+/* Camera cues for the fictional SAR transport and the playable Berth 4 arrival. */
+(() => {
+  window.createPortPrologueFlight = (world, aircraft, landing) => {
+    const { THREE } = world;
+    const { root, anchors } = aircraft;
+    const pad = root.position.clone();
+    const stableRotation = root.rotation.clone();
+    const eye = new THREE.Vector3(), target = new THREE.Vector3(), exit = new THREE.Vector3();
+    const touchdown = landing?.clone().add(new THREE.Vector3(0, 1.62, 0));
+    const harbor = landing?.clone().add(new THREE.Vector3(36, .6, -13));
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const smooth = (from, to, time) => {
+      const t = Math.max(0, Math.min(1, (time - from) / (to - from)));
+      return t * t * (3 - 2 * t);
+    };
+    function point(key, out) {
+      const anchor = anchors[key];
+      if (anchor.isObject3D) return anchor.getWorldPosition(out);
+      return root.localToWorld(out.copy(anchor));
+    }
+    function cabin(lookAhead, camera) {
+      point('seat', eye);
+      root.localToWorld(target.set(lookAhead, 2.02, -6));
+      camera(eye, target, 66);
+    }
+    function hover(inbound = 0) {
+      root.rotation.set(0, Math.PI, 0);
+      root.position.set(landing.x + anchors.cable.x, landing.y + 20 + inbound * 1.5,
+        landing.z + anchors.cable.z + inbound * 16);
+    }
+    function stow() {
+      root.position.copy(pad);
+      root.rotation.copy(stableRotation);
+      aircraft.setDoor(1);
+      aircraft.setCable(0);
+    }
+    return {
+      flightSeconds: 12.3,
+      approachSeconds: 5.5,
+      descentSeconds: 7.2,
+      departure(time, dt, camera) {
+        const lifting = smooth(2.1, 7.2, time);
+        const travel = smooth(3.7, 12.3, time);
+        root.position.set(pad.x + travel * 9, pad.y + lifting * 17, pad.z - travel * 36);
+        root.rotation.set(.09 * Math.sin(lifting * Math.PI), stableRotation.y, reduced ? 0 : Math.sin(time * .35) * .017);
+        aircraft.setDoor(1 - smooth(.15, 1.7, time));
+        aircraft.spin(dt, .35 + .65 * smooth(0, 4, time));
+        cabin(-2.2 - lifting, camera);
+      },
+      approach(time, dt, camera) {
+        root.visible = true;
+        hover(1 - smooth(0, 3.6, time));
+        aircraft.setDoor(smooth(1.6, 4.4, time));
+        aircraft.spin(dt, 1);
+        point('seat', eye);
+        root.localToWorld(target.set(-8, -.6, -1));
+        camera(eye, target, 70);
+      },
+      wait(dt, camera) {
+        root.visible = true;
+        hover();
+        aircraft.setDoor(1);
+        aircraft.spin(dt, 1);
+        point('seat', eye);
+        point('door', exit);
+        eye.lerp(exit, .72);
+        target.copy(harbor).y = landing.y + 8;
+        camera(eye, target, 70);
+      },
+      descend(time, dt, camera) {
+        hover();
+        aircraft.setDoor(1);
+        const reach = smooth(0, 1.35, time);
+        const lowering = smooth(1.25, 6.85, time);
+        point('seat', eye);
+        point('perch', exit);
+        eye.lerp(exit, reach).lerp(touchdown, lowering);
+        if (!reduced) eye.z += Math.sin(time * 3.2) * Math.sin(Math.PI * lowering) * .12;
+        aircraft.setCable(Math.max(.08, lowering * 21));
+        aircraft.spin(dt, 1);
+        target.copy(harbor).y += 8 * (1 - lowering);
+        camera(eye, target, 70);
+      },
+      hide() { aircraft.setCable(0); root.visible = false; },
+      stow,
+    };
+  };
+})();

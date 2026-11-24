@@ -425,6 +425,7 @@
       select,
       addAmmo(rounds) { active.addAmmo(rounds); },
       refill() { active.reset(); },
+      refillAll() { rifle.reset(); sidearm?.reset(); },
       reloadNow() { return active.reloadNow(); },
       muzzleWorld(out) { return active.muzzleWorld(out); },
       setWetness(value) { rifle.setWetness(value); },

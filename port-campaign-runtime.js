@@ -55,9 +55,9 @@
 
   function createHandoffVisual(world, chapter, {glove,layer}) {
     const lines = forms[chapter];
-    if (!lines && chapter !== 'reopen' && chapter !== 'rail' && chapter !== 'tidegate') return null;
+    if (!lines && chapter !== 'reopen' && chapter !== 'rail' && chapter !== 'tidegate' && chapter !== 'descent') return null;
     const {Group,Mesh,MeshStandardMaterial,MeshBasicMaterial,PlaneGeometry,BoxGeometry,
-      CanvasTexture,SRGBColorSpace} = world.THREE;
+      CanvasTexture,SRGBColorSpace,CylinderGeometry} = world.THREE;
     const root = new Group();
     root.name = 'chapter-handoff-' + chapter;
     const geometry = new Set(), materials = new Set(), textures = new Set();
@@ -113,6 +113,8 @@
       } else {
         add(item,new PlaneGeometry(.19,.125),card(lines[0],lines.slice(1)),0,0,0);
       }
+    } else if (chapter === 'descent') {
+      add(item,new CylinderGeometry(.005,.005,.43,10),material(0x555b55),0,.08,-.025);
     } else if(chapter === 'reopen') {
       const leather=material(0x3e3024),sole=material(0x22241f),lace=material(0x72715e);
       for(const x of [-.036,.036]){
@@ -131,7 +133,8 @@
       for(const [side,mirror] of [[-1,true],[1,false]]){
         const model=glove({mirror,fingers:[[.9,1.4,.65,0],[.95,1.4,.65,0],[1.02,1.4,.65,0],[1.06,1.4,.65,0]],
           thumb:[[-.78,.06,-.6],[-.42,.1,-.9],[-.12,.02,-.99]],forearm:[.28,-.4,.85],sleeve:.21});
-        const hand=add(root,model.fabric,fabric,side*.092,-.055,.065);
+        const hand=add(root,model.fabric,fabric,side*(chapter==="descent"?.037:.092),-.055+
+          (chapter==="descent"?side*.028:0),.065);
         hand.rotation.set(.27,-side*.38,side*.57);
       }
     }
@@ -141,7 +144,8 @@
     return {
       update(time,duration) {
         const ease=x=>{const value=Math.min(1,Math.max(0,x));return value*value*(3-2*value)};
-        const raise=ease((time-4)/1.7)*(1-ease((time-(duration-5))/1.2));
+        const raise=chapter==='descent'?ease((time-.3)/.85)*(1-ease((time-(duration-.95))/.65)):
+          ease((time-4)/1.7)*(1-ease((time-(duration-5))/1.2));
         root.visible=raise>.01;
         root.position.set(.035,-.20+.072*raise,-.33+.015*raise);
         root.rotation.set(-.18+(1-raise)*.4,.015,Math.sin(time*1.8)*.014);

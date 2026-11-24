@@ -10,15 +10,23 @@
     return edge;
   }
 
-  window.createCampaignOverview = (root, { progress, launch, initial, signal }) => {
-    const chapters = window.SaltlineCampaign.chapters;
+  window.createCampaignOverview = (root, { progress, prologue, launch, initial, signal }) => {
+    const intro = { id: 'prologue', title: ['Prologue · Dispatch', '序章 · 出勤'],
+      description: ['Report to SAR Headquarters, visit the range or head to the helipad.',
+        '到应急救援总部听取简报，可先去训练场，再前往停机坪。'] };
+    const chapters = prologue ? [intro, ...window.SaltlineCampaign.chapters] : window.SaltlineCampaign.chapters;
+    const statusFor = id => id === 'prologue'
+      ? prologue.needsPrologue ? 'next' : 'available'
+      : id === 'berth' && prologue?.needsPrologue ? 'locked' : progress.status(id);
     const art = root.querySelector('.campaign-cover-art');
     const title = root.querySelector('[data-campaign-location]');
     const description = root.querySelector('[data-preview-description]');
     const main = root.querySelector('[data-campaign-launch]');
+    const range = root.querySelector('[data-campaign-range]');
     const list = root.querySelector('.campaign-chapter-list');
     const previous = [];
-    let selected = chapters.findIndex(chapter => chapter.id === initial && progress.status(chapter.id) !== 'locked');
+    if (prologue?.needsPrologue) initial = 'prologue';
+    let selected = chapters.findIndex(chapter => chapter.id === initial && statusFor(chapter.id) !== 'locked');
     const ui = chapters.map((chapter, index) => {
       const item = document.createElement('li');
       const button = document.createElement('button');
@@ -28,7 +36,7 @@
       button.type = 'button';
       button.className = 'campaign-chapter-select';
       number.className = 'campaign-number';
-      number.textContent = String(index + 1).padStart(2, '0');
+      number.textContent = String(index + (prologue ? 0 : 1)).padStart(2, '0');
       name.className = 'campaign-menu-place';
       status.className = 'campaign-menu-state';
       button.append(number, name, status);
@@ -50,7 +58,7 @@
     function render() {
       if (selected < 0) selected = progress.next ? chapters.findIndex(chapter => chapter.id === progress.next) : chapters.length - 1;
       const chapter = chapters[selected];
-      const status = progress.status(chapter.id);
+      const status = statusFor(chapter.id);
       if (art.dataset.chapter !== chapter.id) {
         art.src = './art/campaign-' + chapter.id + '.jpg';
         art.dataset.chapter = chapter.id;
@@ -59,24 +67,28 @@
       description.textContent = local(...chapter.description);
       main.disabled = status === 'locked';
       main.textContent = status === 'locked' ? local('Chapter locked', '章节未解锁') :
+        chapter.id === 'prologue' ? status !== 'next' ? local('Replay prologue', '回放序章') :
+          prologue.phase === 'unstarted' ? local('Start prologue', '开始序章') : local('Continue prologue', '继续序章') :
         status === 'complete' ? local('Replay chapter', '章节回放') :
         chapter.id === 'berth' && !progress.checkpoint(chapter.id) && !progress.pendingEnding?.(chapter.id)
           ? local('Start campaign', '开始战役') : local('Continue campaign', '继续战役');
+      if (range) range.textContent = local('Training ground', '训练场');
       ui.forEach(({ button, name, status: label }, index) => {
         const entry = chapters[index];
-        const availability = progress.status(entry.id);
+        const availability = statusFor(entry.id);
         button.classList.toggle('is-selected', index === selected);
         button.setAttribute('aria-pressed', String(index === selected));
         button.dataset.progress = availability;
         name.textContent = local(...entry.title);
         label.textContent = availability === 'complete' ? local('Complete', '已完成') :
-          availability === 'next' ? local('Current', '当前章节') : local('Locked', '未解锁');
+          availability === 'next' ? local('Current', '当前章节') : availability === 'available' ? local('Available', '可回放') : local('Locked', '未解锁');
       });
     }
 
     main.addEventListener('click', () => {
       if (!main.disabled) launch(chapters[selected].id);
     }, { signal });
+    range?.addEventListener('click', () => launch('prologue', { range: true }), { signal });
     list.addEventListener('keydown', event => {
       const delta = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[event.key];
       if (delta === undefined) return;
@@ -97,7 +109,7 @@
     };
   };
 
-  window.createPortEvidenceSlate = ({ parent, clues, available, verified, verify, onOpen, signal }) => {
+  window.createPortEvidenceSlate = ({ parent, clues, available, verified, verify, onOpen, signal, practice = false }) => {
     const overlay = document.createElement('section');
     overlay.className = 'campaign-slate';
     overlay.hidden = true;
@@ -115,7 +127,14 @@
     const list = overlay.querySelector('.campaign-slate-records');
     const previous = [];
     const selected = new Set();
-    const records = [...clues, { id: 'radio', time: '05:37', title: ['Pilot radio log', '引航员电台日志'],
+    const records = practice ? [
+      { id: 'evacuation', time: '07:20', title: ['Training transport log', '训练运输记录'],
+        detail: ['Operator Gray is marked off-site.', '格雷已离开训练基地。'] },
+      { id: 'shift-log', time: '07:26', title: ['Training duty sheet', '训练值班表'],
+        detail: ['Operator Gray signs at the exercise desk.', '格雷在训练值班台当面签字。'] },
+      { id: 'radio', time: '07:30', title: ['Range signal check', '靶场信号检查'],
+        detail: ['The training channel is clear.', '训练频道信号正常。'] },
+    ] : [...clues, { id: 'radio', time: '05:37', title: ['Pilot radio log', '引航员电台日志'],
       detail: ['Radio contact with Berth 4 was lost.', '与四号泊位失去无线电联络。'] }];
     const options = records.map(({ id, time, title, detail }, index) => {
       const button = document.createElement('button');
@@ -144,7 +163,8 @@
       overlay.querySelector('h2').textContent = local('Field terminal', '战术终端');
       overlay.querySelector('[data-slate-task]').textContent = completed ?
         local('Discrepancy filed. Take the dossier to the boat.', '矛盾记录已确认。携档案登船。') :
-        local('Select two records that place the same worker in different places.', '选出两份记载同一名工人在不同地点的证物。');
+        practice ? local('Training exercise. Select two records about the same worker.', '训练演习。选出关于同一名工人的两份记录。') :
+          local('Select two records that place the same worker in different places.', '选出两份记载同一名工人在不同地点的证物。');
       close.textContent = local('Close', '关闭');
       touchOpen.textContent = local('Evidence', '证物');
       confirm.textContent = local('Compare records', '核验记录');
@@ -172,7 +192,8 @@
     function submit() {
       if (selected.size !== 2 || verified()) return;
       if (verify([...selected])) {
-        feedback.textContent = local('05:31 and 05:34 cannot both be true. Control has a copy.', '05:31 和 05:34 的记录有矛盾。指挥部已收到副本。');
+        feedback.textContent = practice ? local('Exercise complete. This is a local training record.', '训练完成。这份记录仅供练习。') :
+          local('05:31 and 05:34 cannot both be true. Control has a copy.', '05:31 和 05:34 的记录有矛盾。指挥部已收到副本。');
       } else {
         feedback.textContent = local('Check the worker’s name and signed time in both records.', '检查两份记录里的姓名和签字时间。');
       }

@@ -16,7 +16,6 @@
   };
   const markerText = {
     entry: ['Port Control duty board', '港务控制楼值班板'],
-    range: ['Training lane', '训练靶道'],
     road: ['Loading road / guard console', '装卸车道／岗亭控制台'],
     water: ['Waterside maintenance entrance', '临水维修入口'],
     archive: ['Port control / freight dossier', '港口控制楼／货运档案'],
@@ -195,20 +194,8 @@
       cylinder('steel_dark', .158, .12, x, y - .1, z, { seg: 10 });
     }
 
-    const training = [];
+    let dispatchDossier = null;
     if (dispatchPoint) {
-      const aimLine = point(-32, 6);
-      sign('CHECK ZERO / TRAINING', 2.5, .19, -30.8, 2.15, 4.5, -Math.PI / 2);
-      for (const [x,z] of [[-25.8,5.74],[-23.5,6.88],[-24.55,8.03]]) {
-        const stand = new THREE.Group();
-        model.add(stand);
-        stand.position.set(x,0,z);
-        const color = new THREE.MeshBasicMaterial({ color: 0xdeab77 });
-        piece('steel_dark',.08,1.26,.1,0,.63,0,stand);
-        piece('steel_worn',.1,.62,.62,0,1.43,0,stand);
-        piece(color,.018,.34,.34,-.058,1.43,0,stand);
-        training.push({ stand, color, center: point(x-.075,z,1.43), hit:false });
-      }
       const desk = new THREE.Group();
       model.add(desk);
       desk.position.copy(dispatchPoint);
@@ -219,15 +206,14 @@
       desk.add(paper);
       piece('paint_white',.28,.025,.22,0,.913,-.58,paper);
       piece('paint_orange',.32,.02,.25,0,.902,-.58,paper);
-      training.start = aimLine;
-      training.paper = paper;
+      dispatchDossier = paper;
     }
 
     return {
-      dispatchPoint, training,
+      dispatchPoint, dispatchDossier,
       model, gate, dossier, consoleMaterial, geometry, searchlights, alarms, extraction,
       gateBounds: { ...bounds(gateX - .1, 0, gateNorth + .1, gateX + .1, gateTravel, gateSouth - .1), surface: 'metal' },
-      playerStart: { pos: dispatchPoint ? training.start : point(19.1, -7.96), yaw: -Math.PI / 2 },
+      playerStart: { pos: dispatchPoint ? point(-32, 6) : point(19.1, -7.96), yaw: -Math.PI / 2 },
       archive: point(24.7, -5.87), archiveSight: point(24.72, -4.98, .955),
       routes: {
         road: { pos: consolePos, console: consolePos, threshold: point(gateX, laneZ),
@@ -237,7 +223,6 @@
             point(28.08, -6.4), point(east, -6.4), point(24.7, -5.87)] },
       },
       supplies: [
-        ...(dispatchPoint ? [{ id: 'training-ammo', pos: point(-31.8, 5.4), rounds: 90 }] : []),
         { id: 'berth-loading-ammo', pos: point(18.58, -5.12), rounds: 45 },
         { id: 'berth-maintenance-ammo', pos: point(27.16, -10.03), rounds: 45 },
       ],
@@ -302,9 +287,8 @@
 
   window.createPortBerthChapter = (world, layout, { initialPhase, onAlarm = () => {}, requiresEvidence = false } = {}) => {
     const { THREE, physics } = world;
-    const { model, gate, dossier, consoleMaterial, searchlights, routes, extraction, dispatchPoint, training } = layout;
+    const { model, gate, dossier, consoleMaterial, searchlights, routes, extraction, dispatchPoint, dispatchDossier } = layout;
     const dispatchSight = dispatchPoint?.clone().add(new THREE.Vector3(0,.91,-.58));
-    const trainingRay = new THREE.Ray();
     const lamps = searchlights.map(spec => searchlightVisual(THREE, model, spec));
     const green = 0x8fefba, amber = 0xf0a04b;
     const darkRed = 0x4e1b16, hotRed = 0xff512a;
@@ -401,12 +385,7 @@
       holding = null;
       gateLift = gateOpen ? gateTravel : 0;
       dossier.visible = dispatchPoint ? phase === 'entry' : phase === 'archive';
-      if (training.paper) training.paper.visible = ['entry','archive'].includes(phase);
-      for (const target of training) {
-        target.hit = false;
-        target.stand.rotation.x = 0;
-        target.color.color.set(0xdeab77);
-      }
+      if (dispatchDossier) dispatchDossier.visible = ['entry','archive'].includes(phase);
       syncGate();
       updateBeacons();
       updateSearchlights();
@@ -454,18 +433,13 @@
             phase = 'archive';
             dossier.visible = false;
           } else {
-            if (training.paper) training.paper.visible = false;
+            if (dispatchDossier) dispatchDossier.visible = false;
             phase = requiresEvidence ? 'verify' : 'extract';
             dossier.visible = false;
           }
           return null;
         }
         return { prompt: promptText[action], progress: held / span };
-      }
-      if (phase === 'entry' && training.start && inReach(player.pos, training.start, 3.2, 1.2)) {
-        const hit = training.filter(target => target.hit).length;
-        return { trainingHint: [`Optional range ${hit}/3 · 1/2 switch · Aim · R reload`,
-          `可选靶场 ${hit}/3 · 1/2 换枪 · 瞄准 · R 换弹`] };
       }
       if (!alarmed && exposure > .13) return { prompt: promptText.light, progress: exposure / exposureLimit };
       return null;
@@ -477,18 +451,6 @@
 
     return {
       reset, update, alert,
-      trainingHit({origin, dir} = {}) {
-        if (!active || phase !== 'entry' || !origin?.isVector3 || !dir?.isVector3 ||
-          !training.start || origin.distanceToSquared(training.start) > 64) return false;
-        trainingRay.set(origin, dir);
-        const target = training.find(item => !item.hit &&
-          trainingRay.distanceSqToPoint(item.center) < .105 && physics.lineOfSight(origin, item.center));
-        if (!target) return false;
-        target.hit = true;
-        target.color.color.set(0x88d4b6);
-        target.stand.rotation.x = -.32;
-        return true;
-      },
       confirmEvidence() {
         if (phase !== 'verify') return false;
         phase = 'extract';
@@ -521,7 +483,7 @@
       },
       markers() {
         const approaches = [marker('road', 'RD', routes.road.pos), marker('water', 'QY', routes.water.pos)];
-        if (phase === 'entry') return [marker('entry','CTRL',layout.archive), marker('range','RNG',training.start)];
+        if (phase === 'entry') return [marker('entry','CTRL',layout.archive)];
         if (phase === 'archive') return [...(dispatchPoint ? [] : approaches), marker('archive', 'LOG', dispatchPoint ?? layout.archive)];
         if (phase === 'extract') {
           const exit = marker('extract', 'EX', extraction.pos, 'extract');

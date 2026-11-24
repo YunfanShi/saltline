@@ -4,7 +4,7 @@ A small browser first-person shooter set in a rainy industrial port. Recover evi
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.12.0
+## Saltline fork 0.13.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
 - **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure four sectors in order, beginning at West Dispatch. The LAN staging room is available when launched with the local server.
@@ -21,13 +21,13 @@ The battle settings, requisition menu and scoreboard adapt systems from [IRONFRO
 
 ## Campaign
 
-**The Missing List** follows the hunt for seventeen workers whose port records show them already evacuated. Open **Campaign** to start or continue. A chapter ends with a first-person handoff and advances automatically in the same page. From the campaign menu, select a completed chapter to replay it without changing the story save.
+**The Missing List** follows the hunt for seventeen workers whose port records show them already evacuated. Open **Campaign** to start or continue. A new story begins with **Dispatch** at SAR Headquarters. Read the last call in the briefing room, practice at the range or continue to the helipad, then follow the prompts aboard the helicopter to descend into Berth 4. A chapter ends with a first-person handoff and advances automatically in the same page. From the campaign menu, select a completed chapter to replay it without changing the story save.
 
 The game saves mission checkpoints and chapter handoffs separately. If you leave during a handoff, **Continue campaign** resumes the ending and then loads the next chapter. Already finished chapters from earlier versions remain unlocked.
 
 | Chapter | Main task |
 | --- | --- |
-| Berth 4 | Practice at the optional range, check the duty board, cross to West Dispatch and confirm the conflicting records before returning to the boat. |
+| Berth 4 | Land at the original entrance, check the duty board, cross to West Dispatch and confirm the conflicting records before returning to the boat. |
 | Rail Inspection Yard | Reach the lookout, track the wreck survivor and escort him via the cargo ramp or maintenance lane. |
 | Old Drydock | Reconstruct the tug route and climb out as the dock floods. |
 | Tide Gate | Cross the exposed gantry and reunite with Mara after the barge collision. |
@@ -37,7 +37,7 @@ The game saves mission checkpoints and chapter handoffs separately. If you leave
 | Last Pilotage | Get Harris and the evidence across the cut-off pier to the pilot station. |
 | Reopening | Walk the original quay, return the boots and cast off. |
 
-Berth 4 starts at the original port entrance. The training lane has three reactive targets, with the rifle and sidearm available from the start. You can practice switching, aiming and reloading or head straight for the duty board.
+The training range is at SAR Headquarters. Its near and middle targets, ammunition bench and field terminal let you practice without changing the story save. Open **Campaign → Training ground** to visit independently. The story saves its headquarters briefing, helicopter boarding and Berth 4 landing. The Berth 4 landing restores at the original entrance; existing campaign checkpoints and chapter numbering carry over.
 
 At Berth 4, hold **Tab** to open the field terminal. Use the arrow keys to highlight a document, **Space** to select it and **Enter** to compare the pair. Touch users can open **Evidence** and tap the documents. The game continues while the terminal is open.
 

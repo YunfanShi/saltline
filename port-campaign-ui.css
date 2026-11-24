@@ -174,3 +174,16 @@
 
 .campaign-slate-controls { display: inline; margin-left: 1rem; color: #b2bbb7; font-size: .8rem; }
 @media (any-pointer: coarse) { .campaign-slate-controls { display: none; } }
+
+.campaign-range-link {
+  align-self: flex-end;
+  margin-top: -.85rem;
+  min-height: 40px;
+  padding: .45rem 1rem;
+  border: 1px solid var(--campaign-border);
+  background: #151c22;
+  color: var(--campaign-ink);
+  font: 650 14px/1.25 var(--f-label);
+  cursor: pointer;
+}
+.campaign-range-link:hover { color: var(--campaign-accent); }

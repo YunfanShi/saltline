@@ -8,7 +8,7 @@
   }
 
   const chapters = Object.freeze([
-    chapter('berth', 'Berth 4', '四号泊位', ['Saltline Terminal', 'Saltline 港区'], '05:37', 30,
+    chapter('berth', 'Berth 4', '四号泊位', ['Saltline Terminal', 'Saltline 港区'], '05:54', 30,
       ['Start at the port entrance, cross the yard and check the records at West Dispatch.', '从港区入口出发，横穿货场到西调度站核对记录。']),
     chapter('rail', 'Rail Yard', '铁路货场', ['West rail yard', '西区铁路货场'], '06:12', 35,
       ['Check the manifest and meet the incoming transport.', '核验签发货单，在铁路货场接应运输机。']),
@@ -30,7 +30,7 @@
   const CHAPTERS = chapters.map(({ id }) => id);
   const CHECKPOINTS = ['archive', 'lookout', 'detour', 'beacon', 'extract'];
   const SAVE_PHASES = {
-    berth: ['archive', 'verify', 'extract'],
+    berth: ['entry', 'archive', 'verify', 'extract'],
     rail: ['lookout', 'search', 'locate', 'choose', 'escort'],
   };
   const PROGRESS_KEY = 'saltline.campaign.progress.v3';
