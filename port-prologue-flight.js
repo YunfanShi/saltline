@@ -73,6 +73,7 @@
         root.visible = true;
         hover();
         aircraft.setDoor(1);
+        aircraft.setCable(21.5);
         aircraft.spin(dt, 1);
         point('seat', eye);
         point('door', exit);
@@ -89,7 +90,7 @@
         point('perch', exit);
         eye.lerp(exit, reach).lerp(touchdown, lowering);
         if (!reduced) eye.z += Math.sin(time * 3.2) * Math.sin(Math.PI * lowering) * .12;
-        aircraft.setCable(Math.max(.08, lowering * 21));
+        aircraft.setCable(21.5);
         aircraft.spin(dt, 1);
         target.copy(harbor).y += 8 * (1 - lowering);
         camera(eye, target, 70);

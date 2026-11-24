@@ -1,35 +1,70 @@
 .developer-menu {
   box-sizing: border-box;
-  width: min(35rem, calc(100% - 2rem));
+  width: min(44rem, calc(100% - 2rem));
   max-height: calc(100% - 2rem);
   overflow: auto;
-  padding: 1.25rem;
+  padding: 1.2rem 1.35rem;
   color: var(--bone);
-  background: var(--ink-2);
+  background: rgba(16, 21, 24, 0.96);
   border: 1px solid var(--signal);
-  font: 15px/1.5 system-ui, sans-serif;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .65);
+  font: 14px/1.5 system-ui, sans-serif;
 }
 
-.developer-menu::backdrop { background: rgb(8 11 13 / 75%); }
+.developer-menu::backdrop { background: rgb(8 11 13 / 72%); }
 
 .developer-menu header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: .75rem;
 }
 
-.developer-menu h2 { margin: 0; font-size: 1.35rem; }
+.developer-menu h2 { margin: 0; font-size: 1.3rem; letter-spacing: .04em; }
+
+.developer-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-bottom: .9rem;
+  padding-bottom: .65rem;
+  border-bottom: 1px solid var(--bone-faint);
+}
+
+.developer-tab {
+  padding: .42rem .85rem;
+  color: var(--bone-dim);
+  background: transparent;
+  border: 1px solid var(--bone-faint);
+  font: 600 13px/1.2 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.developer-tab.is-active {
+  color: var(--ink);
+  background: var(--signal);
+  border-color: var(--signal);
+}
+
+.developer-pane[hidden] { display: none; }
 
 .developer-menu button,
 .developer-toggles label {
-  padding: .5rem .7rem;
+  padding: .48rem .72rem;
   color: inherit;
   background: var(--ink);
   border: 1px solid var(--bone-faint);
   font: inherit;
   cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+
+.developer-menu button.is-accent {
+  color: var(--ink);
+  background: var(--signal);
+  border-color: var(--signal);
+  font-weight: 600;
 }
 
 .developer-menu button:hover:not(:disabled),
@@ -49,6 +84,16 @@
   gap: .5rem;
 }
 
+.developer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: .5rem;
+}
+
+.developer-grid button {
+  text-align: left;
+}
+
 .developer-toggles label {
   display: flex;
   align-items: center;
@@ -56,8 +101,24 @@
 }
 
 .developer-toggles input { accent-color: var(--signal); }
-.developer-menu p { color: var(--bone-dim); }
-.developer-status { margin-bottom: 0; font-variant-numeric: tabular-nums; }
+.developer-menu p { color: var(--bone-dim); margin: .65rem 0; }
+.developer-hint { margin-top: 0 !important; font-size: 13px; }
+.developer-sublabel {
+  margin: .8rem 0 .4rem;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--signal);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.developer-status {
+  margin-top: .95rem !important;
+  margin-bottom: 0 !important;
+  padding-top: .65rem;
+  border-top: 1px solid var(--bone-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
 
 .developer-indicator {
   position: absolute;

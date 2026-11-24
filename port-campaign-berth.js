@@ -20,12 +20,18 @@
     water: ['Waterside maintenance entrance', '临水维修入口'],
     archive: ['Port control / freight dossier', '港口控制楼／货运档案'],
     extract: ['Boat / south ladder', '接应艇／南端梯口'],
+    shed: ['Warehouse 1 power breaker (cuts searchlights)', '1 号货仓配电总闸（切断探照灯）'],
+    catwalk: ['Yard catwalk overlook (recon & tags patrols)', '货场高架猫道侦察站（标记巡逻）'],
+    equip: ['West equipment EMP console (jams drones)', '西区设备棚干扰终端（瘫痪无人机）'],
   };
   const promptText = {
     entry: ["Read the duty board", "查看值班板"],
     gate: ['Open truck gate · triggers alarm', '开启货车闸门 · 将触发警报'],
     archive: ['Take the freight dossier', '取走货运档案'],
     light: ['Get clear of the searchlight', '离开探照灯照射范围'],
+    shed: ['Cut Warehouse 1 breaker · disables searchlights 45s', '切断 1 号货仓电闸 · 探照灯停机 45 秒'],
+    catwalk: ['Activate catwalk spotter · tags yard patrols', '启动高架猫道侦察中继 · 标记巡逻目标'],
+    equip: ['Trigger West Annex EMP jammer · suppresses drones', '启动西区设备棚干扰器 · 压制周边无人机'],
   };
 
   window.createPortBerthAlarmSound = rate => {
@@ -209,8 +215,27 @@
       dispatchDossier = paper;
     }
 
+    const sideStations = {};
+    if (dispatchPoint) {
+      const makeConsole = (id, pos, accent) => {
+        const unit = new THREE.Group();
+        unit.name = 'berth-side-' + id;
+        unit.position.copy(pos);
+        model.add(unit);
+        piece('steel_dark', .56, 1.02, .42, 0, .51, 0, unit);
+        piece('steel_galv', .62, .06, .48, 0, 1.04, 0, unit);
+        const lampMat = new THREE.MeshBasicMaterial({ color: accent });
+        piece(lampMat, .38, .16, .04, 0, .86, .22, unit);
+        sideStations[id] = { pos: pos.clone(), sight: pos.clone().add(point(0, .86, 0)), lampMat };
+      };
+      makeConsole('shed', point(-2, -18.2, .03), 0xffb347);
+      makeConsole('catwalk', point(8.98, 12.42, 2.59), 0x58e0ff);
+      makeConsole('equip', point(-64.5, 16.1, 0), 0x5bffd6);
+    }
+    const westCheckpoint = point(-54, -4);
+
     return {
-      dispatchPoint, dispatchDossier,
+      dispatchPoint, dispatchDossier, sideStations, westCheckpoint,
       model, gate, dossier, consoleMaterial, geometry, searchlights, alarms, extraction,
       gateBounds: { ...bounds(gateX - .1, 0, gateNorth + .1, gateX + .1, gateTravel, gateSouth - .1), surface: 'metal' },
       playerStart: { pos: dispatchPoint ? point(-32, 6) : point(19.1, -7.96), yaw: -Math.PI / 2 },
@@ -243,13 +268,51 @@
     const joint = new THREE.Group();
     joint.position.copy(spec.origin);
     parent.add(joint);
-    const lamp = new THREE.Mesh(new THREE.BoxGeometry(.43, .41, .39),
-      new THREE.MeshStandardMaterial({ color: 0x3d4140, metalness: .55, roughness: .61 }));
-    joint.add(lamp);
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(.328, .245, .023),
+    const housingMat = new THREE.MeshStandardMaterial({ color: 0x353c3e, metalness: .62, roughness: .48 });
+    const darkTrimMat = new THREE.MeshStandardMaterial({ color: 0x1f2426, metalness: .68, roughness: .52 });
+    const reflectorMat = new THREE.MeshStandardMaterial({ color: 0xcfd6d4, metalness: .88, roughness: .18 });
+    // Industrial U-shaped gimbal yoke & mounting trunnions
+    const yokeBase = new THREE.Mesh(new THREE.BoxGeometry(.54, .055, .14), darkTrimMat);
+    yokeBase.position.set(0, -.26, .02);
+    joint.add(yokeBase);
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(.055, .28, .12), darkTrimMat);
+      arm.position.set(side * .245, -.12, .02);
+      const bolt = new THREE.Mesh(new THREE.CylinderGeometry(.042, .042, .06, 10), reflectorMat);
+      bolt.rotation.z = Math.PI / 2;
+      bolt.position.set(side * .26, 0, .02);
+      joint.add(arm, bolt);
+    }
+    // Cylindrical ribbed marine searchlight drum & rear cooling fins
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(.215, .195, .36, 18), housingMat);
+    drum.rotation.x = Math.PI / 2;
+    drum.position.z = .02;
+    joint.add(drum);
+    for (let i = 0; i < 4; i++) {
+      const fin = new THREE.Mesh(new THREE.CylinderGeometry(.228, .228, .018, 18), darkTrimMat);
+      fin.rotation.x = Math.PI / 2;
+      fin.position.z = .04 + i * .045;
+      joint.add(fin);
+    }
+    const rearCap = new THREE.Mesh(new THREE.CylinderGeometry(.13, .19, .09, 16), darkTrimMat);
+    rearCap.rotation.x = Math.PI / 2;
+    rearCap.position.z = .235;
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(.22, .032, .032), reflectorMat);
+    handle.position.set(0, 0, .30);
+    joint.add(rearCap, handle);
+    // Flared glare hood, parabolic reflector collar & recessed glowing circular lens
+    const hood = new THREE.Mesh(new THREE.CylinderGeometry(.248, .218, .14, 18, 1, true), darkTrimMat);
+    hood.rotation.x = Math.PI / 2;
+    hood.position.z = -.22;
+    const bezel = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .04, 18), reflectorMat);
+    bezel.rotation.x = Math.PI / 2;
+    bezel.position.z = -.165;
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(.188, .188, .024, 18),
       new THREE.MeshBasicMaterial({ color: 0xffecc3 }));
-    glass.position.z = -.2;
-    joint.add(glass);
+    glass.rotation.x = Math.PI / 2;
+    glass.position.z = -.19;
+    joint.add(hood, bezel, glass);
+
     const length = 1;
     const beamShape = new THREE.ConeGeometry(Math.tan(lampAngle) * length, length, 24, 1, true);
     beamShape.translate(0, -length / 2, 0).rotateX(Math.PI / 2);
@@ -293,10 +356,24 @@
     const green = 0x8fefba, amber = 0xf0a04b;
     const darkRed = 0x4e1b16, hotRed = 0xff512a;
     const color = new THREE.Color();
+    const cageMat = new THREE.MeshStandardMaterial({ color: 0x2a3134, metalness: .68, roughness: .48 });
     const sirens = layout.alarms.map((position, index) => {
-      const housing = new THREE.Mesh(new THREE.CylinderGeometry(.122, .145, .22, 12),
-        new THREE.MeshBasicMaterial({ color: darkRed }));
+      const beaconMat = new THREE.MeshBasicMaterial({ color: darkRed });
+      const housing = new THREE.Mesh(new THREE.CylinderGeometry(.108, .128, .16, 16), beaconMat);
       housing.position.copy(position);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(.108, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), beaconMat);
+      dome.position.y = .08;
+      const flange = new THREE.Mesh(new THREE.CylinderGeometry(.155, .168, .048, 16), cageMat);
+      flange.position.y = -.095;
+      const topRing = new THREE.Mesh(new THREE.CylinderGeometry(.125, .125, .016, 16, 1, true), cageMat);
+      topRing.position.y = .09;
+      housing.add(dome, flange, topRing);
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2;
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(.014, .21, .014), cageMat);
+        rib.position.set(Math.cos(a) * .135, .01, Math.sin(a) * .135);
+        housing.add(rib);
+      }
       model.add(housing);
       const light = new THREE.PointLight(0xff452c, 0, index ? 13 : 9, 1.75);
       light.position.copy(position);
@@ -309,6 +386,8 @@
     const consoleSight = routes.road.console.clone().add(new THREE.Vector3(-.19, 1.045, 0));
     let phase, alarmed, gateOpen, reinforcementCalled;
     let active = false, gateLift = 0, elapsed = 0, exposure = 0, held = 0, holding = null;
+    let lightsDisabledUntil = 0;
+    const sideDone = { shed: false, catwalk: false, equip: false };
     let gateCollider = null;
     const colliders = [];
 
@@ -335,6 +414,7 @@
     }
 
     function updateSearchlights() {
+      const blackout = elapsed < lightsDisabledUntil;
       for (const [index, spec] of searchlights.entries()) {
         const lamp = lamps[index];
         const angle = elapsed * Math.PI * 2 / spec.period + spec.offset;
@@ -346,8 +426,9 @@
         lamp.direction.subVectors(lamp.aim.position, spec.origin);
         lamp.beam.scale.setScalar(lamp.direction.length() - .2);
         lamp.direction.normalize();
-        lamp.beam.material.uniforms.intensity.value = alarmed ? .36 : .25;
-        lamp.spot.intensity = alarmed ? 27 : 19;
+        lamp.beam.visible = !blackout;
+        lamp.beam.material.uniforms.intensity.value = blackout ? 0 : alarmed ? .36 : .25;
+        lamp.spot.intensity = blackout ? 0 : alarmed ? 27 : 19;
       }
     }
 
@@ -360,7 +441,7 @@
     }
 
     function updateExposure(dt, player) {
-      if (alarmed) return;
+      if (alarmed || elapsed < lightsDisabledUntil) return;
       sightPoint.copy(player.eye ?? player.pos);
       if (!player.eye) sightPoint.y += 1.4;
       const exposed = searchlights.some((spec, index) => {
@@ -381,8 +462,12 @@
       alarmed = resumed && !!snapshot?.alarm;
       gateOpen = !!dispatchPoint || resumed && !!snapshot?.gateOpen;
       reinforcementCalled = resumed && !!snapshot?.reinforcementCalled;
-      held = exposure = elapsed = 0;
+      held = exposure = elapsed = lightsDisabledUntil = 0;
       holding = null;
+      sideDone.shed = sideDone.catwalk = sideDone.equip = false;
+      for (const [id, st] of Object.entries(layout.sideStations ?? {})) {
+        st.lampMat.color.setHex(id === 'shed' ? 0xffb347 : id === 'catwalk' ? 0x58e0ff : 0x5bffd6);
+      }
       gateLift = gateOpen ? gateTravel : 0;
       dossier.visible = dispatchPoint ? phase === 'entry' : phase === 'archive';
       if (dispatchDossier) dispatchDossier.visible = ['entry','archive'].includes(phase);
@@ -416,19 +501,40 @@
         const point = remote ? dispatchPoint : layout.archive;
         const sight = remote ? dispatchSight : layout.archiveSight;
         if (inReach(player.pos, point, 1.7, 1.4) && physics.lineOfSight(eye, sight)) action = phase;
-
+      }
+      if (!action && layout.sideStations) {
+        for (const [id, st] of Object.entries(layout.sideStations)) {
+          if (!sideDone[id] && inReach(player.pos, st.pos, 1.9, 1.7)) {
+            action = id;
+            break;
+          }
+        }
       }
       if (action !== holding || !interact) held = 0;
       holding = action;
       if (action) {
         if (interact) held += dt;
-        const span = action === 'gate' ? consoleHold : archiveHold;
+        const span = action === 'gate' || Object.hasOwn(sideDone, action) ? consoleHold : archiveHold;
         if (held >= span) {
           held = 0;
           if (action === 'gate') {
             gateOpen = true;
             syncGate();
             alert();
+          } else if (action === 'shed' || action === 'catwalk' || action === 'equip') {
+            sideDone[action] = true;
+            layout.sideStations[action].lampMat.color.setHex(green);
+            if (action === 'shed') {
+              lightsDisabledUntil = elapsed + 45;
+              updateSearchlights();
+              world.tactical?.notify?.('1 号货仓电闸已切断：东区探照灯停机 45 秒！', 'Warehouse 1 breaker cut: searchlights offline 45s!');
+            } else if (action === 'catwalk') {
+              world.tactical?.triggerScan?.(true);
+              world.tactical?.notify?.('高架猫道侦察完成：已高亮标记货场巡逻与可爆油桶！', 'Catwalk recon active: patrols & fuel drums tagged!');
+            } else if (action === 'equip') {
+              world.tactical?.triggerEmpBurst?.(layout.sideStations.equip.pos, 38);
+              world.tactical?.notify?.('西区设备棚干扰器已启动：周边敌方无人机陷入瘫痪！', 'West Annex EMP active: nearby drones disrupted!');
+            }
           } else if (action === 'entry') {
             phase = 'archive';
             dossier.visible = false;
@@ -476,15 +582,25 @@
       },
       get resumePosition() {
         if (['extract','verify'].includes(phase)) return dispatchPoint ?? layout.archive;
-        return phase === 'archive' && dispatchPoint ? layout.archive : null;
+        // Spawn right outside West Annex near West Dispatch instead of 112m away at East Quay.
+        return phase === 'archive' && dispatchPoint ? (layout.westCheckpoint ?? layout.archive) : null;
       },
       get checkpoint() {
         return ['extract','verify'].includes(phase) || phase==='archive'&&dispatchPoint ? { phase, alarm: alarmed, gateOpen, reinforcementCalled } : null;
       },
       markers() {
         const approaches = [marker('road', 'RD', routes.road.pos), marker('water', 'QY', routes.water.pos)];
-        if (phase === 'entry') return [marker('entry','CTRL',layout.archive)];
-        if (phase === 'archive') return [...(dispatchPoint ? [] : approaches), marker('archive', 'LOG', dispatchPoint ?? layout.archive)];
+        const sideMarkers = [];
+        if (dispatchPoint && layout.sideStations) {
+          if (phase === 'entry') {
+            if (!sideDone.shed) sideMarkers.push(marker('shed', 'PWR', layout.sideStations.shed.pos));
+            if (!sideDone.catwalk) sideMarkers.push(marker('catwalk', 'OBS', layout.sideStations.catwalk.pos));
+          } else if (phase === 'archive' && !sideDone.equip) {
+            sideMarkers.push(marker('equip', 'EMP', layout.sideStations.equip.pos));
+          }
+        }
+        if (phase === 'entry') return [marker('entry','CTRL',layout.archive), ...sideMarkers];
+        if (phase === 'archive') return [...(dispatchPoint ? [] : approaches), marker('archive', 'LOG', dispatchPoint ?? layout.archive), ...sideMarkers];
         if (phase === 'extract') {
           const exit = marker('extract', 'EX', extraction.pos, 'extract');
           return alarmed && !dispatchPoint ? [...approaches, exit] : [exit];

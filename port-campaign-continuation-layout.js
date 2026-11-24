@@ -115,14 +115,24 @@
     }
     function shed(name, x0, z0, x1, z1, y = 0) {
       solid('concrete_dirty', x0, y, z0, x1, y + 2.6, z0 + .18, 'concrete');
-      solid('corrugated_roof', x0 - .15, y + 2.65, z0 - .23, x1 + .15, y + 2.8, z1 + .19);
+      solid('corrugated_roof', x0 - .18, y + 2.65, z0 - .25, x1 + .18, y + 2.82, z1 + .22);
+      // Roof fascia trim & rain gutter along front eave
+      piece('steel_dark', x1 - x0 + .42, .14, .07, (x0 + x1) / 2, y + 2.74, z1 + .23);
+      piece('steel_galv', x1 - x0 + .40, .07, .07, (x0 + x1) / 2, y + 2.62, z1 + .24);
       for (const x of [x0, x1]) {
-        solid('steel_dark', x - .08, y, z0, x + .08, y + 2.68, z0 + .22);
-        solid('steel_dark', x - .08, y, z1 - .15, x + .08, y + 2.68, z1 + .12);
+        solid('steel_dark', x - .09, y, z0, x + .09, y + 2.68, z0 + .22);
+        solid('steel_dark', x - .09, y, z1 - .15, x + .09, y + 2.68, z1 + .12);
+        // Concrete column plinths & diagonal knee-braces
+        piece('concrete_dirty', .32, .22, .32, x, y + .11, z1);
+        const brace = piece('steel_worn', .06, .72, .06, x + (x === x0 ? .24 : -.24), y + 2.38, z1);
+        brace.rotation.z = x === x0 ? -.78 : .78;
       }
       for (let x = x0 + 1; x < x1; x += 1.25) {
-        piece('steel_worn', .075, .07, z1 - z0, x, y + 2.66, (z0 + z1) / 2);
+        piece('steel_worn', .075, .07, z1 - z0, x, y + 2.64, (z0 + z1) / 2);
       }
+      // Interior ceiling fluorescent fixture
+      piece('steel_dark', Math.min(2.1, (x1 - x0) * .45), .07, .22, (x0 + x1) / 2, y + 2.58, (z0 + z1) / 2);
+      piece(glows.warm, Math.min(1.9, (x1 - x0) * .4), .025, .14, (x0 + x1) / 2, y + 2.535, (z0 + z1) / 2);
       label(name, (x0 + x1) / 2, y + 2.41, z1 + .018, Math.min(x1 - x0 - .5, 3.5));
       interiorBoxes.push({
         min: point(x0, z0, y), max: point(x1, z1, y + 2.78),
@@ -131,9 +141,15 @@
     const glows = Object.fromEntries(Object.entries(paint).map(([name, color]) => [name, G.mats.emissive(color, 1.25)]));
     function lamp(x, z, y = 3.4, color = 'warm', powered = true) {
       const stand = group('work-light', moving, x, 0, z);
-      cyl('steel_dark', .07, y, x, y / 2, z, { parent: scenery });
-      piece('steel_dark', .46, .22, .31, 0, y, 0, stand);
-      piece(glows[color], .39, .071, .22, 0, y - .118, .03, stand);
+      cyl('steel_dark', .14, .18, x, .09, z, { parent: scenery });
+      cyl('steel_dark', .065, y, x, y / 2, z, { parent: scenery });
+      piece('steel_galv', .72, .06, .08, 0, y, 0, stand);
+      for (const sx of [-.24, .24]) {
+        const head = piece('steel_dark', .26, .16, .24, sx, y - .04, .06, stand);
+        head.rotation.x = .24;
+        const lens = piece(glows[color], .20, .05, .16, sx, y - .12, .08, stand);
+        lens.rotation.x = .24;
+      }
       const light = new THREE.PointLight(paint[color], powered ? 14 : 0, 10, 2);
       light.position.set(0, y - .27, 0);
       stand.add(light);
@@ -156,44 +172,79 @@
     }
     function actor(id, at, coat = 0xc27037, seated = false, variation = 0) {
       const { x, y, z } = at;
+      if (window.createSaltlineHuman) {
+        const role = /harris/i.test(id) ? 'operator' : /mara/i.test(id) ? 'engineer' :
+          /nurse/i.test(id) ? 'medic' : 'worker';
+        const human = window.createSaltlineHuman(THREE, { name: id, role, coat, variation });
+        const figure = human.actor;
+        figure.position.set(x, y, z);
+        moving.add(figure);
+        figure.userData.pose = (age, walk) => human.pose(seated ? 'seated' : 'stand', age * 8, age, walk);
+        figure.userData.pose(0, false);
+        objects[id] = figure;
+        points[id] = at;
+        return figure;
+      }
       const figure = group(id, moving, x, y, z);
-      const cloth = new THREE.MeshStandardMaterial({ color: coat, roughness: .94 });
+      const cloth = new THREE.MeshStandardMaterial({ color: coat, roughness: .88 });
+      const pants = new THREE.MeshStandardMaterial({ color: 0x2c3438, roughness: .90 });
       const skin = new THREE.MeshStandardMaterial({
-        color: [0x96684e, 0x69483b, 0xb3856b][variation % 3], roughness: .81,
+        color: [0xa67458, 0x735040, 0xbe8e72][variation % 3], roughness: .78,
       });
+      const hatMat = new THREE.MeshStandardMaterial({
+        color: [0x263136, 0xd48e2a, 0x3b4448][variation % 3], roughness: .48, metalness: .18,
+      });
+      // Realistic 1.78m human proportions (hip at 0.93m, shoulder at 1.46m, head center at 1.65m)
       const core = group('body', figure);
-      const limbMaterial = G.mats.get('steel_dark');
-      const sphere = new THREE.SphereGeometry(1, 12, 7);
-      const oval = (material, x, y, z, sx, sy, sz, parent) => {
+      const sphere = new THREE.SphereGeometry(1, 14, 10);
+      const limbCyl = new THREE.CylinderGeometry(1, 1, 1, 12);
+      const oval = (material, ox, oy, oz, sx, sy, sz, parent) => {
         const mesh = new THREE.Mesh(sphere, material);
-        mesh.position.set(x, y, z);
+        mesh.position.set(ox, oy, oz);
         mesh.scale.set(sx, sy, sz);
         mesh.castShadow = true;
         parent.add(mesh);
       };
-      piece(cloth, .388, .43, .241, 0, 1.17, 0, core);
-      for (const x of [-.095, .095]) piece('paint_white', .024, .32, .016, x, 1.23, .126, core);
-      piece(limbMaterial, .321, .063, .25, 0, .985, 0, core);
-      oval(skin, 0, 1.52, .018, .098, .132, .1, core);
-      oval(limbMaterial, 0, 1.598, -.001, .101, .065, .102, core);
-      piece(limbMaterial, .14, .018, .046, 0, 1.56, .102, core);
+      const tube = (material, ox, oy, oz, rx, h, rz, parent) => {
+        const mesh = new THREE.Mesh(limbCyl, material);
+        mesh.position.set(ox, oy, oz);
+        mesh.scale.set(rx, h, rz);
+        mesh.castShadow = true;
+        parent.add(mesh);
+      };
+      // Pelvis, waist, jacketed chest & collar
+      tube(pants, 0, .97, 0, .148, .17, .11, core);
+      tube(cloth, 0, 1.24, 0, .168, .44, .118, core);
+      piece('steel_dark', .31, .05, .23, 0, 1.03, 0, core);
+      for (const rx of [-.095, .095]) piece('paint_white', .026, .34, .016, rx, 1.26, .122, core);
+      piece('paint_white', .33, .026, .016, 0, 1.16, .122, core);
+      // Neck, sculpted head & cap/hard-hat
+      tube(skin, 0, 1.51, .01, .052, .09, .052, core);
+      oval(skin, 0, 1.64, .016, .090, .112, .098, core);
+      oval(hatMat, 0, 1.71, .004, .102, .068, .108, core);
+      piece(hatMat, .145, .016, .055, 0, 1.685, .105, core);
       const limbs = [-1, 1].map(sign => {
-        const hip = group('hip', core, sign * .09, .95, 0);
-        const arm = group('shoulder', core, sign * .207, 1.35, 0);
-        piece(limbMaterial, .148, .8, .155, 0, -.42, 0, hip);
-        piece('polymer_black', .151, .121, .246, 0, -.863, .044, hip);
-        piece(cloth, .119, .36, .127, 0, -.163, 0, arm);
-        piece(skin, .079, .116, .077, 0, -.378, .014, arm);
+        const hip = group('hip', core, sign * .092, .93, 0);
+        const arm = group('shoulder', core, sign * .208, 1.43, 0);
+        // Tapered thigh + calf + tactical boot
+        tube(pants, 0, -.22, 0, .072, .44, .076, hip);
+        tube(pants, 0, -.62, 0, .058, .40, .060, hip);
+        piece('polymer_black', .098, .102, .235, 0, -.87, .042, hip);
+        // Upper arm + forearm + gloved hand
+        oval(cloth, 0, 0, 0, .062, .062, .062, arm);
+        tube(cloth, 0, -.15, 0, .052, .28, .054, arm);
+        tube(cloth, 0, -.40, 0, .044, .24, .046, arm);
+        oval(skin, 0, -.55, .012, .038, .056, .034, arm);
         return { hip, arm, sign };
       });
       figure.userData.pose = (age, walk) => {
-        core.position.y = seated ? -.31 : Math.abs(Math.sin(age * 7)) * (walk ? .039 : .009);
-        core.rotation.x = seated ? .12 : walk ? .07 : .028;
+        core.position.y = seated ? -.28 : Math.abs(Math.sin(age * 7)) * (walk ? .032 : .008);
+        core.rotation.x = seated ? .10 : walk ? .06 : .02;
         for (const { hip, arm, sign } of limbs) {
-          const swing = walk ? sign * .45 * Math.sin(age * 8) : 0;
-          hip.rotation.x = seated ? -.88 : swing;
-          arm.rotation.x = -swing - (seated ? .6 : .03);
-          arm.rotation.z = sign * .11;
+          const swing = walk ? sign * .42 * Math.sin(age * 8) : 0;
+          hip.rotation.x = seated ? -.85 : swing;
+          arm.rotation.x = -swing - (seated ? .55 : .03);
+          arm.rotation.z = sign * .08;
         }
       };
       figure.userData.pose(0, false);
@@ -203,23 +254,50 @@
     }
     function boat(name, x, z, y, length = 8, tint = 'steel_worn') {
       const boat = group(name, moving, x, y, z);
-      piece(tint, length * .78, .94, 3.35, -.32, -.23, 0, boat);
-      piece('steel_dark', length * .81, .14, 3.39, -.35, -.59, 0, boat);
-      const prow = piece(tint, 2.3, .8, 2.37, length * .35, -.2, 0, boat);
+      // Lower hull, waterline chine & tapered prow
+      piece(tint, length * .78, .96, 3.35, -.32, -.23, 0, boat);
+      piece('steel_dark', length * .82, .18, 3.42, -.35, -.62, 0, boat);
+      piece('paint_red', length * .80, .14, 3.44, -.35, -.46, 0, boat);
+      const prow = piece(tint, 2.35, .86, 2.38, length * .35, -.20, 0, boat);
       prow.rotation.y = Math.PI / 4;
-      piece('steel_galv', length * .82, .13, 3.13, -.29, .3, 0, boat);
-      for (const z of [-1.58, 1.58]) piece('steel_dark', length * .78, .32, .08, -.35, .43, z, boat);
-      piece('corrugated_roof', 1.86, 1.51, 2.27, .87, 1.03, 0, boat);
-      piece('glass_dirty', .023, .57, 1.97, 1.808, 1.304, 0, boat);
-      for (const z of [-1.148, 1.148]) piece('glass_dirty', 1.44, .58, .024, .86, 1.29, z, boat);
-      piece('steel_dark', 2.12, .16, 2.54, .8, 1.85, 0, boat);
-      piece('steel_dark', .08, .92, .08, .8, 2.34, 0, boat);
-      piece(glows.red, .12, .12, .12, .8, 2.833, -.14, boat);
-      piece(glows.teal, .12, .12, .12, .8, 2.833, .14, boat);
-      for (let x = -length * .39; x < length * .17; x += 1.25) {
+      const prowTrim = piece('steel_dark', 2.42, .16, 2.42, length * .35, .28, 0, boat);
+      prowTrim.rotation.y = Math.PI / 4;
+      // Main deck, raised gunwale bulwarks & mooring bollards
+      piece('steel_galv', length * .82, .13, 3.13, -.29, .30, 0, boat);
+      for (const sz of [-1.58, 1.58]) {
+        piece('steel_dark', length * .78, .34, .09, -.35, .44, sz, boat);
+        piece('paint_white', length * .78, .055, .11, -.35, .62, sz, boat);
+        for (const bx of [-length * .34, length * .14]) {
+          cyl('steel_galv', .075, .26, bx, .48, sz * .92, { parent: boat });
+        }
+      }
+      // Detailed wheelhouse cabin with recessed framed bridge windows & angled brow visor
+      piece('corrugated_roof', 2.05, 1.56, 2.32, .85, 1.05, 0, boat);
+      piece('steel_dark', 2.15, .12, 2.42, .85, .36, 0, boat);
+      piece('glass_dirty', .03, .58, 2.02, 1.88, 1.32, 0, boat);
+      for (const wz of [-.66, 0, .66]) piece('steel_dark', .05, .60, .055, 1.89, 1.32, wz, boat);
+      for (const sz of [-1.16, 1.16]) {
+        piece('glass_dirty', 1.48, .58, .03, .86, 1.31, sz, boat);
+        piece('steel_dark', .05, .60, .05, .86, 1.31, sz, boat);
+        // Orange lifebuoy ring mounted on cabin side
+        cyl('paint_orange', .22, .05, .25, .82, sz * 1.03, { axis: 'z', parent: boat });
+      }
+      // Bridge roof brow, twin exhaust stacks & marine radar mast with scanner bar
+      const visor = piece('steel_dark', 2.38, .14, 2.58, .92, 1.88, 0, boat);
+      visor.rotation.z = -.04;
+      for (const ez of [-.68, .68]) {
+        cyl('steel_dark', .12, .72, -.05, 2.18, ez, { parent: boat });
+        cyl('paint_orange', .125, .14, -.05, 2.36, ez, { parent: boat });
+      }
+      piece('steel_dark', .09, 1.15, .09, .82, 2.44, 0, boat);
+      piece('steel_galv', .12, .08, 1.12, .82, 2.86, 0, boat);
+      piece('paint_white', .95, .09, .14, .82, 3.04, 0, boat);
+      piece(glows.red, .12, .12, .12, .82, 2.86, -.54, boat);
+      piece(glows.teal, .12, .12, .12, .82, 2.86, .54, boat);
+      for (let fx = -length * .39; fx < length * .17; fx += 1.25) {
         for (const side of [-1, 1]) {
-          cyl('polymer_black', .23, .15, x, -.035, side * 1.7, { axis: 'z', parent: boat });
-          piece('paint_white', .7, .054, .031, x, .085, side * 1.693, boat);
+          cyl('polymer_black', .23, .16, fx, -.035, side * 1.7, { axis: 'z', parent: boat });
+          piece('paint_white', .7, .054, .031, fx, .085, side * 1.693, boat);
         }
       }
       objects[name] = boat;
@@ -281,7 +359,8 @@
     shed('UPPER LANDING', -39.4, 6.52, -34.4, 10.68, 3.05);
     lamp(-35.1, 10.1, 5.45, 'teal');
     label('HIGH GROUND +3.05', -45.48, 2.78, 5.85, 2.3, Math.PI);
-    actor('flood-worker', point(-44.9, 3.31, 1.84), 0xce7433, true);
+    actor('flood-worker', point(-44.9, 3.31, 1.84), 0xce7433, true, 0);
+    actor('flood-worker-2', point(-44.05, 4.15, 1.84), 0x8f6237, true, 2);
     addPoints({ start: [-96, 14, .026], stair: [-45.5, -.72, .26], landing: [-45.4, 8.13, 3.05], exit: [-35.65, 9.47, 3.05] });
     const water = new set.root.constructor();
     water.name = 'rising-drydock-water';
@@ -523,6 +602,7 @@
     label('SIGNAL TOWER', wallX - .66, 4.29, 1.08, 3.8, -Math.PI / 2);
     shed('WATCH FLOOR', west, -6.9, -13.1, 4.45);
     shed('LOCKER 12', -10.05, 9.2, -.9, 15.2);
+    set.actor('archivist', point(-19.4, 1.1, 0), 0x5c6d73, false, 1);
     control('crack-report', 'INSPECTION LOG', point(-18.23, 2.48));
     control('transfer-order', 'CARGO ORDER', point(-3.7, 13.4));
     control('search-cancelled', 'SEARCH CHANNEL', point(-3.55, -8.54, 2.84));
@@ -627,6 +707,12 @@
     const exit = extraction?.pos ?? point(28.9, 19.4);
     const mara = actor('mara-reopen', point(19.8, -9.94), 0x956a3f);
     mara.rotation.y = -.81;
+    const harris = actor('harris-reopen', point(21.4, -9.4), 0x54666c, false, 1);
+    harris.rotation.y = -1.2;
+    const hawk = actor('hawk-reopen', point(27.2, 16.4), 0xc26c30, false, 2);
+    hawk.rotation.y = Math.PI;
+    const mechanic = actor('mechanic-reopen', point(27.0, 14.8), 0x8f6237, false, 0);
+    mechanic.rotation.y = Math.PI * .85;
     const boots = new set.root.constructor();
     boots.name = 'dockwork-boots';
     boots.position.set(19.55, .785, -9.28);

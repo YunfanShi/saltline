@@ -42,75 +42,82 @@
   };
 
   function createSurvivor(parts) {
-    const { group, block, oval, surface } = parts;
+    const { group, block, oval, cylinder, surface } = parts;
     const actor = group('rail-loadmaster');
-    const torso = group('loadmaster-body', actor, 0, .88);
-    const flightSuit = surface(0x4e5550);
-    const sleeve = surface(0x6d6c56);
-    const ankle = surface(0x292d2b);
-    const harness = surface(0x322f2a);
-    const vest = surface(0xbb5b2f);
-    const reflector = surface(0xdacba9);
-    const skin = surface(0xac7a5e);
-    const hair = surface(0x282320);
-    const glove = surface(0x3f3c30);
-    const black = surface(0x131519);
-    const joint = surface(0x3c4642);
+    // Realistic 1.80m human proportions (hip at 0.94m, shoulder at 1.47m, head center at 1.66m)
+    const torso = group('loadmaster-body', actor, 0, .94);
+    const flightSuit = surface(0x46514b, .10, .86);
+    const pants = surface(0x3a4340, .08, .88);
+    const bootMat = surface(0x1f2221, .16, .74);
+    const harness = surface(0x282927, .14, .82);
+    const vest = surface(0xc45828, .08, .76);
+    const reflector = surface(0xe2d8b4, .25, .42);
+    const skin = surface(0xb48367, .04, .78);
+    const helmetMat = surface(0x2d3534, .28, .48);
+    const visorMat = surface(0x141b20, .75, .18);
+    const glove = surface(0x2e302c, .10, .85);
+    const black = surface(0x15181b, .25, .62);
 
-    oval(torso, flightSuit, .249, .215, .125, 0, .09, 0);
-    oval(torso, flightSuit, .224, .30, .133, 0, .31, 0);
-    oval(torso, vest, .238, .22, .15, 0, .375, .025);
-    block(torso, harness, .38, .077, .29, 0, .155, .011);
-    block(torso, reflector, .297, .029, .016, 0, .368, .166);
-    block(torso, black, .072, .052, .022, 0, .154, .165);
-    block(torso, sleeve, .249, .26, .11, 0, .368, -.182);
-    block(torso, harness, .217, .044, .119, 0, .313, -.178);
-    block(torso, reflector, .154, .024, .012, 0, .342, -.245);
-    block(torso, black, .068, .1, .046, -.129, .424, .163);
-    block(torso, black, .011, .104, .011, -.151, .515, .167);
+    // Pelvis, waist, contoured chest & tactical high-vis rescue vest
+    cylinder(torso, pants, .155, .18, .115, 0, .04, 0);
+    cylinder(torso, flightSuit, .145, .24, .11, 0, .22, 0);
+    cylinder(torso, flightSuit, .178, .28, .122, 0, .40, 0);
+    block(torso, vest, .34, .34, .24, 0, .38, .01);
+    block(torso, harness, .32, .055, .24, 0, .14, .005);
+    block(torso, black, .062, .05, .024, 0, .14, .125);
+    block(torso, reflector, .345, .028, .014, 0, .31, .132);
+    block(torso, reflector, .345, .028, .014, 0, .44, .132);
+    // Parachute/survival pack & chest radio with whip antenna
+    block(torso, harness, .25, .34, .12, 0, .39, -.16);
+    block(torso, reflector, .18, .026, .012, 0, .35, -.222);
+    block(torso, black, .055, .11, .042, -.11, .43, .14);
+    cylinder(torso, black, .006, .16, .006, -.125, .56, .14);
+    // Neck
+    cylinder(torso, skin, .054, .09, .054, 0, .59, .01);
 
-    const head = group('loadmaster-head', torso, 0, .666, .015);
-    oval(head, skin, .097, .137, .107, 0, 0, .019);
-    oval(head, hair, .103, .080, .111, 0, .081, .006);
-    oval(head, skin, .022, .035, .03, 0, -.018, .119);
-    block(head, hair, .059, .009, .013, 0, -.067, .112);
+    const head = group('loadmaster-head', torso, 0, .71, .015);
+    oval(head, skin, .092, .115, .10, 0, 0, .012);
+    // Flight / SAR helmet with dark visor & comms earcups
+    oval(head, helmetMat, .108, .095, .114, 0, .048, -.004);
+    block(head, visorMat, .165, .052, .048, 0, .032, .092);
+    oval(head, skin, .018, .026, .024, 0, -.018, .108);
+    block(head, black, .045, .009, .014, 0, -.058, .102);
     for (const sign of [-1, 1]) {
-      oval(head, skin, .02, .034, .023, sign * .097, -.01, .014);
-      block(head, hair, .033, .009, .012, sign * .038, .025, .117);
-      block(head, black, .024, .01, .014, sign * .037, .011, .119);
-      block(torso, harness, .042, .32, .029, sign * .11, .396, .157);
+      cylinder(head, black, .034, .024, .034, sign * .108, .005, 0).rotation.z = Math.PI / 2;
+      block(torso, harness, .038, .35, .022, sign * .10, .39, .135);
     }
 
     const limbs = [-1, 1].map(sign => {
-      const shoulder = group('loadmaster-shoulder', torso, sign * .234, .456, 0);
-      shoulder.rotation.z = sign * .09;
-      oval(shoulder, sleeve, .079, .168, .082, 0, -.103, 0);
-      const elbow = group('loadmaster-elbow', shoulder, 0, -.252, 0);
-      oval(elbow, flightSuit, .057, .142, .065, 0, -.065, 0);
-      block(elbow, reflector, .093, .032, .101, 0, -.144, 0);
-      oval(elbow, glove, .05, .076, .048, 0, -.202, .01);
-      const hip = group('loadmaster-hip', actor, sign * .112, .876);
-      oval(hip, flightSuit, .097, .246, .101, 0, -.153, 0);
-      const knee = group('loadmaster-knee', hip, 0, -.394, 0);
-      oval(knee, joint, .077, .214, .081, 0, -.133, 0);
-      block(knee, harness, .112, .112, .035, 0, -.009, .066);
-      block(knee, ankle, .146, .112, .254, 0, -.405, .048);
-      block(knee, harness, .15, .029, .26, 0, -.465, .048);
+      const shoulder = group('loadmaster-shoulder', torso, sign * .215, .51, 0);
+      shoulder.rotation.z = sign * .06;
+      oval(shoulder, flightSuit, .068, .068, .068, 0, 0, 0);
+      cylinder(shoulder, flightSuit, .054, .29, .056, 0, -.15, 0);
+      const elbow = group('loadmaster-elbow', shoulder, 0, -.30, 0);
+      cylinder(elbow, flightSuit, .046, .26, .048, 0, -.13, 0);
+      cylinder(elbow, reflector, .050, .03, .050, 0, -.23, 0);
+      oval(elbow, glove, .040, .062, .036, 0, -.29, .01);
+      const hip = group('loadmaster-hip', actor, sign * .096, .94);
+      cylinder(hip, pants, .078, .44, .082, 0, -.22, 0);
+      const knee = group('loadmaster-knee', hip, 0, -.44, 0);
+      oval(knee, harness, .064, .068, .066, 0, 0, .028);
+      cylinder(knee, pants, .060, .40, .062, 0, -.20, 0);
+      block(knee, bootMat, .102, .105, .245, 0, -.44, .045);
+      block(knee, harness, .106, .025, .252, 0, -.49, .045);
       return { shoulder, elbow, hip, knee };
     });
 
     function pose(crouched, stride, age, moving) {
-      torso.position.y = crouched ? .55 : .88 + Math.abs(Math.sin(stride)) * .021;
-      torso.rotation.set(crouched ? .23 : .044, moving ? Math.sin(stride) * .036 : 0,
-        crouched ? -.12 : Math.sin(age * 1.85) * .011);
-      head.rotation.set(crouched ? -.19 : -.037, Math.sin(age * .82) * .17, 0);
+      torso.position.y = crouched ? .64 : .94 + Math.abs(Math.sin(stride)) * .022;
+      torso.rotation.set(crouched ? .18 : .035, moving ? Math.sin(stride) * .04 : 0,
+        crouched ? -.06 : Math.sin(age * 1.85) * .01);
+      head.rotation.set(crouched ? -.14 : -.03, Math.sin(age * .82) * .16, 0);
       limbs.forEach(({ shoulder, elbow, hip, knee }, index) => {
         const swing = moving ? Math.sin(stride + index * Math.PI) : 0;
-        shoulder.rotation.x = crouched ? (index === 0 ? -.52 : -.69) : swing * .32 - .04;
-        elbow.rotation.x = crouched ? -.78 : -.17 - Math.max(swing, 0) * .23;
-        hip.position.y = crouched ? .57 : .876;
-        hip.rotation.x = crouched ? -1.12 : -swing * .43;
-        knee.rotation.x = crouched ? 1.56 : Math.max(swing, 0) * .74;
+        shoulder.rotation.x = crouched ? (index === 0 ? -.42 : -.58) : swing * .34 - .04;
+        elbow.rotation.x = crouched ? -.72 : -.16 - Math.max(swing, 0) * .22;
+        hip.position.y = crouched ? .64 : .94;
+        hip.rotation.x = crouched ? (index === 0 ? -1.18 : -.45) : -swing * .42;
+        knee.rotation.x = crouched ? (index === 0 ? 1.48 : 1.25) : Math.max(swing, 0) * .72;
       });
     }
 
@@ -163,14 +170,24 @@
 
     const locator = group('rail-emergency-locator');
     locator.position.copy(layout.locator);
-    block(locator, black, .5, .09, .34, 0, .09, 0);
-    block(locator, locatorColor, .42, .168, .27, 0, .193, 0);
-    block(locator, black, .265, .063, .027, 0, .197, .145);
+    block(locator, black, .52, .09, .36, 0, .06, 0);
+    block(locator, locatorColor, .44, .18, .28, 0, .19, 0);
+    for (const sx of [-.18, .18]) block(locator, black, .036, .19, .30, sx, .19, 0);
+    block(locator, black, .265, .07, .028, 0, .20, .145);
     const locatorLamp = block(locator, redLight, .16, .035, .03, 0, .217, .16);
-    block(locator, safety, .046, .21, .045, -.143, .344, -.09).rotation.z = -.39;
-    block(locator, safety, .046, .21, .045, .143, .344, -.09).rotation.z = .39;
+    cylinder(locator, metal, .012, .52, .012, -.16, .52, -.08).rotation.z = .18;
+    cylinder(locator, safety, .042, .06, .042, .082, .29, .078);
 
-    const survival = createSurvivor({ group, block, oval, surface });
+    const survival = window.createSaltlineHuman
+      ? (() => {
+        const h = window.createSaltlineHuman(THREE, { name: 'rail-loadmaster', role: 'pilot', variation: 0 });
+        root.add(h.actor);
+        return {
+          actor: h.actor,
+          pose: (crouched, stride, age, moving) => h.pose(crouched ? 'crouch' : 'stand', stride, age, moving),
+        };
+      })()
+      : createSurvivor({ group, block, oval, cylinder, surface });
     const { actor } = survival;
     actor.position.copy(layout.survivor);
     const flare = group('rail-rescue-flare', root, layout.survivor.x - .54, 0, layout.survivor.z - .54);
@@ -239,8 +256,12 @@
     const search = group('rail-emergency-searchlight');
     search.position.copy(layout.searchlight);
     const searchHead = group('rail-searchlight-head', search);
-    block(searchHead, black, .59, .4, .54, 0, .03, 0);
-    block(searchHead, warmLight, .45, .24, .046, 0, .03, .28);
+    const drum = cylinder(searchHead, black, .24, .46, .24, 0, .03, 0);
+    drum.rotation.x = Math.PI / 2;
+    const hood = cylinder(searchHead, metal, .27, .14, .27, 0, .03, .26);
+    hood.rotation.x = Math.PI / 2;
+    const lens = cylinder(searchHead, warmLight, .20, .03, .20, 0, .03, .25);
+    lens.rotation.x = Math.PI / 2;
     const lightMaterial = (fragment, opacity) => new ShaderMaterial({
       side: DoubleSide, transparent: true, blending: AdditiveBlending, depthWrite: false,
       uniforms: { opacity: { value: opacity } },

@@ -16,16 +16,21 @@
     const surface = () => Math.min(2.54, -.05 + m.phaseAge * .09);
     const rescued = () => Boolean(m.state.worker);
 
+    const clueLines = {
+      'tug-drydock': text('Mara: “That uneven cylinder beat left this basin at 06:41. Prove you aren’t here for Ward.”', '玛拉：「这阵顿挫引擎声 06:41 刚离开船坞。证明你不是替沃德来灭口的。」'),
+      'tug-south-lock': text('Mara: “South lock dropped to idle at 06:46. Someone held the gate open for them.”', '玛拉：「06:46 在南闸降至怠速——有人专门替他们留了闸门。」'),
+      'tug-outer-roads': text('Mara: “Heading straight for the outer service platform. One tape left.”', '玛拉：「引擎声直奔闸外维修平台。再核对最后一段。」'),
+    };
     function findRecording(id) {
       if (!m.evidence.collect(id)) return;
       const aligned = tugIds.every(tug => m.evidence.collected.includes(tug));
       if (aligned && m.evidence.verify(tugIds)) {
         m.advance('flood', id);
-        m.speak('Three recordings, one tug. Water is coming up the slip. Take the marked stairs.', '三段录音都是同一艘拖轮。船台开始进水。走有标记的楼梯。');
-        m.effect({ sound: 'rail_touchdown', shake: .21, pos: points.stair });
+        m.speak('Mara: “Three tapes, one tug—and someone just blew the sluice! Water is flooding the slip! Get to the high stairs!”', '玛拉：「三段录音全指向同一艘拖轮！有人炸开了泄水闸——船台进水了，快冲上高处楼梯！」');
+        m.effect({ sound: 'rail_touchdown', shake: .35, pos: points.stair });
       } else {
         m.advance('recordings', id);
-        m.clue(id, text('The engine trace holds.', '引擎波形已对齐。'));
+        m.clue(id, clueLines[id] ?? text('The engine trace holds.', '引擎波形已对齐。'));
       }
     }
     return {
@@ -33,11 +38,11 @@
       objective() {
         if (m.phase === 'recordings') {
           const done = m.evidence.collected.length;
-          return text(`Align the tug recordings (${done}/3)`, `对齐拖轮录音（${done}/3）`);
+          return text(`Align the tug recordings in the basin & gantry (${done}/3)`, `在坞底与上层吊廊找齐并对齐三段拖轮录音（${done}/3）`);
         }
-        if (m.phase === 'flood') return text('Climb above the rising water. A worker is stranded by the stairs.',
-          '爬到水位以上。楼梯旁还有一名被困工人。');
-        return text('Reach the marked upper landing', '前往有标记的上层出口');
+        if (m.phase === 'flood') return text('Climb above the rising water. Two mechanics are stranded by the stairs!',
+          '船坞进水！爬向高处——楼梯旁有两名被困维修工可以回头营救！');
+        return text('Meet Mara at the upper landing for the tug chart', '前往上层出口与玛拉会合，拿取拖轮航线图');
       },
       actions() {
         if (m.phase === 'recordings') {
@@ -51,11 +56,12 @@
           });
         }
         if (m.phase === 'flood' && !rescued()) return [m.action('flood-worker',
-          text('Help the worker up', '扶工人上楼'), () => {
+          text('Pull both stranded mechanics clear of the flood', '回头扶起两名被困维修工'), () => {
             m.advance('flood', m.state.resume, { worker: true });
-            m.speak('I can manage from here. Get up to the landing.', '我自己能走了。快上到平台。');
+            m.effect({ sound: 'rail_log_radio', choice: 'drydockWorkersSaved' });
+            m.speak('Mechanic: “We’ve got our footing—go! Mara saw you come back for us!”', '维修工：「我们能站稳了，快上平台！玛拉看到你回头救我们了！」');
           }, { hold: .92, height: .79 })];
-        return m.phase === 'landing' ? [m.action('exit', text('Take the tug route chart', '接过拖轮航线图'), m.complete)] : [];
+        return m.phase === 'landing' ? [m.action('exit', text('Take Mara’s tug route chart', '接过玛拉的拖轮航线图'), m.complete)] : [];
       },
       markers() {
         if (m.phase === 'recordings') return tugIds.filter(id => !m.evidence.collected.includes(id))
@@ -67,11 +73,16 @@
         return [m.marker('exit', 'EX', 'extract')];
       },
       tick(dt, player) {
+        if (m.phase === 'recordings' && !m.state.introSaid && m.age > 1.2) {
+          m.state.introSaid = true;
+          m.speak('Mara: “Stay back—Command already wrote off seventeen men. Pull all three tug tapes if you want my chart.”', '玛拉：「别靠太近——指挥部已经把十七个人写成了已离港。想拿航线图，先把三段拖轮录音找齐。」');
+        }
         if (m.phase !== 'flood') return;
         if (near(player.pos, points.landing, 2.5, .33)) {
           m.advance('landing', 'landing');
-          const message = rescued() ? text('We are both clear of the water.', '我们都上来了。') :
-            text('High ground. The tug’s departure is marked on the chart.', '到高处了。图上标了拖轮离港的路线。');
+          const message = rescued()
+            ? text('Mara: “You actually went back for both mechanics. Maybe you aren’t like Ward after all. Here’s the chart.”', '玛拉：「你真回头把两个维修工都拉上来了……看来你跟沃德不一样。拿好航线图。」')
+            : text('Mara: “High ground. The tug’s departure is marked on the chart—we’ll see if you earn my trust at the tide gate.”', '玛拉：「到高处了。图上标了拖轮离港航线，防潮闸见分晓。」');
           m.speak(...message);
           return;
         }
@@ -86,9 +97,15 @@
         const flooding = m.phase === 'flood' || m.phase === 'landing' || m.phase === 'complete';
         objects.flood.visible = flooding;
         objects.flood.position.y = m.phase === 'flood' ? surface() : 2.54;
-        objects['flood-worker'].visible = m.phase !== 'recordings' && (rescued() || m.phase === 'flood');
+        const showWorkers = m.phase !== 'recordings' && (rescued() || m.phase === 'flood');
+        objects['flood-worker'].visible = showWorkers;
         if (rescued()) objects['flood-worker'].position.set(points.landing.x + .73, points.landing.y, points.landing.z + 1.14);
         else objects['flood-worker'].position.copy(points['flood-worker']);
+        if (objects['flood-worker-2']) {
+          objects['flood-worker-2'].visible = showWorkers;
+          if (rescued()) objects['flood-worker-2'].position.set(points.landing.x + 1.45, points.landing.y, points.landing.z + .95);
+          else if (points['flood-worker-2']) objects['flood-worker-2'].position.copy(points['flood-worker-2']);
+        }
         for (const id of tugIds) switches[id].glow(m.evidence.collected.includes(id) || signal(id) > .66 ? 'teal' : 'warm');
       },
     };
@@ -112,23 +129,26 @@
       },
       actions() {
         if (m.phase === 'gate') return [m.action('lock-control', text('Raise the lock shutter', '升起检修卷帘门'),
-          () => m.advance('wind', 'lock-control'))];
+          () => {
+            m.advance('wind', 'lock-control');
+            m.speak('Mara: “Tide gauge is at 4.8 meters and climbing! Move between the storm gusts!”', '玛拉：「水位已经涨到 4.8 米！听我报数，趁阵风间隙穿过高架！」');
+          })];
         if (m.phase === 'wind') return [m.action('gust-latch', latchWindow() ?
           text('Release the latch · sheltered interval', '解开门闩 · 风力转弱') :
           text('Hold position · gust on deck', '留在背风处 · 阵风来袭'), () => {
           m.advance('barge', 'gust-latch');
-          m.speak('The gate is clear. Stay on the marked road.', '闸门开了。沿标记车道前进。');
+          m.speak('Mara: “Swell dropping for twelve seconds—cross the lock road now!”', '玛拉：「浪涌回落十二秒！门闩开了，沿闸顶车道冲过去！」');
         }, { allowed: latchWindow(), hold: .68 })];
         if (m.phase === 'detour' && !m.state.bypass) return [m.action('bypass-control',
           text('Raise the floodway access door', '打开泄洪道检修门'), () => {
             m.advance('detour', 'bypass-control', { bypass: true });
-            m.speak('The floodway is open. Cross the raised service bridge.', '泄洪道门已开。走上面的检修桥。');
+            m.speak('Mara: “Floodway hatch is up! Cross the lower gate chamber to reunite with me!”', '玛拉：「泄洪道检修门开了！从闸体下层检修桥过来和我重聚！」');
           })];
-        if (m.phase === 'reunion') return [m.action('mara-tidegate', text('Talk to Mara', '和玛拉交谈'), () => {
+        if (m.phase === 'reunion') return [m.action('mara-tidegate', text('Meet Mara & answer Reed’s incoming call', '与玛拉重聚并接听里德的来电'), () => {
           m.advance('departure', 'mara-tidegate');
-          m.speak('Mara here. I have the side-channel bearing. The platform is outside the gate.', '我是玛拉。我拿到了支航道方位。平台就在闸外。');
+          m.speak('Reed (Radio): “Lin? Listen—the outer service platform is listing, but the leeward starboard fender can still take a cutter. Get them out.”', '里德（首次来电）：「林恩？听好——外锚地维修平台已经倾斜，但背浪的右舷护舷一侧还能靠艇。把人带出来。」');
         }, { hold: 1.45 })];
-        if (m.phase === 'departure') return [m.action('exit', text('Board with Mara', '和玛拉登船'), m.complete)];
+        if (m.phase === 'departure') return [m.action('exit', text('Board the cutter with Mara for Outer Anchorage', '与玛拉登艇前往外锚地'), m.complete)];
         return [];
       },
       markers() {
@@ -187,21 +207,24 @@
       const phase = group === 'a' ? 'muster-b' : group === 'b' ? 'crane' : 'departure';
       m.advance(phase, 'muster-' + group, { rescued: total });
       if (group === 'b') {
-        m.speak('Eleven aboard. The crane is coming down. Leave the ladder and use the port catwalk.',
-          '十一人上船了。吊机要倒了。别走梯子，改走左舷栈道。');
-        m.effect({ sound: 'rail_touchdown', shake: .38, pos: points['muster-b'] });
+        m.speak('Eleven aboard (5+6)! The crane boom is snapping! Fall back to the second boarding point via the port catwalk!',
+          '十一人已登艇（5+6）！吊臂断裂坠落了！改走左舷栈道去第二处接驳点！');
+        m.effect({ sound: 'rail_touchdown', shake: .45, pos: points['muster-b'] });
+      } else if (group === 'c') {
+        m.speak('Old Hawk: “All seventeen aboard! Take this evacuation receipt addendum—they crossed off the second boat after I signed.”',
+          '老霍克（第十七人）：「十七人全上艇了！拿着这份撤离回执附页——我签完字后，有人把第二艘船划掉了。」');
       } else {
-        m.speak(`${total} of seventeen aboard.`, `已经上船 ${total} 人，共十七人。`);
+        m.speak(`First batch of ${total} aboard—twelve still on the listing deck!`, `第一批 ${total} 人已登艇，平台上还有十二人！`);
       }
     }
     return {
       phases: ['radio', 'platform', 'muster-a', 'muster-b', 'crane', 'muster-c', 'departure'],
       objective() {
-        if (m.phase === 'radio') return text('Call the pilot boat from the shed', '从引航棚呼叫接应艇');
-        if (m.phase === 'platform') return text('Cross the tilted platform and bring the pilot boat alongside', '穿过倾斜平台，让接应艇靠拢');
-        if (m.phase === 'crane') return text('The crane crushed the ladder. Take the port catwalk', '吊机压坏了梯子。走左舷栈道。');
-        if (m.phase === 'departure') return text('Report the final head count and board the cutter', '报告最终人数，然后登艇');
-        return text(`Evacuate the workers (${rescued()}/17)`, `撤离工人（${rescued()}/17）`);
+        if (m.phase === 'radio') return text('Call the pilot cutter to the leeward side Reed marked', '按里德指出的背浪侧呼叫接应艇靠泊');
+        if (m.phase === 'platform') return text('Cross the tilted platform and winch the cutter alongside', '穿过倾斜平台，操作绞盘接驳接应艇');
+        if (m.phase === 'crane') return text('Crane boom collapsed! Reroute to the second boarding point via port catwalk', '吊臂坠落堵死梯口！改走左舷栈道前往第二处接驳点');
+        if (m.phase === 'departure') return text('Take Old Hawk’s evacuation addendum and cast off with all 17', '收好老霍克交出的撤离回执附页，确认十七人后离泊');
+        return text(`Evacuate the 17 workers in 5/6/6 batches (${rescued()}/17)`, `分 5／6／6 三批撤离十七名工人（${rescued()}/17）`);
       },
       actions() {
         if (m.phase === 'radio') return [m.action('pilot-radio', text('Call the pilot cutter', '呼叫接应艇'), () => {
@@ -212,10 +235,12 @@
           () => m.advance('muster-a', 'approach-boat'), { hold: 2.2 })];
         if (m.phase.startsWith('muster-')) {
           const count = rescueBatches[last()];
-          return [m.action(m.phase, text(`Send the next ${count} workers aboard`, `安排接下来 ${count} 名工人登艇`),
-            () => evacuate(last()), { hold: 2.4 })];
+          const label = last() === 'c'
+            ? text('Board final 6 workers & Old Hawk (receives addendum)', '安排最后 6 人与老霍克登艇（接收撤离回执附页）')
+            : text(`Send the next ${count} workers aboard`, `安排本批 ${count} 名工人登艇`);
+          return [m.action(m.phase, label, () => evacuate(last()), { hold: 2.4 })];
         }
-        return m.phase === 'departure' ? [m.action('departure-radio', text('Confirm seventeen aboard', '确认十七人全部上船'),
+        return m.phase === 'departure' ? [m.action('departure-radio', text('Confirm all 17 aboard with Old Hawk’s addendum', '确认十七人全部上艇并收存回执附页'),
           m.complete, { hold: 1.7 })] : [];
       },
       markers() {
@@ -264,23 +289,28 @@
     return {
       phases: ['meet', ...segments],
       objective() {
-        if (m.phase === 'meet') return text('Meet the nurse in the west triage shed', '到西侧分诊棚找到护士');
+        if (m.phase === 'meet') return text('Dock silently and meet the nurse in the west cold-storage shed', '静默靠岸，到西侧冷雾库分诊棚找到护士');
         const index = stage();
-        return text(`Lead the nurse through receiving (${assembled[index]}/17 admitted)`,
-          `带护士穿过收货区（已接收 ${assembled[index]}/17 人）`);
+        return text(`Escort the nurse through cold storage to the field clinic (${assembled[index]}/17 admitted)`,
+          `经冷雾库护送护士到临时诊所（已核收 ${assembled[index]}/17 人）`);
       },
       actions() {
-        if (m.phase === 'meet') return [m.action('nurse', text('Tell the nurse where the boat docked', '告知护士救援艇的靠岸位置'), () => {
+        if (m.phase === 'meet') return [m.action('nurse', text('Tell the nurse where the boat docked', '告知护士静默靠岸位置'), () => {
           m.advance('west', 'nurse');
-          m.speak('Stay close. I need to see the cleared path before I move.', '别离太远。等我看清路再走。');
+          m.speak('Nurse: “Keep the lights low in cold storage. Clear each bulkhead before I cross.”', '护士：「冷雾库里别打草惊蛇。每过一道隔离门先帮我清出通道。」');
         })];
         const index = stage();
         if (index < 0) return [];
         const id = controls[index];
-        return [m.action(id, index === 3 ? text('Confirm all seventeen in the arrival ledger', '核对登记簿上的十七人') :
-          text('Clear the crossing for the nurse', '为护士打开通道'), () => {
-          if (index === 3) m.complete();
-          else m.advance(segments[index + 1], id);
+        return [m.action(id, index === 3 ? text('Witness Mara verify the 17th worker & receive Ward’s 05:50 tape', '见证玛拉核到第十七人并接收沃德 05:50 取消搜救录音') :
+          text('Clear the cold-storage crossing for the nurse', '为护士打开冷雾库通道'), () => {
+          if (index === 3) {
+            m.speak('Mara: “Seventeen—all accounted for. And here’s the raw 05:50 tape: Ward personally cancelled the rescue boat.”',
+              '玛拉：「第十七人核对完毕！还有这盘 05:50 原始录音——是沃德亲口下令取消搜救的。」');
+            m.complete();
+          } else {
+            m.advance(segments[index + 1], id);
+          }
         }, { allowed: m.followDone, hold: 1 })];
       },
       markers() {
@@ -310,16 +340,20 @@
     return {
       phases: ['approach', 'search', 'order', 'transmit'],
       objective() {
-        if (m.phase === 'approach') return text('Enter the tower by the watch, cable, or service access', '从值班门、电缆孔或检修门进入调度塔');
-        if (m.phase === 'search') return text(`Find the original calls (${m.evidence.collected.length}/4)`,
-          `找齐原始通话（${m.evidence.collected.length}/4）`);
-        if (m.phase === 'order') return text(`Select each call from earliest to latest (${m.state.order?.length ?? 0}/4)`,
-          `按时间从早到晚选取通话（${m.state.order?.length ?? 0}/4）`);
-        return text('Deliver the verified recording to the transmitter', '把核验过的录音送到发报机');
+        if (m.phase === 'approach') return text('Choose a dispatch tower entry: watch door, cable duct, or service lock', '选择调度塔入口：值班门、电缆孔或检修门');
+        if (m.phase === 'search') return text(`Find the archivist & recover all 4 raw calls (${m.evidence.collected.length}/4)`,
+          `找到记录员并找齐四段原始通话（${m.evidence.collected.length}/4）`);
+        if (m.phase === 'order') return text(`Reconstruct the timeline to separate Reed’s & Anvil’s liability (${m.state.order?.length ?? 0}/4)`,
+          `按时间复原四段通话，厘清里德与铁砧各自的责任（${m.state.order?.length ?? 0}/4）`);
+        return text('Transmit the indexed recordings & liability brief', '发送复原后的原始录音与责任清单');
       },
       actions() {
         if (m.phase === 'approach') return routes.map(route => m.action('entry-' + route,
-          text('Open tower access', '打开调度塔入口'), () => m.advance('search', 'entry-' + route, { route })));
+          text('Open tower access', '打开调度塔入口'), () => {
+            m.advance('search', 'entry-' + route, { route });
+            m.speak('Archivist: “I hid the four master reels before Anvil locked the tower—crack report, transfer order, rescue recall, and the intercept.”',
+              '记录员：「铁砧封塔前我藏好了四盘母带：裂缝报告、转移授权、召回搜救艇和拦截命令。」');
+          }));
         if (m.phase === 'search') return unfinished().map(id => {
           const clue = m.evidence.clues.find(item => item.id === id);
           return m.action(id, text(`Recover ${clue.title[0]}`, `取回${clue.title[1]}`), () => {
@@ -332,12 +366,16 @@
             const order = [...(m.state.order ?? []), clue.id];
             if (order.length === 4 && !m.evidence.verify(order)) {
               m.advance('order', 'console', { order: [] });
-              m.speak('Check the timestamps. Start with the inspection report.', '复核时间戳。从巡检报告开始。');
+              m.speak('Archivist: “Check the timestamps—start with the 05:21 crack report.”', '记录员：「核对时间戳——从 05:21 裂缝报告开始排。」');
             } else {
+              if (order.length === 4) {
+                m.speak('Timeline verified: Reed signed the 05:28 transfer cover-up; Anvil ordered the 06:13 transport shootdown. Upload it now!',
+                  '时间线复原完毕：里德签发了 05:28 转移授权掩盖裂缝，铁砧下达了 06:13 拦截击落运输机命令！立刻发报！');
+              }
               m.advance(order.length === 4 ? 'transmit' : 'order', 'console', { order });
             }
           }, { hold: .32, radius: .96 }));
-        return m.phase === 'transmit' ? [m.action('record-upload', text('Send the indexed recordings', '发出带索引的录音'), m.complete)] : [];
+        return m.phase === 'transmit' ? [m.action('record-upload', text('Transmit the verified master recordings', '发出复原后的四段原始录音'), m.complete)] : [];
       },
       markers() {
         if (m.phase === 'approach') return routes.map((route,index) => m.marker('entry-' + route, ['FIRE','DUCT','KEY'][index]));
@@ -367,15 +405,36 @@
       actions() {
         if (m.phase === 'meet') return [m.action('causeway-call', text('Check in with Harris', '与哈里斯会合'), () => m.advance('impact','fork'))];
         if (m.phase === 'route') return [
-          m.action('pick-bridge', text('Open the upper bridge', '开启高架引航桥'),
+          m.action('pick-bridge', text('Open the upper bridge (fast route)', '开启高架引航桥（快速路线）'),
             () => m.advance('escort','fork',{route:'bridge'})),
-          m.action('rescue-workers', text('Free the stranded workers', '救出受困的码头工'),
-            () => m.advance('workers','rescue-workers',{route:'workers'})),
+          m.action('rescue-workers', text('Free the stranded dock workers first', '先救出避险棚受困的码头工'),
+            () => {
+              m.effect({ sound: 'rail_log_radio', choice: 'lastPilotWorkersSaved' });
+              m.advance('workers','rescue-workers',{route:'workers'});
+            }),
         ];
-        if (m.phase === 'workers') return [m.action('open-worker-route', text('Clear the service lock', '打开装卸通道'),
+        if (m.phase === 'workers') return [m.action('open-worker-route', text('Clear the service lock with the workers', '和工人们一起打开装卸通道'),
           () => m.advance('escort','open-worker-route'))];
-        if (m.phase === 'escort') return [m.action('harris-handoff', text('Present the evidence with Harris', '和哈里斯移交证物'),
-          m.complete, { allowed: m.followDone })];
+        if (m.phase === 'escort') {
+          const step = Number(m.state.handoffStep) || 0;
+          const items = [
+            text('Chart table 1/3 · Place 05:31 Receipt & 05:34 Handover', '海图桌 1/3 · 移交 05:31 撤离回执与 05:34 交接条'),
+            text('Chart table 2/3 · Place Old Hawk’s Addendum & Ward’s 05:50 Tape', '海图桌 2/3 · 移交老霍克附页与沃德 05:50 录音'),
+            text('Chart table 3/3 · Place Tower Master Reels & Sign Inquiry', '海图桌 3/3 · 移交调度塔四段母带并签署调查书'),
+          ];
+          return [m.action('harris-handoff', items[step] ?? items[2], () => {
+            if (step === 0) {
+              m.advance('escort', 'harris-handoff', { handoffStep: 1 });
+              m.speak('Investigator: “First exhibit logged—the falsified departure roster. Keep going.”', '调查员：「第一组证物已登记——伪造的离港名单。请继续移交。」');
+            } else if (step === 1) {
+              m.advance('escort', 'harris-handoff', { handoffStep: 2 });
+              m.speak('Investigator: “Hawk’s addendum and Ward’s 05:50 recall order logged. Place the tower reels.”', '调查员：「老霍克附页与沃德 05:50 召回录音已归档。移交最后四盘母带。」');
+            } else {
+              m.speak('Harris: “Every original is on the chart table. Berth 4 can finally reopen.”', '哈里斯：「全部原始证物都在海图桌上了。四号泊位终于能重新开航了。」');
+              m.complete();
+            }
+          }, { allowed: m.followDone, hold: .55 })];
+        }
         return [];
       },
       markers() {
@@ -388,8 +447,8 @@
       tick(dt, player) {
         if (m.phase === 'impact' && near(player.pos, points.fork, 6.5, 1.1)) {
           m.advance('route','fork',{impact:true});
-          m.speak('The ship has cut off the causeway. Get Harris clear on another route.', '巨轮切断了岸道。另找一条路把哈里斯带出去。');
-          m.effect({ sound:'rail_touchdown', shake:.42, pos:points.impact });
+          m.speak('The ship has cut off the causeway. Take Harris across the upper bridge, or free the trapped workers first.', '巨轮撞断主岸道！带哈里斯走高架引航桥，或先救出避险棚的被困工人！');
+          m.effect({ sound:'rail_touchdown', shake:.48, pos:points.impact });
         }
         if (m.phase === 'escort' && harris) m.follow(harris, paths[m.state.route], player, dt, 2.7);
       },
@@ -410,14 +469,29 @@
 
   function reopen(m) {
     const { points, objects } = m.layout;
+    const savedChoices = (() => {
+      try { return JSON.parse(window.localStorage?.getItem('saltline.campaign.choices.v1') || '{}'); }
+      catch { return {}; }
+    })();
     return {
       phases: ['boots','castoff'],
-      objective: () => m.phase === 'boots' ? text('Meet Mara and take the work boots', '与玛拉会合，取回工靴') :
-        text('Carry the boots to the boat and cast off', '把工靴带上艇，解开缆绳'),
-      actions: () => m.phase === 'boots' ? [m.action('boots', text('Pick up the boots', '拿起工靴'), () => {
+      objective: () => m.phase === 'boots' ? text('Walk the morning quay, meet Mara & the survivors, and take Eli’s work boots', '漫步清晨港区，与玛拉和获救工友会合，取回伊莱的工靴') :
+        text('Return the work boots to the boat and cast off for first departure', '将工靴归还上艇，解缆迎接首班出港'),
+      actions: () => m.phase === 'boots' ? [m.action('boots', text('Take Eli Venn’s work boots from Mara', '从玛拉手中接过伊莱的工靴'), () => {
         m.advance('castoff','boots');
-        m.speak('His boots. He will want them when he gets home.', '把他的靴子带上。回家以后用得着。');
-      }, { hold: .7 })] : [m.action('cast-off', text('Stow the boots and untie the line', '放好工靴，解开缆绳'),m.complete)],
+        const extra = savedChoices.drydockWorkersSaved && savedChoices.lastPilotWorkersSaved
+          ? text('Mara: “Everyone you pulled out—from the drydock mechanics to the causeway crew—is on the pier today. Bring Eli’s boots aboard.”',
+            '玛拉：「从旧船坞的两名维修工到引航站受困的工友，今天全都在码头送行。把伊莱的工靴带上艇吧。」')
+          : savedChoices.drydockWorkersSaved
+            ? text('Mara: “The drydock mechanics are back on shift because of you. Bring Eli’s boots aboard.”',
+              '玛拉：「旧船坞那两名维修工今天回来当班了，都念着你的好。把伊莱的工靴带上艇吧。」')
+            : text('Mara: “All seventeen made it home. Put his boots on the seat—he’ll want them.”',
+              '玛拉：「十七个人全部平安回家了。把他的靴子带上艇吧，他回家用得着。」');
+        m.speak(...extra);
+      }, { hold: .7 })] : [m.action('cast-off', text('Return the boots & untie the bow line to depart', '归还工靴并解缆离港'), () => {
+        m.speak('Control: “Berth 4 is open. All seventeen confirmed—full campaign complete.”', '指挥部：「四号泊位正式重新开航。十七人全员确认，全战役圆满完成。」');
+        m.complete();
+      })],
       markers: () => m.phase === 'boots' ? [m.marker('boots','MARA')] : [m.marker('cast-off','EX','extract')],
       draw() {
         const boots = objects.boots;

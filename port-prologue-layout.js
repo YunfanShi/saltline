@@ -5,33 +5,131 @@
     root.name = 'saltline-rescue-07';
     parent?.add(root);
 
-    const group = (name, x, y, z) => {
+    const group = (name, x, y, z, host = root) => {
       const node = new THREE.Group();
       node.name = name;
       node.position.set(x, y, z);
-      root.add(node);
+      host.add(node);
       return node;
     };
+
+    // Procedural riveted aviation skin DataTexture (works in browser and headless Node tests).
+    function createAviationSkin(baseHex, roughness = .52, metalness = .26, stripes = false) {
+      const size = 256;
+      const color = new Uint8Array(size * size * 4);
+      const bump = new Uint8Array(size * size * 4);
+      const base = new THREE.Color(baseHex);
+      const r0 = Math.round(base.r * 255);
+      const g0 = Math.round(base.g * 255);
+      const b0 = Math.round(base.b * 255);
+      let seed = (baseHex ^ 0x5bd1e995) >>> 0;
+      const cellCols = 4, cellRows = 4;
+      const cellW = size / cellCols, cellH = size / cellRows;
+      const cellTone = Array.from({ length: cellCols * cellRows }, () => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        return ((seed >>> 24) / 255 - .5) * 14;
+      });
+      for (let y = 0; y < size; y++) {
+        const cy = Math.floor(y / cellH);
+        const ly = y - cy * cellH;
+        const seamY = ly < 1.5 || ly > cellH - 1.5;
+        const rivetY = (ly >= 4 && ly <= 5) || (ly >= cellH - 6 && ly <= cellH - 5);
+        for (let x = 0; x < size; x++) {
+          const cx = Math.floor(x / cellW);
+          const lx = x - cx * cellW;
+          const seamX = lx < 1.5 || lx > cellW - 1.5;
+          const rivetX = (lx >= 4 && lx <= 5) || (lx >= cellW - 6 && lx <= cellW - 5);
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          const grain = ((seed >>> 24) / 255 - .5) * 7;
+          const isSeam = seamX || seamY;
+          const isRivet = !isSeam && ((rivetY && (x % 8 < 2)) || (rivetX && (y % 8 < 2)));
+          const streak = Math.max(0, Math.sin(x * .21 + Math.cos(y * .05))) ** 6 * 7;
+          let delta = cellTone[cy * cellCols + cx] + grain - streak;
+          if (stripes && (y % 32 < 4)) delta -= 12;
+          if (isSeam) delta -= 22;
+          else if (isRivet) delta += 10;
+          const idx = (y * size + x) * 4;
+          color[idx] = Math.max(0, Math.min(255, r0 + delta));
+          color[idx + 1] = Math.max(0, Math.min(255, g0 + delta));
+          color[idx + 2] = Math.max(0, Math.min(255, b0 + delta));
+          color[idx + 3] = 255;
+          const bVal = isSeam ? 86 : isRivet ? 172 : Math.max(0, Math.min(255, 128 + grain * 2));
+          const rVal = Math.max(40, Math.min(245, Math.round(roughness * 255 + (isSeam ? 42 : streak * 3 + grain * 2))));
+          bump[idx] = bVal;
+          bump[idx + 1] = rVal;
+          bump[idx + 2] = 255;
+          bump[idx + 3] = 255;
+        }
+      }
+      const makeTex = (buf, cs) => {
+        const t = new THREE.DataTexture(buf, size, size);
+        t.colorSpace = cs;
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(2, 2);
+        t.magFilter = THREE.LinearFilter;
+        t.minFilter = THREE.LinearMipmapLinearFilter;
+        t.generateMipmaps = true;
+        t.needsUpdate = true;
+        return t;
+      };
+      const map = makeTex(color, THREE.SRGBColorSpace);
+      const bumpMap = makeTex(bump, THREE.NoColorSpace);
+      return new THREE.MeshStandardMaterial({
+        map, bumpMap, roughnessMap: bumpMap, bumpScale: .006,
+        roughness: 1, metalness,
+      });
+    }
+
+    function createMfdMaterial() {
+      const w = 128, h = 128;
+      const buf = new Uint8Array(w * h * 4);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const nx = (x - w / 2) / (w / 2);
+          const ny = (y - h / 2) / (h / 2);
+          const rad = Math.hypot(nx, ny);
+          let r = 10, g = 28, b = 26;
+          if (Math.abs(ny) < .03 || Math.abs(nx) < .025) { r = 64; g = 220; b = 178; }
+          if (Math.abs(rad - .42) < .035 || Math.abs(rad - .75) < .03) { r = 46; g = 186; b = 152; }
+          if (x < 18 && y > 24 && y < 104 && y % 8 < 4) { r = 240; g = 184; b = 88; }
+          if (x > 110 && y > 32 && y < 96 && y % 8 < 4) { r = 92; g = 232; b = 192; }
+          if (x < 4 || x > w - 5 || y < 4 || y > h - 5) { r = 24; g = 40; b = 38; }
+          const i = (y * w + x) * 4;
+          buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = 255;
+        }
+      }
+      const map = new THREE.DataTexture(buf, w, h);
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.magFilter = THREE.LinearFilter;
+      map.needsUpdate = true;
+      return new THREE.MeshBasicMaterial({ map });
+    }
+
     const finish = (color, roughness = .58, metalness = .22) =>
       new THREE.MeshStandardMaterial({ color, roughness, metalness });
-    const navy = finish(0x233343);
-    const blueGrey = finish(0x465864, .43, .34);
-    const ivory = finish(0xd4dad5, .55);
-    const orange = finish(0xdc5c30, .43);
-    const frame = finish(0x283740, .69);
-    const panel = finish(0x5f6e71, .76);
-    const padded = finish(0x4a4f3d, .99, 0);
-    const glazing = new THREE.MeshStandardMaterial({ color: 0x7295a8, roughness: .16,
-      metalness: .34, transparent: true, opacity: .36, depthWrite: false, side: THREE.DoubleSide });
+    const navy = createAviationSkin(0x213244, .48, .28);
+    const blueGrey = createAviationSkin(0x465a68, .42, .38);
+    const ivory = createAviationSkin(0xd6dcd7, .46, .20);
+    const orange = createAviationSkin(0xe05b2d, .40, .24);
+    const darkMetal = finish(0x232d34, .46, .58);
+    const titanium = finish(0x5a5855, .36, .74);
+    const frame = finish(0x26343d, .64, .32);
+    const panel = finish(0x556468, .72, .25);
+    const padded = finish(0x434a3a, .94, .04);
+    const optic = finish(0x16242c, .12, .82);
+    const mfdMat = createMfdMaterial();
+    const glazing = new THREE.MeshStandardMaterial({ color: 0x7295a8, roughness: .14,
+      metalness: .38, transparent: true, opacity: .36, depthWrite: false, side: THREE.DoubleSide });
     const rubber = mats.get('rubber');
     const steel = mats.get('steel_galv');
     const warm = mats.emissive(0xffc07b, 1.5);
-    const red = mats.emissive(0xff5a42, 2);
-    const green = mats.emissive(0x70e4bc, 2);
-    const white = mats.emissive(0xffefe0, 2.1);
-    const sphere = new THREE.SphereGeometry(1, 20, 12);
-    const cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+    const red = mats.emissive(0xff5a42, 2.2);
+    const green = mats.emissive(0x70e4bc, 2.2);
+    const white = mats.emissive(0xffefe0, 2.3);
+    const sphere = new THREE.SphereGeometry(1, 20, 14);
+    const cylinder = new THREE.CylinderGeometry(1, 1, 1, 16);
     const cube = new THREE.BoxGeometry(1, 1, 1);
+
     function mesh(geometry, material, x, y, z, node = root, cast = true) {
       const item = new THREE.Mesh(geometry, material);
       item.position.set(x, y, z);
@@ -63,50 +161,115 @@
         x, y, z, node, false);
       print.rotation.y = yaw;
     }
-    function shell(material, stations, arc = Math.PI * 2) {
-      const vertices = [], triangles = [];
-      const segments = 24;
-      const columns = segments + (arc < Math.PI * 2 ? 1 : 0);
+    function shell(material, stations, arc = Math.PI * 2, segments = 36, host = root, startAngle = null) {
+      const vertices = [], uvs = [], triangles = [];
+      const fullWrap = startAngle === null && Math.abs(arc - Math.PI * 2) < 1e-4;
+      const columns = segments + 1;
+      const zMin = stations[0][0];
+      const zSpan = Math.max(.001, stations[stations.length - 1][0] - zMin);
       for (const [z, width, y, height] of stations) {
-        for (let i = 0; i < columns; i++) {
-          const angle = (i / segments - .5) * arc;
+        const v = (z - zMin) / zSpan;
+        for (let i = 0; i <= segments; i++) {
+          const u = i / segments;
+          const angle = startAngle !== null ? startAngle + u * arc : (u - .5) * arc;
           vertices.push(Math.sin(angle) * width, y + Math.cos(angle) * height, z);
+          uvs.push(u * 2, v * 2);
         }
       }
       for (let ring = 0; ring < stations.length - 1; ring++) {
         for (let i = 0; i < segments; i++) {
           const here = ring * columns + i;
-          const next = ring * columns + (i + 1) % columns;
+          const next = here + 1;
           triangles.push(here, here + columns, next, next, here + columns, next + columns);
         }
       }
       const skin = new THREE.BufferGeometry();
       skin.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      skin.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
       skin.setIndex(triangles);
       skin.computeVertexNormals();
-      return mesh(skin, material, 0, 0, 0, root, !material.transparent);
+      if (fullWrap) {
+        const normals = skin.attributes.normal;
+        const a = new THREE.Vector3(), b = new THREE.Vector3();
+        for (let ring = 0; ring < stations.length; ring++) {
+          const first = ring * columns;
+          const last = first + segments;
+          a.fromBufferAttribute(normals, first).add(b.fromBufferAttribute(normals, last)).normalize();
+          normals.setXYZ(first, a.x, a.y, a.z);
+          normals.setXYZ(last, a.x, a.y, a.z);
+        }
+      }
+      return mesh(skin, material, 0, 0, 0, host, !material.transparent);
     }
 
-    // Two continuous shells leave an unobstructed window and side-door band.
+    // Lofted symmetric airfoil surface along a span axis (axis: 'x' | 'y' | 'z').
+    function airfoilLoft(material, sections, axis = 'x', host = root, cast = true, segs = 16) {
+      const vertices = [], uvs = [], indices = [];
+      const cols = segs + 1;
+      for (let r = 0; r < sections.length; r++) {
+        const [span, cA, cB, halfChord, halfThick, twist = 0] = sections[r];
+        const ct = Math.cos(twist), st = Math.sin(twist);
+        for (let i = 0; i <= segs; i++) {
+          const theta = (i / segs) * Math.PI * 2;
+          const cosT = Math.cos(theta), sinT = Math.sin(theta);
+          const chordPos = halfChord * cosT;
+          const thickPos = halfThick * sinT * (1 + .24 * cosT);
+          const rotC = chordPos * ct - thickPos * st;
+          const rotT = chordPos * st + thickPos * ct;
+          if (axis === 'x') vertices.push(span, cA + rotT, cB + rotC);
+          else if (axis === 'y') vertices.push(cA + rotT, span, cB + rotC);
+          else vertices.push(cA + rotC, cB + rotT, span);
+          uvs.push(i / segs, r / (sections.length - 1));
+        }
+      }
+      for (let r = 0; r < sections.length - 1; r++) {
+        for (let i = 0; i < segs; i++) {
+          const a = r * cols + i, b = a + 1, c = a + cols, d = c + 1;
+          indices.push(a, c, b, b, c, d);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return mesh(geo, material, 0, 0, 0, host, cast);
+    }
+
+    // Lower belly uses a bottom-only U-hull so it never bulges up through the flat cabin floor.
     const belly = shell(navy, [
-      [-3.68, .018, 1.53, .022], [-3.47, .48, 1.49, .24], [-3.17, .83, 1.41, .41],
-      [-2.69, 1.089, 1.23, .49], [-2.16, 1.23, 1.14, .52], [-1.25, 1.258, 1.11, .53],
-      [.72, 1.251, 1.11, .53], [1.84, 1.22, 1.17, .51],
-      [2.38, 1.09, 1.35, .52], [2.75, .83, 1.66, .52], [3.1, .5, 1.92, .31], [3.31, .2, 2.06, .18],
-    ]);
+      [-3.72, .016, 1.53, .018], [-3.62, .24, 1.52, .13], [-3.47, .48, 1.49, .24],
+      [-3.17, .83, 1.41, .41], [-2.69, 1.089, 1.28, .44], [-2.16, 1.23, 1.24, .46],
+      [-1.25, 1.258, 1.24, .48], [.72, 1.251, 1.24, .48], [1.84, 1.22, 1.24, .46],
+      [2.38, 1.09, 1.38, .46], [2.75, .83, 1.66, .46], [3.1, .5, 1.92, .30], [3.31, .2, 2.06, .18],
+    ], Math.PI * 1.04, 36, root, Math.PI * .48);
     belly.name = 'rescue-lower-fuselage';
+    // Contoured nose cone & forward deck strictly ahead of the cockpit dashboard (z <= -2.92)
+    shell(navy, [
+      [-3.72, .016, 1.53, .018], [-3.62, .24, 1.52, .13], [-3.47, .48, 1.49, .22],
+      [-3.17, .83, 1.46, .28], [-2.94, .98, 1.44, .27],
+    ], Math.PI, 28, root, -Math.PI * .5);
+    // Weather radar nose radome cap
+    const radome = shell(darkMetal, [
+      [-3.75, .015, 1.53, .015], [-3.65, .21, 1.52, .12], [-3.50, .42, 1.50, .21],
+    ], Math.PI * 2, 24);
+    radome.name = 'rescue-nose-radome';
+
+    // Upper roof uses a top-only dome so it never dips down into the cabin ceiling.
     const roofSkin = shell(ivory, [
-      [-3.24, .28, 2.51, .051], [-2.96, .68, 2.61, .118], [-2.57, .946, 2.70, .161],
-      [-2.05, 1.153, 2.76, .219], [-1.13, 1.234, 2.793, .245], [.71, 1.237, 2.795, .251],
-      [1.68, 1.215, 2.76, .222], [2.22, 1.073, 2.65, .23], [2.74, .68, 2.45, .27], [3.1, .32, 2.19, .18],
-    ]);
+      [-3.24, .28, 2.55, .06], [-2.96, .68, 2.62, .12], [-2.57, .946, 2.66, .17],
+      [-2.05, 1.153, 2.68, .22], [-1.13, 1.234, 2.69, .25], [.71, 1.237, 2.69, .25],
+      [1.68, 1.215, 2.68, .22], [2.22, 1.073, 2.62, .22], [2.74, .68, 2.45, .24], [3.1, .32, 2.19, .18],
+    ], Math.PI * 1.04, 36, root, -Math.PI * .52);
     roofSkin.name = 'rescue-upper-fuselage';
     const windscreen = shell(glazing, [
       [-3.56, .24, 1.72, .28], [-3.37, .57, 1.83, .405], [-3.12, .82, 1.82, .657],
       [-2.8, 1.011, 1.83, .73], [-2.46, 1.14, 1.78, .78], [-2.12, 1.19, 1.77, .824],
       [-1.91, 1.231, 1.78, .824],
-    ], Math.PI * 1.085);
+    ], Math.PI * 1.085, 32);
     windscreen.name = 'rescue-windscreen';
+
+    // Windscreen structural mullions, parked wipers, and pitot tubes
     pipe(frame, .026, [0, 2.62, -3.151], [0, 2.06, -3.585]);
     for (const side of [-1, 1]) {
       pipe(frame, .027, [side * .61, 2.52, -2.98], [side * .89, 1.96, -3.10]);
@@ -114,11 +277,64 @@
       pipe(navy, .032, [side * 1.214, 1.87, -2.36], [side * 1.245, 2.59, -1.93]);
       const noseStripe = box(orange, .034, .092, .58, side * 1.18, 1.72, -2.19);
       noseStripe.rotation.y = side * .22;
+      // Parked windscreen wiper arm along lower cowl (below sightlines)
+      pipe(darkMetal, .009, [side * .09, 1.79, -3.50], [side * .48, 1.86, -3.38]);
+      // Pitot static probe on nose cheek
+      pipe(steel, .008, [side * .64, 1.56, -3.26], [side * .66, 1.56, -3.54]);
     }
-    oval(blueGrey, 1.049, .227, 1.59, 0, 2.925, .23);
-    box(panel, 2.27, .072, 4.06, 0, 1.255, .15);
-    box(frame, 2.26, .08, 3.97, 0, 2.59, .14);
+    // Chin-mounted FLIR electro-optical turret (below nose, clear of cockpit sightlines)
+    const flir = group('rescue-flir-turret', 0, 1.12, -3.12);
+    piece(cylinder, darkMetal, .11, .16, .11, 0, .11, 0, flir);
+    box(darkMetal, .28, .05, .14, 0, .02, 0, flir);
+    for (const sx of [-.12, .12]) box(darkMetal, .04, .18, .10, sx, -.07, 0, flir);
+    oval(darkMetal, .135, .135, .145, 0, -.12, 0, flir);
+    piece(cylinder, optic, .052, .03, .052, -.04, -.12, -.13, flir).rotation.x = Math.PI / 2;
+    piece(cylinder, optic, .034, .03, .034, .055, -.11, -.13, flir).rotation.x = Math.PI / 2;
+    // Upper and lower wire-strike cutters
+    box(darkMetal, .018, .26, .14, 0, 2.74, -2.92).rotation.x = -.42;
+    box(darkMetal, .018, .24, .14, 0, .91, -2.55).rotation.x = .38;
+
+    // Lofted twin-turboshaft engine cowling & transmission fairing
+    shell(blueGrey, [
+      [-1.38, .34, 2.86, .08], [-1.05, .74, 2.91, .18], [-.55, .96, 2.95, .25],
+      [.25, .99, 2.96, .26], [1.05, .89, 2.93, .23], [1.62, .68, 2.86, .18], [1.96, .34, 2.74, .10],
+    ], Math.PI * 2, 28);
+    // Forward twin engine intakes with FOD screens & aluminum lip rings
+    for (const side of [-1, 1]) {
+      const intake = group('rescue-engine-intake', side * .46, 2.94, -1.04);
+      const lip = piece(cylinder, steel, .21, .12, .18, 0, 0, 0, intake);
+      lip.rotation.x = Math.PI / 2;
+      const bore = piece(cylinder, darkMetal, .175, .14, .145, 0, 0, .02, intake);
+      bore.rotation.x = Math.PI / 2;
+      // Swept titanium turbine exhaust ducts
+      const exPipe = piece(cylinder, titanium, .165, .44, .145, side * .58, 2.93, 1.54);
+      exPipe.rotation.set(1.24, side * .22, 0);
+      const exBore = piece(cylinder, darkMetal, .13, .12, .115, side * .62, 2.99, 1.72);
+      exBore.rotation.set(1.24, side * .22, 0);
+      // Louvered side cooling vents
+      const vent = box(blueGrey, .052, .234, .68, side * .97, 2.949, .48);
+      vent.rotation.z = -side * .29;
+      for (const z of [.24, .34, .44, .54, .64, .74]) {
+        const opening = box(darkMetal, .028, .15, .028, side * 1.008, 2.946, z, root, false);
+        opening.rotation.z = -side * .29;
+      }
+      // Fuselage jacking/tie-down lugs
+      for (const z of [-1.82, -1.05, 1.39, 2.02]) {
+        box(blueGrey, .018, .049, .145, side * 1.197, 1.195, z, root, false);
+      }
+    }
+    // Dorsal oil-cooler scoop & mast fairing collar
+    box(darkMetal, .36, .14, .58, 0, 3.16, .62);
+    piece(cylinder, frame, .34, .18, .34, 0, 3.18, -.25);
+
+    // Flat industrial cabin & cockpit floor with tie-down tracks, ceiling liner, and bulkheads
+    box(panel, 2.28, .072, 4.92, 0, 1.255, -.28);
+    for (const tx of [-.56, 0, .56]) box(darkMetal, .048, .012, 3.85, tx, 1.295, .15, root, false);
+    box(orange, .09, .012, 1.9, -1.08, 1.295, .33, root, false);
+    box(frame, 2.26, .08, 4.45, 0, 2.61, -.08);
     box(frame, 2.21, 1.36, .12, 0, 1.94, 2.13);
+    // Overhead cockpit breaker console (above y=2.50, clear of sightlines)
+    box(darkMetal, .62, .10, .78, 0, 2.53, -2.35);
     for (const x of [-1.105, 1.105]) box(panel, .159, 1.36, .13, x, 1.94, -1.91);
     box(panel, 2.11, .115, .13, 0, 2.53, -1.91);
 
@@ -152,17 +368,20 @@
     for (const z of [-.46, -.19, .08, .35, .62, .89, 1.16]) {
       box(blueGrey, .147, .012, .023, -1.362, 1.256, z, root, false);
     }
-    box(frame, .044, .047, .173, -.101, 1.69, -.64, door);
+    // Exterior recessed door handle & upper sliding rail with carriage brackets
+    box(darkMetal, .048, .052, .18, -.101, 1.69, -.64, door);
     box(steel, .059, .048, 2.8, -1.22, 2.646, .74);
+    box(darkMetal, .05, .04, 2.75, -1.24, 1.29, .74);
     stencil('SAR 07', -.085, 1.56, 0, .88, -Math.PI / 2, door);
     stencil('SALTLINE RESCUE', 1.272, 1.56, .49, 1.36, Math.PI / 2);
     stencil('07', -1.264, 1.557, -1.34, .42, -Math.PI / 2);
 
-    // Webbed cabin seats, amber cabin lighting, and the ramp-side threshold.
+    // Webbed cabin seats, amber cabin lighting, and cockpit avionics.
     for (const z of [-.96, -.26, .44, 1.14, 1.84]) {
       box(frame, 2.16, .019, .057, 0, 1.301, z);
       box(padded, .45, .087, .51, .88, 1.62, z);
       box(padded, .086, .46, .51, 1.065, 1.87, z);
+      box(padded, .07, .14, .26, 1.06, 2.18, z);
       pipe(frame, .018, [.71, 1.31, z], [1.04, 1.58, z]);
       box(rubber, .019, .41, .025, 1.017, 1.89, z + .143);
       box(steel, .04, .06, .067, 1.003, 1.72, z + .124);
@@ -174,17 +393,31 @@
     root.add(cabinLight);
     pipe(steel, .027, [-.94, 2.39, -1.85], [-.94, 2.39, 2.03]);
     box(rubber, .16, .05, .16, .78, 1.57, -1.67);
+    // Rear bulkhead rescue medical pack & fire extinguisher
     box(orange, .34, .59, .18, -.63, 1.84, 1.972);
     box(ivory, .2, .05, .015, -.63, 1.94, 1.871);
+    box(ivory, .05, .2, .015, -.63, 1.94, 1.871);
+    piece(cylinder, orange, .055, .36, .055, -.28, 1.74, 1.98);
+    piece(cylinder, darkMetal, .022, .07, .022, -.28, 1.95, 1.98);
+
+    // Cockpit pilot seats, flight controls (kept below y=1.82 to preserve sightlines), and MFD dash
     for (const x of [-.65, .65]) {
       box(padded, .47, .102, .41, x, 1.49, -2.19);
       box(frame, .438, .47, .112, x, 1.68, -2.03).rotation.x = -.1;
       box(steel, .032, .38, .04, x - .13, 1.68, -1.964);
       box(navy, .32, .09, .18, x, 1.39, -2.33);
+      // Cyclic stick & collective lever
+      pipe(darkMetal, .014, [x, 1.32, -2.52], [x, 1.66, -2.44]);
+      oval(rubber, .026, .04, .026, x, 1.68, -2.43);
+      pipe(darkMetal, .012, [x - .25, 1.36, -2.18], [x - .25, 1.54, -2.44]);
     }
-    box(frame, 1.68, .17, .35, 0, 1.63, -2.9).rotation.x = .2;
-    for (const x of [-.54, -.26, .26, .54]) {
-      box(x < 0 ? green : warm, .147, .04, .046, x, 1.719, -2.815).rotation.x = .2;
+    // Center avionics pedestal
+    box(darkMetal, .36, .28, .66, 0, 1.44, -2.46);
+    box(frame, 1.68, .19, .38, 0, 1.63, -2.9).rotation.x = .2;
+    box(darkMetal, 1.72, .035, .42, 0, 1.73, -2.92).rotation.x = .18;
+    for (const x of [-.52, 0, .52]) {
+      const mfd = mesh(new THREE.PlaneGeometry(.28, .15), mfdMat, x, 1.68, -2.72, root, false);
+      mfd.rotation.x = -.32;
     }
     const cargoNet = group('rescue-cabin-cargo-net', .73, 1.97, 1.715);
     for (const i of [-1, 0, 1]) {
@@ -192,58 +425,138 @@
       box(padded, .48, .023, .025, 0, i * .145, -.012, cargoNet).rotation.z = .18;
     }
 
-    // The tail boom and landing gear carry the color bands around the aircraft.
-    const boom = mesh(new THREE.CylinderGeometry(.26, .58, 4.38, 10), navy, 0, 2.21, 4.35);
-    boom.rotation.x = 1.47;
-    const stripe = piece(cylinder, orange, .32, .46, .32, 0, 2.41, 6.13);
-    stripe.rotation.x = 1.47;
-    const verticalFin = box(ivory, .13, 1.37, .77, 0, 2.97, 6.48);
-    verticalFin.rotation.x = .33;
-    const finStripe = box(orange, .144, .18, .77, 0, 3.25, 6.58);
-    finStripe.rotation.x = .33;
-    box(navy, 2.45, .079, .57, 0, 2.25, 5.37);
-    box(red, .11, .055, .15, -1.2, 2.28, 5.39);
-    box(green, .11, .055, .15, 1.2, 2.28, 5.39);
-    box(white, .073, .09, .095, .01, 3.49, 6.63);
-    for (const side of [-1, 1]) {
-      pipe(steel, .071, [side * .9, 1.12, -1.66], [side * 1.46, .155, -1.08]);
-      pipe(steel, .083, [side * .92, 1.1, 1.36], [side * 1.46, .155, 1.36]);
-      pipe(navy, .079, [side * 1.46, .105, -2.27], [side * 1.46, .105, 2.24]);
-      pipe(navy, .079, [side * 1.46, .105, -2.27], [side * 1.46, .43, -2.81]);
-      oval(rubber, .107, .083, .45, side * 1.46, .081, 1.48);
-      box(steel, .22, .058, .82, side * 1.44, .51, .28);
-      box(side < 0 ? red : green, .076, .105, .154, side * 1.259, 1.77, -1.97);
-      oval(white, .114, .095, .065, side * .54, 1.36, -3.355);
-      const exhaust = piece(cylinder, frame, .168, .26, .132, side * .62, 2.94, 1.49);
-      exhaust.rotation.x = 1.21;
-      const vent = box(blueGrey, .052, .234, .62, side * .97, 2.949, .51);
-      vent.rotation.z = -side * .29;
-      for (const z of [.30, .40, .5, .60, .70]) {
-        const opening = box(frame, .026, .143, .028, side * 1.008, 2.946, z, root, false);
-        opening.rotation.z = -side * .29;
-      }
-      for (const z of [-1.82, -1.05, 1.39, 2.02]) {
-        box(blueGrey, .018, .049, .145, side * 1.197, 1.195, z, root, false);
-      }
-    }
-    stencil('07', -.074, 2.96, 6.52, .31, -Math.PI / 2);
+    // Lofted tapered tail boom, dorsal driveshaft spine, airfoil stabilizers & tail skid
+    shell(navy, [
+      [2.15, .64, 2.02, .56], [3.05, .48, 2.13, .42], [4.15, .36, 2.26, .32],
+      [5.25, .28, 2.38, .25], [6.25, .22, 2.49, .21], [6.62, .16, 2.53, .16],
+    ], Math.PI * 2, 24);
+    // Dorsal tail rotor driveshaft cover
+    shell(blueGrey, [
+      [2.2, .17, 2.60, .09], [3.8, .12, 2.59, .07], [5.4, .09, 2.63, .06], [6.3, .07, 2.68, .05],
+    ], Math.PI * 2, 16);
+    // High-visibility orange tail band
+    shell(orange, [
+      [5.85, .252, 2.445, .232], [6.28, .226, 2.495, .214],
+    ], Math.PI * 2, 24);
+    // VHF blade antennas on tail boom
+    const vhfTop = box(darkMetal, .016, .28, .11, 0, 2.75, 4.15);
+    vhfTop.rotation.x = .32;
+    const vhfBot = box(darkMetal, .016, .24, .09, 0, 1.88, 3.65);
+    vhfBot.rotation.x = -.28;
+    // Tail bumper skid
+    pipe(steel, .022, [0, 2.28, 5.95], [0, 1.86, 6.22]);
+    pipe(steel, .022, [0, 1.86, 6.22], [0, 2.36, 6.52]);
 
+    // Lofted airfoil vertical stabilizer with swept dorsal fillet
+    airfoilLoft(ivory, [
+      [2.48, 0, 5.75, .62, .085],
+      [2.72, 0, 6.24, .46, .075],
+      [3.12, 0, 6.46, .39, .065],
+      [3.52, 0, 6.66, .31, .052],
+      [3.66, 0, 6.72, .22, .036],
+    ], 'y');
+    // Orange band wrapped onto vertical fin
+    airfoilLoft(orange, [
+      [3.16, 0, 6.48, .385, .072],
+      [3.34, 0, 6.57, .35, .065],
+    ], 'y');
+    // Lofted airfoil horizontal stabilizer with endplates
+    airfoilLoft(navy, [
+      [-1.24, 2.25, 5.38, .25, .042],
+      [-.65, 2.25, 5.37, .29, .050],
+      [0, 2.25, 5.36, .31, .054],
+      [.65, 2.25, 5.37, .29, .050],
+      [1.24, 2.25, 5.38, .25, .042],
+    ], 'x');
+    for (const side of [-1, 1]) {
+      box(navy, .032, .34, .48, side * 1.24, 2.26, 5.40);
+      box(orange, .036, .08, .48, side * 1.24, 2.38, 5.40);
+    }
+    // Navigation & anti-collision strobe lights
+    oval(red, .045, .035, .065, -1.26, 2.28, 5.26);
+    oval(green, .045, .035, .065, 1.26, 2.28, 5.26);
+    oval(white, .042, .058, .048, 0, 3.70, 6.70);
+    oval(red, .042, .052, .042, 0, 3.24, 1.35);
+
+    // Upgraded skid landing gear with shock collars, wear shoes, tie-downs & boarding steps
+    for (const side of [-1, 1]) {
+      pipe(steel, .068, [side * .9, 1.12, -1.66], [side * 1.46, .155, -1.08]);
+      pipe(steel, .078, [side * .92, 1.1, 1.36], [side * 1.46, .155, 1.36]);
+      // Fuselage strut fairings & shock collars
+      oval(darkMetal, .11, .09, .14, side * .92, 1.08, -1.64);
+      oval(darkMetal, .11, .09, .14, side * .94, 1.07, 1.36);
+      piece(cylinder, titanium, .092, .22, .092, side * 1.18, .64, -1.37).rotation.z = side * .48;
+      piece(cylinder, titanium, .10, .22, .10, side * 1.19, .63, 1.36).rotation.z = side * .48;
+      // Main skid tube & upturned tip
+      pipe(navy, .076, [side * 1.46, .105, -2.27], [side * 1.46, .105, 2.24]);
+      pipe(navy, .074, [side * 1.46, .105, -2.27], [side * 1.46, .43, -2.81]);
+      oval(darkMetal, .076, .076, .08, side * 1.46, .43, -2.81);
+      oval(darkMetal, .076, .076, .08, side * 1.46, .105, 2.24);
+      // Wear shoes & damper pad
+      box(steel, .095, .022, .52, side * 1.46, .022, -1.1);
+      box(steel, .095, .022, .58, side * 1.46, .022, 1.36);
+      oval(rubber, .107, .083, .45, side * 1.46, .081, 1.48);
+      // Grated boarding step solidly bracketed to the landing skid
+      box(darkMetal, .24, .052, .86, side * 1.44, .51, .28);
+      for (const bz of [-.06, .62]) {
+        pipe(steel, .022, [side * 1.44, .50, bz], [side * 1.46, .12, bz]);
+        pipe(steel, .020, [side * 1.34, .50, bz], [side * 1.16, 1.12, bz]);
+      }
+      for (let gz = -.08; gz <= .64; gz += .12) {
+        box(steel, .20, .014, .035, side * 1.44, .54, gz, root, false);
+      }
+      // Side position lights & recessed twin landing lights
+      box(darkMetal, .06, .11, .16, side * 1.24, 1.77, -1.97);
+      oval(side < 0 ? red : green, .045, .048, .062, side * 1.275, 1.77, -1.97);
+      piece(cylinder, darkMetal, .118, .06, .118, side * .54, 1.36, -3.33).rotation.x = Math.PI / 2;
+      oval(white, .095, .082, .045, side * .54, 1.36, -3.36);
+    }
+    stencil('07', -.082, 2.96, 6.46, .31, -Math.PI / 2);
+
+    // Articulated 4-blade lofted airfoil main rotor with swashplate & pitch links
     pipe(steel, .085, [0, 3.07, -.25], [0, 3.64, -.25]);
+    piece(cylinder, darkMetal, .21, .055, .21, 0, 3.36, -.25);
+    piece(cylinder, titanium, .16, .045, .16, 0, 3.43, -.25);
     const mainRotor = group('rescue-main-rotor', 0, 3.64, -.25);
-    box(steel, .57, .086, .51, 0, 0, 0, mainRotor);
+    piece(cylinder, darkMetal, .32, .11, .32, 0, 0, 0, mainRotor);
+    oval(blueGrey, .24, .11, .24, 0, .07, 0, mainRotor);
     for (let i = 0; i < 4; i++) {
       const blade = new THREE.Group();
       blade.rotation.y = i * Math.PI / 2;
       mainRotor.add(blade);
-      box(frame, 4.91, .041, .226, 2.79, 0, 0, blade, false);
-      box(ivory, .28, .039, .226, 5.385, 0, 0, blade, false);
-      box(orange, .19, .039, .226, 5.62, 0, 0, blade, false);
+      // Elastomeric hub arm, pitch horn & link rod
+      box(titanium, .48, .075, .13, .38, 0, 0, blade);
+      pipe(steel, .016, [.26, -.22, .10], [.36, -.02, .10], blade);
+      // Lofted airfoil main blade with root cuff and high-visibility tip stripes
+      airfoilLoft(darkMetal, [
+        [.56, 0, 0, .095, .026, .12],
+        [1.10, .005, 0, .135, .024, .10],
+        [3.40, -.018, 0, .135, .022, .07],
+        [5.24, -.052, 0, .132, .020, .05],
+      ], 'x', blade, false, 12);
+      airfoilLoft(ivory, [
+        [5.24, -.052, 0, .132, .020, .05],
+        [5.52, -.058, 0, .128, .019, .05],
+      ], 'x', blade, false, 12);
+      airfoilLoft(orange, [
+        [5.52, -.058, 0, .128, .019, .05],
+        [5.72, -.062, 0, .112, .016, .05],
+      ], 'x', blade, false, 12);
     }
+
+    // Tail rotor gearbox & 4-blade scissored airfoil tail rotor
+    piece(cylinder, blueGrey, .16, .22, .16, -.12, 2.83, 6.53).rotation.z = Math.PI / 2;
     const tailRotor = group('rescue-tail-rotor', -.34, 2.83, 6.53);
-    pipe(steel, .066, [-.08, 0, 0], [.15, 0, 0], tailRotor);
-    const tailBlade = box(frame, .041, .23, 1.66, -.068, 0, 0, tailRotor, false);
-    tailBlade.rotation.x = .2;
-    for (const end of [-1, 1]) box(ivory, .045, .21, .14, -.068, -.15 * end, .755 * end, tailRotor, false);
+    pipe(steel, .058, [-.09, 0, 0], [.20, 0, 0], tailRotor);
+    oval(darkMetal, .065, .10, .10, -.09, 0, 0, tailRotor);
+    for (const angle of [0, 1.05, Math.PI, Math.PI + 1.05]) {
+      const tb = new THREE.Group();
+      tb.rotation.x = angle;
+      tailRotor.add(tb);
+      box(darkMetal, .028, .12, .68, -.068, 0, .42, tb, false);
+      box(ivory, .031, .115, .11, -.068, 0, .79, tb, false);
+      box(orange, .031, .115, .08, -.068, 0, .88, tb, false);
+    }
 
     const anchors = {
       seat: new THREE.Vector3(.6, 2.03, .94),
@@ -251,11 +564,18 @@
       perch: new THREE.Vector3(-1.62, 1.43, .34),
       cable: new THREE.Vector3(-1.65, 2.74, .34),
     };
+    // Detailed hydraulic rescue hoist & braided tactical fast-rope assembly
+    box(darkMetal, .46, .14, .28, -1.42, 2.75, .34);
+    piece(cylinder, orange, .115, .26, .115, -1.64, 2.74, .34).rotation.x = Math.PI / 2;
+    piece(cylinder, steel, .062, .12, .062, -1.65, 2.63, .34);
+    const ropeMat = finish(0x282d27, .94, .05);
     const cable = group('rescue-cinematic-cable', anchors.cable.x, anchors.cable.y, anchors.cable.z);
-    box(frame, .48, .17, .32, -1.442, 2.74, .34);
-    box(orange, .175, .12, .23, -1.662, 2.703, .34);
-    const line = piece(cylinder, steel, .016, 1, .016, 0, -.5, 0, cable, false);
-    const end = box(orange, .076, .119, .073, 0, -1, 0, cable, false);
+    const line = piece(cylinder, ropeMat, .034, 1, .034, 0, -.5, 0, cable, false);
+    // Keep the weighted end assembly as the last child of `cable` (required by hoist animation & tests)
+    const end = group('rescue-cable-hook', 0, -1, 0, cable);
+    piece(cylinder, darkMetal, .048, .14, .048, 0, .05, 0, end, false);
+    piece(cylinder, orange, .052, .055, .052, 0, .09, 0, end, false);
+    box(steel, .022, .11, .055, 0, -.06, 0, end, false);
     function setCable(length) {
       cable.visible = length > 0;
       if (cable.visible) {
