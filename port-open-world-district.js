@@ -1481,16 +1481,16 @@
       city.shell.add(b);
       roadblockProps.push({ mesh: b, intact: true });
     }
-    // Dense 8-Building Weathered Coastal Downtown (varied heights, setbacks, brick/concrete/steel — ZERO container ribs!)
+    // Showcase Coastal City District featuring ALL 6 distinct architectural archetypes (ZERO copy-pasted boxes!)
     const blocks = [
-      { x0: -98, z0: -72, x1: -66, z1: -38, mat: M.brickWeathered, h: 11.5, style: 'coastal_brick', seed: 101, labelZh: '海事货运事务所', labelEn: 'MARITIME FREIGHT OFFICE' },
+      { x0: -98, z0: -72, x1: -66, z1: -38, mat: M.brickWeathered, h: 11.5, style: 'commercial_arcade', seed: 101, labelZh: '海事货运商业骑楼', labelEn: 'MARITIME COMMERCIAL ARCADE' },
       { x0: -62, z0: -72, x1: -37, z1: -38, mat: M.concrete, h: 8.2, facility: true },
       { x0: -15, z0: -72, x1: 16, z1: -38, mat: M.plasterGrey, h: 9.2, enterable: true },
-      { x0: -98, z0: -115, x1: -68, z1: -93, mat: M.concreteDirty, h: 17.5, style: 'maritime_office', seed: 202, labelZh: '盐线港务大厦', labelEn: 'SALTLINE PORT TOWER' },
-      { x0: -64, z0: -115, x1: -37, z1: -93, mat: M.brickWeathered, h: 12.0, style: 'harbor_apartment', seed: 303, labelZh: '滨海船员公寓', labelEn: 'SEAFARER RESIDENCE' },
-      { x0: -15, z0: -115, x1: 16, z1: -93, mat: M.concrete, h: 15.5, style: 'customs_block', seed: 404, labelZh: '东海海关清关楼', labelEn: 'EAST SEA CUSTOMS' },
-      { x0: -96, z0: -143, x1: -40, z1: -134, mat: M.brickWeathered, h: 9.5, style: 'coastal_brick', seed: 505, labelZh: '北港机电贸易行', labelEn: 'NORTH PORT SUPPLY' },
-      { x0: -15, z0: -143, x1: 16, z1: -134, mat: M.concreteDirty, h: 11.0, style: 'harbor_apartment', seed: 606, labelZh: '海岸旅舍与补给', labelEn: 'COASTAL INN & DEPOT' },
+      { x0: -98, z0: -115, x1: -68, z1: -93, mat: M.concreteDirty, h: 18.2, style: 'modern_office', seed: 202, labelZh: '盐线港务大厦', labelEn: 'SALTLINE PORT TOWER' },
+      { x0: -64, z0: -115, x1: -37, z1: -93, mat: M.brickWeathered, h: 13.0, style: 'harbor_apartment', seed: 303, labelZh: '滨海船员公寓', labelEn: 'SEAFARER COURTYARD APTS' },
+      { x0: -15, z0: -115, x1: 16, z1: -93, mat: M.concrete, h: 15.2, style: 'civic_customs', seed: 404, labelZh: '东海海关清关署', labelEn: 'EAST SEA CUSTOMS HALL' },
+      { x0: -96, z0: -143, x1: -40, z1: -134, mat: M.brickWeathered, h: 9.4, style: 'industrial_hall', seed: 505, labelZh: '北港锯齿机电工坊', labelEn: 'NORTH PORT SAWTOOTH WORKS' },
+      { x0: -15, z0: -143, x1: 16, z1: -134, mat: M.concreteDirty, h: 8.8, style: 'coastal_residence', seed: 606, labelZh: '东海海岸排屋民居', labelEn: 'COASTAL TERRACE RESIDENCE' },
     ];
     for (const blk of blocks) {
       solid(city, city.shell, M.concreteDirty, blk.x0 - 2.0, -.04, blk.z0 - 2.0, blk.x1 + 2.0, .16, blk.z1 + 2.0, 'concrete', true);
@@ -2761,11 +2761,34 @@
     }
     mapOverlay.querySelector('[data-close]').addEventListener('click', () => toggleMap(false));
 
+    // 6-Viewpoint Acceptance Inspection Tour ([B] key) with live FPS / Frame Time / Draw Calls / Triangles / GPU Memory report
+    const inspectViews = [
+      { name: '1/6 白天城市街道', pos: new Vector3(-26, 2.2, -58), sky: 1 },
+      { name: '2/6 建筑近距离细节', pos: new Vector3(-34, 3.2, -96), sky: 1 },
+      { name: '3/6 城市天际线', pos: new Vector3(20, 14.0, -34), sky: 1 },
+      { name: '4/6 工业区域', pos: new Vector3(-164, 5.5, 74), sky: 1 },
+      { name: '5/6 自然地形与森林', pos: new Vector3(-174, 15.2, -78), sky: 1 },
+      { name: '6/6 夜间环境', pos: new Vector3(-26, 3.5, -72), sky: 3 },
+    ];
+    let inspectIdx = -1;
+    function jumpInspectView(idx) {
+      inspectIdx = ((idx % inspectViews.length) + inspectViews.length) % inspectViews.length;
+      const v = inspectViews[inspectIdx];
+      applySkyPreset(v.sky, true);
+      movePlayerAndVehicle(v.pos, false);
+      const st = chunkMgr?.getStats?.();
+      const statsStr = st ? ` | ${st.fps} FPS (${st.frameTimeMs}ms) · DC ${st.drawCalls} · Tri ${st.triangles} · Geo ${st.gpuGeometries} · Tex ${st.gpuTextures}` : '';
+      world.tactical?.notify?.(`📸 验收视角 ${v.name}${statsStr}`, `Inspect ${v.name}${statsStr}`, false, 5.5);
+      return { view: v.name, stats: st };
+    }
+    if (typeof window !== 'undefined') window.SALTLINE_INSPECT_VIEW = jumpInspectView;
+
     const onKeyDown = e => {
       if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
       if (e.code === 'KeyM') { e.preventDefault(); toggleMap(); }
       else if (e.code === 'KeyT' && !e.repeat) { e.preventDefault(); applySkyPreset(skyIdx + 1); }
       else if (e.code === 'KeyV' && !e.repeat) { e.preventDefault(); setPhotoMode(); }
+      else if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); jumpInspectView(inspectIdx + 1); }
       else if (e.code === 'KeyE' && !e.repeat && activeInteractable) { activeInteractable.use(); }
       else if (e.code === 'Escape' && mapOpen) { e.preventDefault(); toggleMap(false); }
     };
