@@ -238,9 +238,7 @@
         const scr = new Mesh(new BoxGeometry(.28, .045, .18), padScreenMat);
         const halo = new Mesh(new TorusGeometry(.30, .016, 8, 20), ringCyanMat);
         halo.rotation.x = Math.PI / 2;
-        const light = new PointLight(0x5bffd6, 2.8, 4.5, 1.6);
-        light.position.y = .25;
-        g.add(pad, scr, halo, light);
+        g.add(pad, scr, halo);
         root.add(g);
         chapterCollectibles.push({ spec, group: g, halo, baseY: spec.pos[1] + .48, taken: false });
       }

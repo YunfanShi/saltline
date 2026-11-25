@@ -6,8 +6,6 @@
   const CHAPTER_BUILDINGS = {
     berth: [
       { id: 'berth-ops-tower', kind: 'ops_tower', title: ['2F Port Ops Tower', '四号泊位 · 双层联合作战指挥楼'], pos: [-45, 0, -20], yaw: 0 },
-      { id: 'berth-fuel-farm', kind: 'fuel_farm', title: ['North Fuel Tank Farm', '北岸扩建 · 高压燃料罐区'], pos: [-28, 0, -39], yaw: 0 },
-      { id: 'berth-customs-hq', kind: 'signal_tower', title: ['West Annex 2F Watchtower', '西区扩建 · 双层海关瞭望楼'], pos: [-96, 0, 12], yaw: Math.PI / 2 },
     ],
     rail: [
       { id: 'rail-signal-tower', kind: 'signal_tower', title: ['2F Rail Signal Tower', '铁路货场 · 双层编组信号楼'], pos: [-48, 0, -22], yaw: 0 },
@@ -47,16 +45,16 @@
 
     // Shared architectural PBR materials
     const M = {
-      concrete: new MeshStandardMaterial({ color: 0x6f7370, roughness: .88, metalness: .06 }),
-      concreteDark: new MeshStandardMaterial({ color: 0x484d4b, roughness: .9, metalness: .08 }),
-      steel: new MeshStandardMaterial({ color: 0x434d52, roughness: .52, metalness: .66 }),
-      steelLight: new MeshStandardMaterial({ color: 0x778287, roughness: .42, metalness: .72 }),
-      corrugated: new MeshStandardMaterial({ color: 0x3b484f, roughness: .62, metalness: .45 }),
+      concrete: world.mats?.get?.('concrete') ?? new MeshStandardMaterial({ color: 0x6f7370, roughness: .88, metalness: .06 }),
+      concreteDark: world.mats?.get?.('concrete_dirty') ?? new MeshStandardMaterial({ color: 0x484d4b, roughness: .9, metalness: .08 }),
+      steel: world.mats?.get?.('steel_dark') ?? new MeshStandardMaterial({ color: 0x434d52, roughness: .52, metalness: .66 }),
+      steelLight: world.mats?.get?.('steel_galv') ?? new MeshStandardMaterial({ color: 0x778287, roughness: .42, metalness: .72 }),
+      corrugated: world.mats?.get?.('steel_worn') ?? new MeshStandardMaterial({ color: 0x3b484f, roughness: .62, metalness: .45 }),
       wallPaint: new MeshStandardMaterial({ color: 0xb7b9b2, roughness: .78, metalness: .06 }),
       hazard: new MeshStandardMaterial({ color: 0xd99b26, roughness: .48, metalness: .22 }),
       red: new MeshStandardMaterial({ color: 0xa83226, roughness: .52, metalness: .25 }),
       glass: new MeshStandardMaterial({ color: 0x6ba0b8, roughness: .12, metalness: .35, transparent: true, opacity: .38 }),
-      wood: new MeshStandardMaterial({ color: 0x6e533c, roughness: .78, metalness: .04 }),
+      wood: world.mats?.get?.('wood_dark') ?? new MeshStandardMaterial({ color: 0x6e533c, roughness: .78, metalness: .04 }),
       whiteCloth: new MeshStandardMaterial({ color: 0xdce2e4, roughness: .82, metalness: .02 }),
       darkTrim: new MeshStandardMaterial({ color: 0x1e2427, roughness: .55, metalness: .52 }),
       glowWarm: new MeshBasicMaterial({ color: 0xffe4b5 }),
@@ -86,12 +84,14 @@
         origin.z - lx * sin + lz * cos,
       );
 
-      function addMesh(parent, geo, mat, sx, sy, sz, x, y, z) {
+      function addMesh(parent, geo, mat, sx, sy, sz, x, y, z, shadow = false) {
         const m = new Mesh(geo, mat);
         m.position.set(x, y, z);
         m.scale.set(sx, sy, sz);
-        m.castShadow = mat !== M.glass;
+        m.castShadow = shadow && mat !== M.glass;
         m.receiveShadow = true;
+        m.matrixAutoUpdate = false;
+        m.updateMatrix();
         parent.add(m);
         return m;
       }
@@ -188,12 +188,9 @@
         updaters.push(dt => { dishGroup.rotation.y += dt * 1.4; });
       }
 
-      function addCeilingLight(parent, x, y, z, color = 0xffe4b5) {
+      function addCeilingLight(parent, x, y, z) {
         addMesh(parent, boxGeo, M.darkTrim, 1.4, .08, .28, x, y - .04, z);
         addMesh(parent, boxGeo, M.glowWarm, 1.25, .03, .20, x, y - .09, z);
-        const pt = new PointLight(color, 10, 12, 1.6);
-        pt.position.set(x, y - .4, z);
-        parent.add(pt);
       }
 
       return { addMesh, addCollider, solid, addStaircase, addRailing, addGlassBand, addConsoleDesk, addServerRack, addRadarMast, addCeilingLight, toWorld };
@@ -277,7 +274,35 @@
       const topY = floors * H;
       b.solid(shell, M.corrugated, x0 - .4, topY, z0 - .4, x1 + .4, topY + .24, z1 + .4, 'metal', true);
       b.addMesh(shell, boxGeo, M.steelLight, 2.2, 1.1, 1.6, 2.4, topY + .78, -1.2);
-      b.addRadarMast(shell, -2.5, topY + .24, 0);
+      const y = topY + .24;
+      if (style === 'pump' || style === 'lock') {
+        for (const x of [-3.2, 0, 3.2]) {
+          const height = style === 'lock' ? 3.4 : 1.9;
+          b.addMesh(shell,cylGeo,M.steel,.52,height,.52,x,y+height/2,1.4);
+          for (const h of [.28,height-.14]) b.addMesh(shell,cylGeo,M.steelLight,.65,.13,.65,x,y+h,1.4);
+          b.addMesh(shell,cylGeo,M.darkTrim,.41,.06,.41,x,y+height,1.4);
+        }
+        if (style === 'lock') b.addMesh(shell,boxGeo,M.hazard,8,.64,.95,0,y+3.26,1.4);
+      } else if (style === 'clinic') {
+        for (const x of [-3.5,-.8]) {
+          b.addMesh(shell,boxGeo,M.steelLight,2.4,1.4,2.0,x,y+.7,1.2);
+          for (let j=0;j<5;j++) b.addMesh(shell,boxGeo,M.darkTrim,2.06,.095,.08,x,y+.35+j*.19,2.22);
+        }
+        b.addMesh(shell,boxGeo,M.whiteCloth,.10,2.4,2.4,x0-.12,y-1.3,-2.8);
+        b.addMesh(shell,boxGeo,M.red,.12,.46,1.7,x0-.22,y-1.3,-2.8);
+        b.addMesh(shell,boxGeo,M.red,.13,1.7,.46,x0-.22,y-1.3,-2.8);
+      } else {
+        b.addRadarMast(shell, -2.5, y, 0);
+        if (style === 'dispatch' || style === 'platform' || style === 'pilot') {
+          const mastHeight = style === 'dispatch' ? 6.8 : 3.8;
+          b.addMesh(shell,cylGeo,M.steelLight,.10,mastHeight,.10,2.5,y+mastHeight/2,1.7);
+          for (const h of [.45,.72,.94]) b.addMesh(shell,boxGeo,M.steel,2.2*(1.3-h),.065,.065,2.5,y+mastHeight*h,1.7);
+          if (style === 'pilot') {
+            b.addMesh(shell,cylGeo,M.glowWarm,.42,.74,.42,2.5,y+mastHeight,1.7);
+            b.addMesh(shell,cylGeo,M.darkTrim,.52,.14,.52,2.5,y+mastHeight+.42,1.7);
+          }
+        }
+      }
     }
 
     function buildFuelFarm(b, shell, interior) {
@@ -329,6 +354,8 @@
       group.rotation.y = spec.yaw ?? 0;
       const shell = new Group();
       const interior = new Group();
+      shell.visible = false;
+      interior.visible = false;
       group.add(shell, interior);
       root.add(group);
 
@@ -348,14 +375,16 @@
       if (spec.kind === 'ops_tower') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'ops' });
       else if (spec.kind === 'signal_tower') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'signal' });
       else if (spec.kind === 'pump_house') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'pump' });
-      else if (spec.kind === 'tide_bastion') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'ops' });
-      else if (spec.kind === 'offshore_deck') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'ops' });
+      else if (spec.kind === 'tide_bastion') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'lock' });
+      else if (spec.kind === 'offshore_deck') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'platform' });
       else if (spec.kind === 'field_clinic') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'clinic' });
       else if (spec.kind === 'dispatch_tower') buildTwoStoryControl(b, shell, interior, { floors: 3, style: 'dispatch' });
-      else if (spec.kind === 'pilot_station') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'ops' });
+      else if (spec.kind === 'pilot_station') buildTwoStoryControl(b, shell, interior, { floors: 2, style: 'pilot' });
       else if (spec.kind === 'fuel_farm') buildFuelFarm(b, shell, interior);
       else if (spec.kind === 'lighthouse') buildLighthouse(b, shell, interior);
 
+      // Builders rotate several pieces after creation, then freeze the finished local transforms.
+      group.traverse(node => { if (!node.matrixAutoUpdate) node.updateMatrix(); });
       sectors.push(sector);
       return sector;
     }

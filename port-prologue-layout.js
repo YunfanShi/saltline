@@ -379,7 +379,14 @@
     // Webbed cabin seats, amber cabin lighting, and cockpit avionics.
     for (const z of [-.96, -.26, .44, 1.14, 1.84]) {
       box(frame, 2.16, .019, .057, 0, 1.301, z);
-      box(padded, .45, .087, .51, .88, 1.62, z);
+      box(frame, .45, .035, .48, .88, 1.58, z);
+      piece(sphere, padded, .245, .062, .255, .88, 1.63, z);
+      for (const edge of [-.18, .18]) {
+        pipe(frame, .013, [.67, 1.58, z + edge], [1.06, 1.58, z + edge]);
+        box(steel, .044, .05, .052, 1.015, 2.08, z + edge);
+        const web = box(rubber, .021, .42, .045, 1.011, 1.88, z + edge * .71);
+        web.rotation.x = edge > 0 ? .25 : -.25;
+      }
       box(padded, .086, .46, .51, 1.065, 1.87, z);
       box(padded, .07, .14, .26, 1.06, 2.18, z);
       pipe(frame, .018, [.71, 1.31, z], [1.04, 1.58, z]);
@@ -570,7 +577,7 @@
     piece(cylinder, steel, .062, .12, .062, -1.65, 2.63, .34);
     const ropeMat = finish(0x282d27, .94, .05);
     const cable = group('rescue-cinematic-cable', anchors.cable.x, anchors.cable.y, anchors.cable.z);
-    const line = piece(cylinder, ropeMat, .034, 1, .034, 0, -.5, 0, cable, false);
+    const line = piece(cylinder, ropeMat, .020, 1, .020, 0, -.5, 0, cable, false);
     // Keep the weighted end assembly as the last child of `cable` (required by hoist animation & tests)
     const end = group('rescue-cable-hook', 0, -1, 0, cable);
     piece(cylinder, darkMetal, .048, .14, .048, 0, .05, 0, end, false);
@@ -729,6 +736,14 @@
     light(-15.02, 11.03, 3.18, 0x97d5f7, 25);
     sign('INCIDENT BRIEFING', .186, -20.3, 3.1, 4.956, 'z-');
     table(-19.5, 11.3, 4.63, 1.64);
+    // Dispatcher's working chart, folded incident file and clipped watch sheets.
+    box('paint_white',1.26,.012,.76,-19.74,.83,11.22);
+    for (let i=0;i<5;i++) {
+      box(trim,.85-i*.095,.003,.012,-19.81+i*.026,.838,10.96+i*.12).rotation.y=.16-i*.05;
+    }
+    box('wood_dark',.36,.035,.48,-18.07,.843,11.51).rotation.y=.14;
+    box('paint_white',.3,.014,.42,-18.07,.864,11.51).rotation.y=.14;
+    box('steel_galv',.14,.018,.045,-18.09,.878,11.31);
     for (const x of [-21.03, -19.5, -17.97]) seat(x, 12.57, 1);
     for (const x of [-21.13, -17.84]) seat(x, 10.09, -1);
     box(trim, 5.43, 1.76, .13, -19.5, 2.02, 15.61);

@@ -170,7 +170,13 @@
     const south = rail ? 27.5 : 28;
     fence(-106.7, north, seamX, north);
     fence(-106.7, south, seamX, south);
-    fence(-106.7, north, -106.7, south);
+    if (rail) {
+      fence(-106.7, north, -106.7, south);
+    } else {
+      // Open a 12m West Freight Highway Gateway (z: -1..11) connecting Berth 4 seamlessly to the West Rail Yard
+      fence(-106.7, north, -106.7, -1);
+      fence(-106.7, 11, -106.7, south);
+    }
     roadLane(5, rail ? -62 : undefined);
     if (!rail) roadLane(-16, -54.4);
     roadLane(19.5, -43.7);

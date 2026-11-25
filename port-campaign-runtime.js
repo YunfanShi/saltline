@@ -114,11 +114,17 @@
         add(item,new PlaneGeometry(.19,.125),card(lines[0],lines.slice(1)),0,0,0);
       }
     } else if (chapter === 'descent') {
-      const ropeMat = material(0x2d322c, .92);
-      const wrapMat = material(0xc48b35, .65);
-      add(item, new CylinderGeometry(.024, .024, .62, 12), ropeMat, 0, .06, -.025);
-      for (const ry of [-.14, -.02, .10, .22]) {
-        add(item, new CylinderGeometry(.026, .026, .016, 12), wrapMat, 0, ry, -.025);
+      const ropeMat = material(0x4c4637,.96);
+      const tracer = material(0x948261,.92);
+      for (let strand=0; strand<4; strand++) {
+        const points=[];
+        for (let i=0; i<=144; i++) {
+          const angle=i*Math.PI/6 + strand*Math.PI/2;
+          points.push(new world.THREE.Vector3(.007*Math.cos(angle),-.30+i*.005,
+            -.025+.007*Math.sin(angle)));
+        }
+        const curve=new world.THREE.CatmullRomCurve3(points);
+        add(item,new world.THREE.TubeGeometry(curve,144,.0055,5,false),strand===0?tracer:ropeMat,0,0,0);
       }
     } else if(chapter === 'reopen') {
       const leather=material(0x3e3024),sole=material(0x22241f),lace=material(0x72715e);
@@ -138,8 +144,8 @@
       for(const [side,mirror] of [[-1,true],[1,false]]){
         const model=glove({mirror,fingers:[[.9,1.4,.65,0],[.95,1.4,.65,0],[1.02,1.4,.65,0],[1.06,1.4,.65,0]],
           thumb:[[-.78,.06,-.6],[-.42,.1,-.9],[-.12,.02,-.99]],forearm:[.28,-.4,.85],sleeve:.21});
-        const hand=add(root,model.fabric,fabric,side*(chapter==="descent"?.037:.092),-.055+
-          (chapter==="descent"?side*.028:0),.065);
+        const hand=add(root,model.fabric,fabric,side*(chapter==="descent"?.028:.092),-.055+
+          (chapter==="descent"?side*.049:0),chapter==="descent"?.003:.065);
         hand.rotation.set(.27,-side*.38,side*.57);
       }
     }
@@ -152,9 +158,15 @@
         const raise=chapter==='descent'?ease((time-.3)/.85)*(1-ease((time-(duration-.95))/.65)):
           ease((time-4)/1.7)*(1-ease((time-(duration-5))/1.2));
         root.visible=raise>.01;
-        root.position.set(.035,-.20+.072*raise,-.33+.015*raise);
-        root.rotation.set(-.18+(1-raise)*.4,.015,Math.sin(time*1.8)*.014);
-        item.rotation.x=.09*Math.sin(time*.8);
+        if (chapter === 'descent') {
+          root.position.set(.19, -.19 + .09 * raise, -.45);
+          root.rotation.set(0, 0, Math.sin(time * 2.0) * .01);
+          item.rotation.x = 0;
+        } else {
+          root.position.set(.035,-.20+.072*raise,-.33+.015*raise);
+          root.rotation.set(-.18+(1-raise)*.4,.015,Math.sin(time*1.8)*.014);
+          item.rotation.x=.09*Math.sin(time*.8);
+        }
       },
       dispose() {
         root.removeFromParent();
@@ -174,7 +186,7 @@
     const size = 128;
     const color = new Uint8Array(size * size * 4);
     const bump = new Uint8Array(size * size * 4);
-    const base = new THREE.Color(hex);
+    const base = new THREE.Color(hex).convertLinearToSRGB();
     const r0 = Math.round(base.r * 255), g0 = Math.round(base.g * 255), b0 = Math.round(base.b * 255);
     let seed = (hex ^ 0x9e3779b9) >>> 0;
     for (let y = 0; y < size; y++) {
@@ -246,6 +258,7 @@
 
     const verts = [], uvs = [], idx = [];
     const cols = segs + 1;
+    const ascending = rings[0][0] < rings.at(-1)[0];
     for (let r = 0; r < smoothRings.length; r++) {
       const [y, rx, rz, ox = 0, oz = 0] = smoothRings[r];
       const v = r / (smoothRings.length - 1);
@@ -259,7 +272,8 @@
     for (let r = 0; r < smoothRings.length - 1; r++) {
       for (let i = 0; i < segs; i++) {
         const a = r * cols + i, b = a + 1, c = a + cols, d = c + 1;
-        idx.push(a, c, b, b, c, d);
+        if (ascending) idx.push(a, c, b, b, c, d);
+        else idx.push(a, b, c, b, d, c);
       }
     }
     const geo = new THREE.BufferGeometry();
@@ -281,21 +295,23 @@
     actor.name = name;
 
     const palette = {
-      pilot: { jacket: 0x3b4941, pants: 0x2f3934, vest: 0xc95524, helmet: 0x2a3331, trim: 0xe3d7b0 },
-      operator: { jacket: 0x354249, pants: 0x293035, vest: 0x2c3533, helmet: 0x242c2e, trim: 0x8ea09c },
-      engineer: { jacket: coat ?? 0x8f6237, pants: 0x2c3338, vest: 0x364044, helmet: 0x2e363a, trim: 0xdfd8bc },
-      medic: { jacket: coat ?? 0x3d6d6b, pants: 0x273236, vest: 0x2c3c3e, helmet: 0xd8dcd8, trim: 0xe8e4d8 },
-      worker: { jacket: coat ?? 0xc26c30, pants: 0x2a3136, vest: 0x383e40, helmet: 0xd99226, trim: 0xe4dcc0 },
-    }[role] ?? { jacket: coat ?? 0x455258, pants: 0x2a3136, vest: 0x323836, helmet: 0x2a3134, trim: 0xdfd8bc };
+      pilot: { jacket: 0x4b5c52, pants: 0x262d2a, vest: 0xc95524, helmet: 0x2a3331, trim: 0xebe0b5 },
+      operator: { jacket: 0x3f4e57, pants: 0x22282d, vest: 0x545d56, helmet: 0x242c2e, trim: 0xb0c2bc },
+      engineer: { jacket: coat ?? 0x9c6e40, pants: 0x22282d, vest: 0x5c665f, helmet: 0x353f44, trim: 0xf0e4ba },
+      medic: { jacket: coat ?? 0x457c79, pants: 0x232d31, vest: 0x7a8584, helmet: 0xd8dcd8, trim: 0xf0ece0 },
+      worker: { jacket: coat ?? 0xc87234, pants: 0x242a2f, vest: 0x4a5256, helmet: 0xdf9828, trim: 0xf0e6c4 },
+    }[role] ?? { jacket: coat ?? 0x526068, pants: 0x242a2f, vest: 0x4d5652, helmet: 0x2a3134, trim: 0xebe0b5 };
 
-    const jacketMat = createTacticalCloth(THREE, coat ?? palette.jacket, .82, .05, 4);
-    const pantsMat = createTacticalCloth(THREE, palette.pants, .86, .04, 4);
-    const vestMat = createTacticalCloth(THREE, palette.vest, .74, .08, 5);
-    const gearMat = new MeshStandardMaterial({ color: 0x222629, roughness: .52, metalness: .30 });
-    const metalMat = new MeshStandardMaterial({ color: 0x626b6e, roughness: .34, metalness: .76 });
-    const bootMat = new MeshStandardMaterial({ color: 0x1c1f20, roughness: .62, metalness: .20 });
-    const gloveMat = createTacticalCloth(THREE, 0x262a28, .76, .10, 6);
-    const reflectorMat = new MeshStandardMaterial({ color: palette.trim, roughness: .28, metalness: .26 });
+    // Distinct roughness & value separation: matte cloth vs. semi-matte cordura vest vs. matte-rubber boots vs. satin hardware
+    const jacketMat = createTacticalCloth(THREE, coat ?? palette.jacket, .88, .02, 5);
+    const pantsMat = createTacticalCloth(THREE, palette.pants, .92, .02, 5);
+    const vestMat = createTacticalCloth(THREE, palette.vest, .72, .08, 6);
+    const gearMat = new MeshStandardMaterial({ color: 0x1d2124, roughness: .46, metalness: .34 });
+    const metalMat = new MeshStandardMaterial({ color: 0x7e888c, roughness: .28, metalness: .82 });
+    const bootMat = new MeshStandardMaterial({ color: 0x2b241f, roughness: .68, metalness: .10 });
+    const bootWeltMat = new MeshStandardMaterial({ color: 0x5c4c3c, roughness: .78, metalness: .06 });
+    const gloveMat = createTacticalCloth(THREE, 0x2b302e, .76, .08, 6);
+    const reflectorMat = new MeshStandardMaterial({ color: palette.trim, roughness: .22, metalness: .32 });
     const skinTone = [0xbe8d70, 0x93664c, 0xcda084][variation % 3];
     const skinMat = new MeshStandardMaterial({ color: skinTone, roughness: .66, metalness: .02 });
     const helmetMat = new MeshStandardMaterial({ color: palette.helmet, roughness: .32, metalness: .26 });
@@ -310,9 +326,9 @@
       parent.add(m);
       return m;
     };
-    const sphGeo = new SphereGeometry(1, 24, 18);
+    const sphGeo = new SphereGeometry(1, 18, 12);
     const cylGeo = new CylinderGeometry(1, 1, 1, 20);
-    const capGeo = CapsuleGeometry ? new CapsuleGeometry(.5, 1, 10, 18) : new SphereGeometry(.5, 18, 14);
+    const capGeo = CapsuleGeometry ? new CapsuleGeometry(.5, 1, 6, 14) : new SphereGeometry(.5, 18, 14);
     const rounded = (p, mat, sx, sy, sz, x, y, z) => {
       const m = add(p, capGeo, mat, x, y, z);
       m.scale.set(sx, sy, sz);
@@ -379,6 +395,14 @@
       strap.rotation.x = Math.PI / 2;
     }
 
+    for (const side of [-1,1]) {
+      const collar = rounded(torso, jacketMat, .058, .072, .068, side*.061, .554, .018);
+      collar.rotation.z = side*.42;
+      const harness = rounded(torso, gearMat, .039, .104, .020, side*.115, .408, .127);
+      harness.rotation.z = side*.20;
+      rounded(torso, reflectorMat, .029, .023, .012, side*.126, .443, .147);
+    }
+
     // Smooth neck + tactical collar/balaclava
     const neck = add(torso, cylGeo, role === 'operator' ? gearMat : skinMat, 0, .60, .008);
     neck.scale.set(.056, .11, .058);
@@ -399,14 +423,22 @@
       [.130, .010, .012, 0, -.004],
     ], 28), skinMat);
     // Rounded nose, brows, eyes & ears
-    const nose = add(head, sphGeo, skinMat, 0, -.006, .098);
-    nose.scale.set(.016, .025, .022);
+    const lipMat = new MeshStandardMaterial({color: new THREE.Color(skinTone).multiplyScalar(.69), roughness: .76});
+    const bridge = add(head,sphGeo,skinMat,0,.006,.106);
+    bridge.scale.set(.012,.031,.017);
+    bridge.rotation.x = -.29;
+    add(head,sphGeo,skinMat,0,-.016,.117).scale.set(.017,.013,.018);
+    add(head,sphGeo,lipMat,0,-.047,.103).scale.set(.026,.005,.008);
+    add(head,sphGeo,skinMat,0,-.056,.103).scale.set(.022,.008,.010);
+    add(head,sphGeo,skinMat,0,-.079,.085).scale.set(.034,.022,.017);
     for (const s of [-1, 1]) {
-      rounded(head, hairMat, .026, .006, .012, s * .031, .026, .096).rotation.z = Math.PI / 2;
-      const eye = add(head, sphGeo, gearMat, s * .031, .013, .094);
-      eye.scale.set(.011, .008, .009);
-      const ear = add(head, sphGeo, skinMat, s * .086, .002, -.004);
-      ear.scale.set(.014, .028, .018);
+      add(head,sphGeo,skinMat,s*.049,-.013,.087).scale.set(.027,.023,.016);
+      const brow = add(head,sphGeo,hairMat,s*.033,.031,.100);
+      brow.scale.set(.022,.005,.007);
+      brow.rotation.z = s*.14;
+      add(head,sphGeo,lipMat,s*.032,.014,.102).scale.set(.018,.007,.007);
+      add(head,sphGeo,hairMat,s*.033,.014,.107).scale.set(.009,.005,.005);
+      add(head,sphGeo,skinMat,s*.086,.002,-.004).scale.set(.014,.028,.018);
     }
     if (role === 'pilot' || role === 'operator') {
       // Smooth rounded ballistic / HGU flight helmet + curved wrap visor + Peltor headset
@@ -487,6 +519,8 @@
       add(elbow, loftOrganic(THREE, [
         [0, .048, .048], [-.08, .046, .046], [-.18, .040, .040], [-.26, .036, .035],
       ], 20), jacketMat);
+      const wristBand = add(elbow, cylGeo, reflectorMat, 0, -.235, 0);
+      wristBand.scale.set(.041, .022, .041);
       buildGlovedHand(elbow, sign);
 
       const hip = new Group();
@@ -513,6 +547,8 @@
       add(knee, loftOrganic(THREE, [
         [0, .064, .066], [-.12, .068, .070], [-.28, .054, .056], [-.40, .050, .052],
       ], 22), pantsMat);
+      const bootCollar = add(knee, cylGeo, bootWeltMat, 0, -.32, .004);
+      bootCollar.scale.set(.060, .026, .064);
       const bootShaft = add(knee, cylGeo, bootMat, 0, -.39, .004);
       bootShaft.scale.set(.056, .14, .062);
       const foot = rounded(knee, bootMat, .100, .112, .078, 0, -.458, .056);

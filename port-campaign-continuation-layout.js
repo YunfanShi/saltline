@@ -5,7 +5,7 @@
     warm: 0xffd6a0, teal: 0x73e6db, red: 0xff643e, blue: 0x82afe0,
   };
 
-  function createSet(builder, vector, id) {
+  function createSet(builder, vector, id, batchStatic) {
     const { THREE, G, dynRoot, box, slab, cyl, col, rod } = builder;
     const root = new THREE.Group();
     const moving = new THREE.Group();
@@ -176,7 +176,15 @@
         const role = /harris/i.test(id) ? 'operator' : /mara/i.test(id) ? 'engineer' :
           /nurse/i.test(id) ? 'medic' : 'worker';
         const human = window.createSaltlineHuman(THREE, { name: id, role, coat, variation });
-        const figure = human.actor;
+        let figure = human.actor;
+        if (id.startsWith('muster-') && batchStatic) {
+          human.pose(seated ? 'seated' : 'stand');
+          const distant = batchStatic(human.actor);
+          figure = new THREE.LOD();
+          figure.name = id;
+          figure.addLevel(human.actor, 0);
+          figure.addLevel(distant, 12, .12);
+        }
         figure.position.set(x, y, z);
         moving.add(figure);
         figure.userData.pose = (age, walk) => human.pose(seated ? 'seated' : 'stand', age * 8, age, walk);
@@ -254,19 +262,33 @@
     }
     function boat(name, x, z, y, length = 8, tint = 'steel_worn') {
       const boat = group(name, moving, x, y, z);
-      // Lower hull, waterline chine & tapered prow
-      piece(tint, length * .78, .96, 3.35, -.32, -.23, 0, boat);
-      piece('steel_dark', length * .82, .18, 3.42, -.35, -.62, 0, boat);
-      piece('paint_red', length * .80, .14, 3.44, -.35, -.46, 0, boat);
-      const prow = piece(tint, 2.35, .86, 2.38, length * .35, -.20, 0, boat);
-      prow.rotation.y = Math.PI / 4;
-      const prowTrim = piece('steel_dark', 2.42, .16, 2.42, length * .35, .28, 0, boat);
-      prowTrim.rotation.y = Math.PI / 4;
-      // Main deck, raised gunwale bulwarks & mooring bollards
-      piece('steel_galv', length * .82, .13, 3.13, -.29, .30, 0, boat);
+      // Loft a hard-chine hull through the transom, parallel midbody and raked stem.
+      const stations=[[-.46,.76,.04],[-.41,.94,0],[-.26,1,0],[.10,1,0],[.26,.92,.03],[.37,.68,.10],[.45,.33,.19],[.50,.016,.30]];
+      const vertices=[], uv=[], indices=[];
+      for (const [along,beam,rise] of stations) {
+        for (const [halfWidth,height] of [[-1.67,.32],[-1.54,-.30],[-.93,-.64],[0,-.79],[.93,-.64],[1.54,-.30],[1.67,.32]]) {
+          vertices.push(along*length,height+rise,beam*halfWidth);
+          uv.push((along+.5)*length/2,(halfWidth+1.67)/2);
+        }
+      }
+      for(let i=0;i<stations.length-1;i++) {
+        for(let j=0;j<7;j++) {
+          const a=i*7+j,b=i*7+(j+1)%7;
+          indices.push(a,a+7,b,b,a+7,b+7);
+        }
+      }
+      for(let j=1;j<6;j++) indices.push(0,j+1,j,49,49+j,49+j+1);
+      const hull=new THREE.BufferGeometry();
+      hull.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+      hull.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+      hull.setIndex(indices);
+      hull.computeVertexNormals();
+      const shell=new THREE.Mesh(hull,G.mats.get(tint));
+      shell.castShadow=shell.receiveShadow=true;
+      boat.add(shell);
       for (const sz of [-1.58, 1.58]) {
-        piece('steel_dark', length * .78, .34, .09, -.35, .44, sz, boat);
-        piece('paint_white', length * .78, .055, .11, -.35, .62, sz, boat);
+        piece('steel_dark', length * .52, .34, .09, -length*.11, .44, sz, boat);
+        piece('paint_white', length * .52, .055, .11, -length*.11, .62, sz, boat);
         for (const bx of [-length * .34, length * .14]) {
           cyl('steel_galv', .075, .26, bx, .48, sz * .92, { parent: boat });
         }
@@ -280,7 +302,9 @@
         piece('glass_dirty', 1.48, .58, .03, .86, 1.31, sz, boat);
         piece('steel_dark', .05, .60, .05, .86, 1.31, sz, boat);
         // Orange lifebuoy ring mounted on cabin side
-        cyl('paint_orange', .22, .05, .25, .82, sz * 1.03, { axis: 'z', parent: boat });
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(.19,.047,8,32), G.mats.get('paint_orange'));
+        ring.position.set(.25,.85,sz*1.055);
+        boat.add(ring);
       }
       // Bridge roof brow, twin exhaust stacks & marine radar mast with scanner bar
       const visor = piece('steel_dark', 2.38, .14, 2.58, .92, 1.88, 0, boat);
@@ -323,6 +347,7 @@
     return {
       point, positions, piece, solid, rail, label, striped, deck, steps, perimeter, crate, cargo, shed, lamp, control,
       actor, boat, gate, addPoints, path, points, objects, switches, routes, interiorBoxes, root, scenery, moving,
+      tube: (mat,r,a,b) => rod(mat,a,b,r,{parent:scenery}),
     };
   }
 
@@ -337,6 +362,12 @@
     cargo(-67, 5.5, -61.3, 12.8);
     cargo(-53, -15.8, -48, -12.2, 'steel_worn');
     for (const [x, z] of [[-94, 16], [-82, 5], [-73, -10], [-58, -15], [-39, -7]]) crate(x, z, 1.58, 1.14, .9);
+    // Dockside service lines turn up into the pump house above the inspection route.
+    for (const z of [9.1,10.15]) {
+      set.tube('steel_worn',.34,[-89.2,2.05,z],[-79.6,2.05,z]);
+      set.tube('steel_worn',.34,[-79.6,2.05,z],[-79.6,.08,z]);
+      for(const x of [-87.5,-83.4,-80.1]) set.tube('steel_galv',.39,[x,2.05,z],[x+.12,2.05,z]);
+    }
     const tug = boat('tug-on-blocks', -70, .3, 2.15, 13, 'paint_orange');
     tug.rotation.y = -.09;
     solid('steel_dark', -77.3, 0, -1.8, -62.3, 2.62, 2.1);
@@ -390,6 +421,14 @@
     solid('concrete_dirty', -88, 0, -16.65, -82.3, 5.15, 5.5, 'concrete');
     solid('concrete_dirty', -88, 0, 15.1, -82.3, 5.15, 16.9, 'concrete');
     gate('tide-shutter', -83.4, 0, 5.5, -83.1, 3.1, 15.1);
+    // Hoist bridge and level graduations are visible above the gate as the player approaches.
+    piece('steel_worn',2.3,.68,11.7,-83.25,5.4,10.25);
+    for (const z of [5.95,14.55]) {
+      piece('steel_dark',.31,2.8,.31,-83.25,4.0,z);
+      piece('paint_yellow',.44,.15,.44,-83.25,5.08,z);
+    }
+    piece('paint_white',.08,4.1,.56,-88.08,2.55,15.79);
+    for(let i=0;i<9;i++) piece('paint_red',.10,.06,i%2?.21:.40,-88.1,.74+i*.43,15.8);
     control('lock-control', 'LOCK CONTROL', point(-85.15, 10.2));
     striped(-82.2, 10.5, 36);
     solid('concrete_dirty', -80, 0, -.4, -51.2, 1.51, .1, 'concrete');
@@ -437,6 +476,12 @@
     perimeter(-47.5, -23, 28.5, 24, 'OUTER ANCHORAGE');
     shed('PILOT SHED', -45.8, 9, -34.4, 16.6);
     crate(-39, 5.1, 1.5, 1.22, 1.16);
+    for (const z of [9,12]) {
+      set.tube('steel_worn',.13,[-33.4,0,z],[-33.4,4.65,z]);
+      set.tube('paint_orange',.095,[-33.4,4.65,z],[-30.6,5.9,z]);
+      set.tube('steel_galv',.065,[-33.4,3.5,z],[-30.6,5.9,z]);
+      set.tube('steel_dark',.024,[-30.6,5.9,z],[-30.6,3.15,z]);
+    }
     control('pilot-radio', 'PILOT RADIO', point(-39.6, 14.2));
     solid('concrete_dirty', -33, 0, -22.7, -29.8, 2.28, 4.15, 'concrete');
     solid('concrete_dirty', -33, 0, 8.9, -29.8, 2.28, 23.9, 'concrete');
@@ -520,6 +565,10 @@
     perimeter(-92, -17.5, 21.5, 22, 'RETURN HARBOR');
     solid('concrete_dirty', -91.6, 0, -17, 21.1, .026, 21.6, 'concrete');
     shed('TRIAGE / WEST', -90.65, 7.3, -81.8, 16.5, .026);
+    piece('paint_white',.09,1.62,1.62,-82.1,3.63,13.3);
+    piece('paint_red',.11,.34,1.17,-82.18,3.63,13.3);
+    piece('paint_red',.12,1.17,.34,-82.18,3.63,13.3);
+    for (const z of [12.7,13.9]) piece('steel_galv',.09,1.06,.09,-82.1,3.11,z);
     actor('nurse', point(-84.6, 14.6, .026), 0x557a76, false, 2);
     const patientCutter = boat('incoming-rescue-boat', -86.2, 19, .07, 8.2, 'paint_orange');
     patientCutter.rotation.y = Math.PI;
@@ -574,6 +623,12 @@
       control, gate, addPoints, path, point, objects, moving } = set;
     perimeter(-75.5, -20.7, 13.6, 20.6, 'NIGHT WATCH / SIGNAL TOWER');
     shed('TRANSFORMER RECESS', -74.1, 9.8, -65.1, 16.33);
+    for(const z of [10.75,12.15]) {
+      for(const x of [-66.7,-65.3]) set.tube('steel_galv',.065,[x,2.82,z],[x,9.4,z]);
+      for(let h=3;h<9;h+=1.5) set.tube('steel_worn',.04,[-66.7,h,z],[-65.3,h+1.4,z]);
+      set.tube('steel_galv',.06,[-66.7,9.4,z],[-65.3,9.4,z]);
+    }
+    set.tube('steel_dark',.045,[-66,9.3,11.45],[-66,12.2,11.45]);
     cargo(-67, -7.8, -56.3, 3.8, 'steel_worn');
     cargo(-57.35, 10.2, -49, 18.85);
     cargo(-45, -16.7, -33.18, -6, 'steel_worn');
@@ -618,7 +673,7 @@
     steps(3.1, -11.86, 6.87, 3.22, 2.84, 0);
     shed('RECORDS / ASSEMBLY', -.71, -13.42, 2.72, -8.43, 2.84);
     for (const [id, stamp, x] of [
-      ['search-cancelled', '05:46', -.08], ['crack-report', '05:21', .67],
+      ['search-cancelled', '05:50', -.08], ['crack-report', '05:21', .67],
       ['transport-intercept', '06:13', 1.42], ['transfer-order', '05:28', 2.17],
     ]) control('order-' + id, stamp, point(x, -12.63, 2.84), { low: true });
     for (const [id, x, z] of [
@@ -649,6 +704,13 @@
       control, actor, boat, gate, addPoints, path, point, objects } = set;
     perimeter(-100.3, -24, -8.1, 23, 'PILOT CORRIDOR / EAST BERTH');
     shed('PILOT OFFICE', -99, 7.9, -88.4, 14.8);
+    // Leading marks on the pilot transfer route: a white diamond over a dark backing.
+    for (const [x,z,h] of [[-80.6,15.8,4.8],[-65.6,17.4,6.9]]) {
+      set.tube('steel_galv',.11,[x,0,z],[x,h+.65,z]);
+      piece('steel_dark',.18,1.27,1.27,x,h,z).rotation.x=Math.PI/4;
+      piece('paint_white',.05,.93,.93,x-.12,h,z).rotation.x=Math.PI/4;
+      piece('steel_dark',.06,.66,.19,x-.16,h,z);
+    }
     actor('harris', point(-70.26, 9.73), 0x54666c, false, 1);
     cargo(-87.8, -21.3, -77.3, -5.3);
     cargo(-86.2, 9.61, -82.1, 20.4, 'steel_worn');
@@ -664,7 +726,7 @@
     gate('causeway-wreck', -61.95, 0, 5.9, -60.2, 3.15, 11.48);
     gate('upper-bridge-door', -61.49, 2.72, -11.75, -61.16, 4.97, -7.18);
     gate('worker-door', -61.49, 0, 16.4, -61.16, 2.85, 20.48);
-    const gapDeck = piece('steel_worn', 8.6, .27, 5.48, -58.68, .121, 8.7);
+    const gapDeck = piece('steel_worn', 8.6, .27, 5.48, -58.68, .121, 8.7, set.moving);
     objects.causeway = gapDeck;
     control('pick-bridge', 'BRIDGE DRIVE', point(-64.16, -9.73, 2.72));
     control('rescue-workers', 'UNLOCK SHELTER', point(-65.05, 18.57));
@@ -748,10 +810,20 @@
   window.createPortContinuationLayout = (builder, vector, id, options = {}) => {
     const build = builds[ids.indexOf(id)];
     if (!build) return null;
-    const set = createSet(builder, vector, id);
+    const set = createSet(builder, vector, id, options.batchStatic);
     set.materials = builder.THREE;
     const { yaw, atmosphere } = build(set, options);
     const { root, scenery, moving, points, objects, switches, routes, interiorBoxes } = set;
+    if (options.batchStatic) {
+      const cells = new Map();
+      for (const node of [...scenery.children]) {
+        if (!node.isMesh || node.material.transparent) continue;
+        const key = [Math.floor(node.position.x/18), Math.floor(node.position.z/18)].join(',');
+        if (!cells.has(key)) cells.set(key, new builder.THREE.Group());
+        cells.get(key).add(node);
+      }
+      for (const cell of cells.values()) scenery.add(options.batchStatic(cell));
+    }
     const enemySpawns = (patrolLocations[id] ?? []).map(([x,z,y,type]) => ({ type, pos: vector(x,y,z) }));
     const supplyPoint = id === 'anchorage' ? points['pilot-radio'] :
       id === 'night-record' ? points['entry-watch'] : id === 'last-pilot' ? points.fork : null;

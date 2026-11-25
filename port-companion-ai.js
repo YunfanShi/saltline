@@ -17,15 +17,9 @@
 
     let human = null;
     if (window.createSaltlineHuman) {
-      human = window.createSaltlineHuman(THREE, { name: 'companion-mara', role, coat: 0x3b6866, variation: 1 });
+      human = window.createSaltlineHuman(THREE, { name: 'companion-mara', role, coat: 0x4b7874, variation: 1 });
       root.add(human.actor);
     }
-
-    // Compact shoulder status beacon & tactical carbine slung/held for companion silhouette
-    const beaconMat = new MeshBasicMaterial({ color: 0x58e8ff });
-    const beacon = new Mesh(new CylinderGeometry(.045, .045, .04, 10), beaconMat);
-    beacon.position.set(.18, 1.56, -.05);
-    root.add(beacon);
 
     // Suppressive tracer pool so Mara visibly fights alongside the player
     const tracerMat = new MeshBasicMaterial({ color: 0xffd36e, transparent: true, opacity: .9 });
@@ -37,7 +31,8 @@
     let yaw = -Math.PI / 2;
     let stride = 0, age = 0;
     let fireCooldown = 0, calloutCooldown = 0;
-    let mode = 'stand'; // 'stand' | 'crouch'
+    let mode = 'stand'; // 'stand' | 'crouch' | 'seated'
+    let seatedInVehicle = false;
     let overrideTarget = null;
     const stepVec = new Vector3(), probe = new Vector3(), up = new Vector3(0, 1, 0);
 
@@ -101,7 +96,7 @@
       pos.x += moveX * travel;
       pos.z += moveZ * travel;
       if (typeof physics?.groundHeight === 'function') {
-        pos.y = physics.groundHeight(pos.x, pos.z, .6);
+        pos.y = physics.groundHeight(pos.x, pos.z, pos.y+.6);
       }
       const targetYaw = Math.atan2(moveX, moveZ);
       const diff = Math.atan2(Math.sin(targetYaw - yaw), Math.cos(targetYaw - yaw));
@@ -127,6 +122,14 @@
         }
       }
 
+      if (seatedInVehicle) {
+        mode = 'seated';
+        root.position.copy(pos);
+        root.rotation.y = yaw;
+        human?.pose('seated', 0, age, false);
+        return;
+      }
+
       if (!player?.alive || !player.pos) return;
 
       // Teleport catch-up if player used fast travel / climbed far away (> 36m)
@@ -134,7 +137,7 @@
       if (playerDist > 36 && !overrideTarget) {
         const backYaw = player.yaw ?? 0;
         pos.set(player.pos.x + Math.sin(backYaw) * 2.8 + 1.4, player.pos.y, player.pos.z + Math.cos(backYaw) * 2.8);
-        if (typeof physics?.groundHeight === 'function') pos.y = physics.groundHeight(pos.x, pos.z, .8);
+        if (typeof physics?.groundHeight === 'function') pos.y = physics.groundHeight(pos.x, pos.z, pos.y+.8);
       }
 
       const hostile = findNearestHostile();
@@ -192,6 +195,21 @@
       overrideTarget = null;
     }
 
+    function setSeated(isSeated, seatPos, seatYaw) {
+      seatedInVehicle = !!isSeated;
+      if (seatPos) {
+        pos.copy(seatPos);
+        root.position.copy(pos);
+      }
+      if (Number.isFinite(seatYaw)) {
+        yaw = seatYaw;
+        root.rotation.y = yaw;
+      }
+      mode = seatedInVehicle ? 'seated' : 'stand';
+      overrideTarget = null;
+      human?.pose(mode, 0, age, false);
+    }
+
     function dispose() {
       for (const tr of tracers) { scene.remove(tr.mesh); tr.mesh.material.dispose(); }
       tracers.length = 0;
@@ -199,9 +217,10 @@
     }
 
     return {
-      update, speak, moveTo, setPosition, dispose,
+      update, speak, moveTo, setPosition, setSeated, dispose,
       get pos() { return pos; },
       get name() { return name; },
+      get seated() { return seatedInVehicle; },
     };
   };
 })();

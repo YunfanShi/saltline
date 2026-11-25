@@ -9,120 +9,9 @@
   const WRECK_SECONDS = 105;
   const DISC_ROTATION = Math.PI * 2;
 
-  window.createCampaignCrash = (world, { retainWreck = false } = {}) => {
-    const { THREE, scene, fx, events } = world;
-    const { BoxGeometry, BufferGeometry, CubicBezierCurve3, CylinderGeometry,
-      DataTexture, DoubleSide, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
-      RingGeometry, Vector3 } = THREE;
-    const point = (x, y, z) => new Vector3(x, y, z);
-    const viewingSpot = point(-94, 0, 9.5);
-    const focus = point(-100, 8, .6);
-    const contact = point(-85.5, 1.12, .6);
-    const impact = point(-77, .94, .6);
-    const turnIn = point(-105, 11.8, -10.4);
-    const approach = new CubicBezierCurve3(
-      point(-153, 39, -16), point(-125, 33, -21), point(-114, 20.215, -12.17), turnIn,
-    );
-    const descent = new CubicBezierCurve3(
-      turnIn, point(-99, 6.19, -9.22), point(-92.75, 1.76, .6), contact,
-    );
-    const sample = new Vector3();
-    const direction = new Vector3(1, 0, 0);
-    const target = new Vector3();
-    const effectPosition = new Vector3();
-    const groundNormal = point(0, 1, 0);
-    const transport = new Group();
-    transport.name = 'rail-campaign-aircraft';
-    const missile = new Group();
-    missile.name = 'rail-campaign-missile';
-    const trail = new Mesh(new CylinderGeometry(.028, .17, 1, 12),
-      new MeshBasicMaterial({ color: 0xffb34d, transparent: true, opacity: .82 }));
-    const flare = new Mesh(new CylinderGeometry(.045, .11, .52, 12),
-      new MeshBasicMaterial({ color: 0xfff3db }));
-    // Attach sculpted missile fuselage, warhead band, nose cone, and cruciform fins to `flare`.
-    const missileBodyMat = new MeshStandardMaterial({ color: 0xd4d8d2, roughness: .42, metalness: .35 });
-    const missileDarkMat = new MeshStandardMaterial({ color: 0x2c3336, roughness: .48, metalness: .55 });
-    const missileBandMat = new MeshStandardMaterial({ color: 0xd94b2b, roughness: .45, metalness: .2 });
-    const missileTube = new Mesh(new CylinderGeometry(.082, .082, 1.38, 14), missileBodyMat);
-    missileTube.position.y = .72;
-    const missileBand = new Mesh(new CylinderGeometry(.084, .084, .18, 14), missileBandMat);
-    missileBand.position.y = 1.12;
-    const missileNose = new Mesh(new CylinderGeometry(.006, .082, .42, 14), missileDarkMat);
-    missileNose.position.y = 1.62;
-    const missileNozzle = new Mesh(new CylinderGeometry(.065, .084, .16, 12), missileDarkMat);
-    missileNozzle.position.y = -.02;
-    flare.add(missileTube, missileBand, missileNose, missileNozzle);
-    for (let i = 0; i < 4; i++) {
-      const fin = new Mesh(new BoxGeometry(.016, .34, .28), missileDarkMat);
-      const angle = i * Math.PI / 2;
-      fin.position.set(Math.cos(angle) * .15, .24, Math.sin(angle) * .15);
-      fin.rotation.y = -angle;
-      const canard = new Mesh(new BoxGeometry(.012, .14, .14), missileDarkMat);
-      canard.position.set(Math.cos(angle) * .11, 1.24, Math.sin(angle) * .11);
-      canard.rotation.y = -angle;
-      flare.add(fin, canard);
-    }
-    missile.add(trail, flare);
-    // Parachuting pilot / loadmaster bailout visual drifting into the playable rescue yard.
-    const parachute = new Group();
-    parachute.name = 'rail-campaign-parachute';
-    const chuteCanopy = new Group();
-    const canopyOrange = new MeshStandardMaterial({ color: 0xe45a28, roughness: .78, side: DoubleSide });
-    const canopyWhite = new MeshStandardMaterial({ color: 0xe6e4dc, roughness: .82, side: DoubleSide });
-    const chuteLineMat = new MeshBasicMaterial({ color: 0x2a2f2e });
-    const pilotSuitMat = new MeshStandardMaterial({ color: 0x3f4a44, roughness: .88 });
-    const pilotVestMat = new MeshStandardMaterial({ color: 0xd45b28, roughness: .75 });
-    for (let i = 0; i < 8; i++) {
-      const gore = new Mesh(
-        new THREE.SphereGeometry(1.55, 4, 8, i * Math.PI / 4, Math.PI / 4, 0, Math.PI * .46),
-        i % 2 === 0 ? canopyOrange : canopyWhite,
-      );
-      gore.scale.set(1, .68, 1);
-      chuteCanopy.add(gore);
-      const ang = (i + .5) * Math.PI / 4;
-      const shroud = new Mesh(new CylinderGeometry(.008, .008, 2.35, 4), chuteLineMat);
-      shroud.position.set(Math.cos(ang) * .68, -.95, Math.sin(ang) * .68);
-      shroud.rotation.set(Math.sin(ang) * .54, 0, -Math.cos(ang) * .54);
-      chuteCanopy.add(shroud);
-    }
-    chuteCanopy.position.y = 2.4;
-    let pilotBody;
-    if (window.createSaltlineHuman) {
-      const h = window.createSaltlineHuman(THREE, { name: 'rail-bailout-pilot', role: 'pilot', variation: 0 });
-      h.pose('parachute', 0, 0, false);
-      pilotBody = h.actor;
-      pilotBody.position.y = -.95;
-    } else {
-      pilotBody = new Group();
-      const pilotTorso = new Mesh(new CylinderGeometry(.16, .14, .56, 10), pilotVestMat);
-      pilotTorso.position.y = .32;
-      const pilotHead = new Mesh(new THREE.SphereGeometry(.11, 10, 8), chuteLineMat);
-      pilotHead.position.y = .72;
-      for (const sx of [-.09, .09]) {
-        const leg = new Mesh(new CylinderGeometry(.065, .055, .68, 8), pilotSuitMat);
-        leg.position.set(sx, -.26, 0);
-        pilotBody.add(leg);
-      }
-      pilotBody.add(pilotTorso, pilotHead);
-    }
-    parachute.add(chuteCanopy, pilotBody);
-    const bailoutOrigin = new Vector3();
-    const bailoutLanding = point(-87.3, .2, 9.85);
-    const explosionFlash = new THREE.PointLight(0xff9b3d, 0, 58, 1.4);
-    explosionFlash.name = 'rail-explosion-flash';
-    let flashEnergy = 0;
-    const hitPose = new Group();
-    const missileStart = new Vector3();
-    const missileHit = new Vector3();
-    const trailEnd = new Vector3();
-    const missileHeading = new Vector3();
-    let nextMissileSmoke = 0;
-    let aircraft = null;
-    let nextTrail = 0;
-    let elapsed = 0;
-    let emitters = [];
-    const finishesByPart = new Map();
-
+  function createAirframe(THREE, state, finishesByPart) {
+    const { BoxGeometry, BufferGeometry, CylinderGeometry, DataTexture, DoubleSide,
+      Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, RingGeometry, Vector3 } = THREE;
     // The UVs follow the skin around each cross-section, then along the airframe or span.
     // Paint, the tiny joint relief, and the change in gloss therefore stay registered.
     function airframeFinish(kind) {
@@ -643,6 +532,149 @@
       return { root, materials, state, wheels, wings, tail, fragments };
     }
 
+    return buildAircraft(state);
+  }
+
+  window.createParkedTransport = THREE => {
+    const finishes = new Map();
+    const model = createAirframe(THREE, 'intact', finishes);
+    for (const wing of model.wings) wing.disc.visible = false;
+    model.root.updateMatrixWorld(true);
+    for (const gear of model.wheels) {
+      const bottom = new THREE.Box3().setFromObject(gear, true).min.y;
+      const extension = bottom + 1.55;
+      for (const part of gear.children) {
+        if (part.position.y < -.25) part.position.y -= extension;
+      }
+      const piston = new THREE.Mesh(new THREE.CylinderGeometry(.041,.041,extension+.08,16), gear.children[0].material);
+      piston.position.y = -.30-extension/2;
+      gear.add(piston);
+    }
+    model.root.updateMatrixWorld(true);
+    return {
+      root: model.root,
+      dispose() {
+        model.root.traverse(node => node.geometry?.dispose());
+        model.materials.forEach(material => material.dispose());
+        for (const { map, bumpMap } of finishes.values()) { map.dispose(); bumpMap.dispose(); }
+      },
+    };
+  };
+
+  window.createCampaignCrash = (world, { retainWreck = false } = {}) => {
+    const { THREE, scene, fx, events } = world;
+    const { BoxGeometry, BufferGeometry, CubicBezierCurve3, CylinderGeometry,
+      DataTexture, DoubleSide, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
+      RingGeometry, Vector3 } = THREE;
+    const point = (x, y, z) => new Vector3(x, y, z);
+    const viewingSpot = point(-94, 0, 9.5);
+    const focus = point(-100, 8, .6);
+    const contact = point(-85.5, 1.12, .6);
+    const impact = point(-77, .94, .6);
+    const turnIn = point(-105, 11.8, -10.4);
+    const approach = new CubicBezierCurve3(
+      point(-153, 39, -16), point(-125, 33, -21), point(-114, 20.215, -12.17), turnIn,
+    );
+    const descent = new CubicBezierCurve3(
+      turnIn, point(-99, 6.19, -9.22), point(-92.75, 1.76, .6), contact,
+    );
+    const sample = new Vector3();
+    const direction = new Vector3(1, 0, 0);
+    const target = new Vector3();
+    const effectPosition = new Vector3();
+    const groundNormal = point(0, 1, 0);
+    const transport = new Group();
+    transport.name = 'rail-campaign-aircraft';
+    const missile = new Group();
+    missile.name = 'rail-campaign-missile';
+    const trail = new Mesh(new CylinderGeometry(.028, .17, 1, 12),
+      new MeshBasicMaterial({ color: 0xffb34d, transparent: true, opacity: .82 }));
+    const flare = new Mesh(new CylinderGeometry(.045, .11, .52, 12),
+      new MeshBasicMaterial({ color: 0xfff3db }));
+    // Attach sculpted missile fuselage, warhead band, nose cone, and cruciform fins to `flare`.
+    const missileBodyMat = new MeshStandardMaterial({ color: 0xd4d8d2, roughness: .42, metalness: .35 });
+    const missileDarkMat = new MeshStandardMaterial({ color: 0x2c3336, roughness: .48, metalness: .55 });
+    const missileBandMat = new MeshStandardMaterial({ color: 0xd94b2b, roughness: .45, metalness: .2 });
+    const missileTube = new Mesh(new CylinderGeometry(.082, .082, 1.38, 14), missileBodyMat);
+    missileTube.position.y = .72;
+    const missileBand = new Mesh(new CylinderGeometry(.084, .084, .18, 14), missileBandMat);
+    missileBand.position.y = 1.12;
+    const missileNose = new Mesh(new CylinderGeometry(.006, .082, .42, 14), missileDarkMat);
+    missileNose.position.y = 1.62;
+    const missileNozzle = new Mesh(new CylinderGeometry(.065, .084, .16, 12), missileDarkMat);
+    missileNozzle.position.y = -.02;
+    flare.add(missileTube, missileBand, missileNose, missileNozzle);
+    for (let i = 0; i < 4; i++) {
+      const fin = new Mesh(new BoxGeometry(.016, .34, .28), missileDarkMat);
+      const angle = i * Math.PI / 2;
+      fin.position.set(Math.cos(angle) * .15, .24, Math.sin(angle) * .15);
+      fin.rotation.y = -angle;
+      const canard = new Mesh(new BoxGeometry(.012, .14, .14), missileDarkMat);
+      canard.position.set(Math.cos(angle) * .11, 1.24, Math.sin(angle) * .11);
+      canard.rotation.y = -angle;
+      flare.add(fin, canard);
+    }
+    missile.add(trail, flare);
+    // Parachuting pilot / loadmaster bailout visual drifting into the playable rescue yard.
+    const parachute = new Group();
+    parachute.name = 'rail-campaign-parachute';
+    const chuteCanopy = new Group();
+    const canopyOrange = new MeshStandardMaterial({ color: 0xe45a28, roughness: .78, side: DoubleSide });
+    const canopyWhite = new MeshStandardMaterial({ color: 0xe6e4dc, roughness: .82, side: DoubleSide });
+    const chuteLineMat = new MeshBasicMaterial({ color: 0x2a2f2e });
+    const pilotSuitMat = new MeshStandardMaterial({ color: 0x3f4a44, roughness: .88 });
+    const pilotVestMat = new MeshStandardMaterial({ color: 0xd45b28, roughness: .75 });
+    for (let i = 0; i < 8; i++) {
+      const gore = new Mesh(
+        new THREE.SphereGeometry(1.55, 4, 8, i * Math.PI / 4, Math.PI / 4, 0, Math.PI * .46),
+        i % 2 === 0 ? canopyOrange : canopyWhite,
+      );
+      gore.scale.set(1, .68, 1);
+      chuteCanopy.add(gore);
+      const ang = (i + .5) * Math.PI / 4;
+      const shroud = new Mesh(new CylinderGeometry(.008, .008, 2.35, 4), chuteLineMat);
+      shroud.position.set(Math.cos(ang) * .68, -.95, Math.sin(ang) * .68);
+      shroud.rotation.set(Math.sin(ang) * .54, 0, -Math.cos(ang) * .54);
+      chuteCanopy.add(shroud);
+    }
+    chuteCanopy.position.y = 2.4;
+    let pilotBody;
+    if (window.createSaltlineHuman) {
+      const h = window.createSaltlineHuman(THREE, { name: 'rail-bailout-pilot', role: 'pilot', variation: 0 });
+      h.pose('parachute', 0, 0, false);
+      pilotBody = h.actor;
+      pilotBody.position.y = -.95;
+    } else {
+      pilotBody = new Group();
+      const pilotTorso = new Mesh(new CylinderGeometry(.16, .14, .56, 10), pilotVestMat);
+      pilotTorso.position.y = .32;
+      const pilotHead = new Mesh(new THREE.SphereGeometry(.11, 10, 8), chuteLineMat);
+      pilotHead.position.y = .72;
+      for (const sx of [-.09, .09]) {
+        const leg = new Mesh(new CylinderGeometry(.065, .055, .68, 8), pilotSuitMat);
+        leg.position.set(sx, -.26, 0);
+        pilotBody.add(leg);
+      }
+      pilotBody.add(pilotTorso, pilotHead);
+    }
+    parachute.add(chuteCanopy, pilotBody);
+    const bailoutOrigin = new Vector3();
+    const bailoutLanding = point(-87.3, .2, 9.85);
+    const explosionFlash = new THREE.PointLight(0xff9b3d, 0, 58, 1.4);
+    explosionFlash.name = 'rail-explosion-flash';
+    let flashEnergy = 0;
+    const hitPose = new Group();
+    const missileStart = new Vector3();
+    const missileHit = new Vector3();
+    const trailEnd = new Vector3();
+    const missileHeading = new Vector3();
+    let nextMissileSmoke = 0;
+    let aircraft = null;
+    let nextTrail = 0;
+    let elapsed = 0;
+    let emitters = [];
+    const finishesByPart = new Map();
+
     function stopEffects() {
       for (const { handle, position, kind } of emitters) {
         // The engine can reuse an emitter after its lifetime ends.
@@ -660,7 +692,7 @@
 
     function showAircraft(state) {
       if (aircraft?.state === state) return;
-      const next = buildAircraft(state);
+      const next = createAirframe(THREE, state, finishesByPart);
       releaseAircraft();
       aircraft = next;
       transport.add(aircraft.root);

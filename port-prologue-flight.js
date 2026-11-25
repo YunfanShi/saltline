@@ -84,15 +84,22 @@
       descend(time, dt, camera) {
         hover();
         aircraft.setDoor(1);
-        const reach = smooth(0, 1.35, time);
-        const lowering = smooth(1.25, 6.85, time);
+        const reach = smooth(0, 1.2, time);
+        const lowering = smooth(1.1, 6.85, time);
         point('seat', eye);
-        point('perch', exit);
-        eye.lerp(exit, reach).lerp(touchdown, lowering);
-        if (!reduced) eye.z += Math.sin(time * 3.2) * Math.sin(Math.PI * lowering) * .12;
+        point('cable', exit);
+        exit.y -= 1.35;
+        eye.lerp(exit, reach);
+        eye.lerp(touchdown, lowering);
+        eye.z += .34 * reach * (1 - smooth(5.8, 6.85, time));
+        if (!reduced) {
+          const sway = Math.sin(Math.PI * lowering);
+          eye.x += Math.sin(time * 2.6) * sway * .07;
+          eye.z += Math.cos(time * 2.1) * sway * .07;
+        }
         aircraft.setCable(21.5);
         aircraft.spin(dt, 1);
-        target.copy(harbor).y += 8 * (1 - lowering);
+        target.copy(harbor).y = landing.y + 1.6 + 6.5 * (1 - lowering);
         camera(eye, target, 70);
       },
       hide() { aircraft.setCable(0); root.visible = false; },

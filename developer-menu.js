@@ -34,7 +34,7 @@
 
   window.createDeveloperMenu = ({
     world, canOpen, isCampaign, onOpen, onClose, onEnemies, onSpawn, onCut,
-    onSwitchChapter, onTriggerCrash, onTriggerBerthClimax, getWaypoints,
+    onSwitchChapter, onTriggerCrash, onTriggerBerthClimax, onTriggerTsunami, getWaypoints,
   }) => {
     const flags = { flight: false, godMode: false, noEnemies: false, infiniteAmmo: false };
     const panel = document.createElement('dialog');
@@ -50,6 +50,12 @@
         <div class="developer-toggles"></div>
         <p data-flight-help></p>
         <div class="developer-actions"></div>
+      </section>
+      <section class="developer-pane" data-pane="events" hidden>
+        <p class="developer-hint" data-events-hint></p>
+        <div class="developer-actions" data-events-list></div>
+        <div class="developer-sublabel" data-stages-label></div>
+        <div class="developer-grid" data-stages-grid></div>
       </section>
       <section class="developer-pane" data-pane="maps" hidden>
         <p class="developer-hint" data-maps-hint></p>
@@ -72,6 +78,8 @@
     const tabBar = panel.querySelector('.developer-tabs');
     const controls = panel.querySelector('.developer-toggles');
     const actions = panel.querySelector('.developer-actions');
+    const eventsList = panel.querySelector('[data-events-list]');
+    const stagesGrid = panel.querySelector('[data-stages-grid]');
     const mapsGrid = panel.querySelector('[data-maps-grid]');
     const modelsPrimary = panel.querySelector('[data-models-primary]');
     const modelsPoses = panel.querySelector('[data-models-poses]');
@@ -86,6 +94,7 @@
 
     const panes = {
       controls: panel.querySelector('[data-pane="controls"]'),
+      events: panel.querySelector('[data-pane="events"]'),
       maps: panel.querySelector('[data-pane="maps"]'),
       models: panel.querySelector('[data-pane="models"]'),
       teleport: panel.querySelector('[data-pane="teleport"]'),
@@ -93,6 +102,7 @@
     let activeTab = 'controls';
     const tabDefs = [
       ['controls', 'Controls', '常用调试'],
+      ['events', 'Set Pieces', '大事件测试'],
       ['maps', 'Maps (10)', '一键切图'],
       ['models', 'Models', '人物与载具展台'],
       ['teleport', 'Teleport', '快速传送'],
@@ -246,17 +256,69 @@
       close();
       onTriggerBerthClimax?.();
     }, true);
+    const tsunamiBtn = addAction(actions, 'Trigger 12m Tsunami Storm Surge', '🌊 触发 12 米超强海啸袭港（高地避险大事件）', () => {
+      close();
+      onTriggerTsunami?.();
+    }, true);
     const clear = addAction(actions, 'Reset switches', '重置开关', () => {
       for (const { key } of switches) setFlag(key, false);
     });
 
-    // Tab 2: All 10 maps / chapters one-click switcher
+    // Tab 2: Dedicated Set Pieces & Random Disaster Events Tester (ALL major events testable!)
+    const evRandomBtn = addAction(eventsList, '🎲 Trigger Random Major Event Now', '🎲 立即随机触发一个大事件', () => {
+      close();
+      world.disasters?.triggerRandomEvent?.();
+    }, true);
+    const evAutoRandomBtn = addAction(eventsList, 'Auto-Random Events: ON', '🔄 自动随机大事件（探索定时触发）：开', () => {
+      const cur = world.disasters?.autoRandom ?? true;
+      world.disasters?.setAutoRandom?.(!cur);
+    });
+    const evGunshipBtn = addAction(eventsList, '🚁 Gunship Sweep & 18m Crane Collapse', '🚁 铁砧武装炮艇空袭 + 18米龙门吊倒塌', () => {
+      close();
+      (onTriggerBerthClimax || world.berthSlice?.triggerClimaxSetPiece)?.();
+    }, true);
+    const evTsunamiBtn = addAction(eventsList, '🌊 12m Tsunami Storm Surge (Fixed)', '🌊 12 米超强海啸风暴潮（高地避险）', () => {
+      close();
+      (onTriggerTsunami || world.disasters?.triggerTsunami)?.();
+    }, true);
+    const evStormBtn = addAction(eventsList, '⛈️ Coastal Lightning Storm & Squall', '⛈️ 沿海强雷暴与港区闪电暴雨', () => {
+      close();
+      world.disasters?.triggerLightningStorm?.();
+    }, true);
+    const evBarrageBtn = addAction(eventsList, '💥 Anvil Artillery Barrage (All 7 Zones)', '💥 铁砧重炮齐射覆盖轰炸（全岛 7 区可用）', () => {
+      close();
+      world.disasters?.triggerArtilleryBarrage?.();
+    }, true);
+    const evFuelChainBtn = addAction(eventsList, '🔥 Harbor Fuel-Tank Chain Explosion', '🔥 港区油罐连锁大爆炸（6 连爆冲击波）', () => {
+      close();
+      world.disasters?.triggerFuelChainBlast?.();
+    }, true);
+    const evCrashBtn = addAction(eventsList, '✈️ Rail Yard Transport Crash Cutscene', '✈️ 铁路货场运输机坠毁过场（货场章）', () => {
+      close();
+      onTriggerCrash?.();
+    });
+    const evModeToggleBtn = addAction(eventsList, '🌏 Toggle Open World Free-Roam / Campaign', '🌏 切换模式：开放世界漫游 / 全城战役', () => {
+      const cur = !!world.openWorld?.freeRoam;
+      world.openWorld?.setFreeRoam?.(!cur, true);
+    }, true);
+    const evSkyBtn = addAction(eventsList, '🌤️ Cycle Sky & Lighting (Dawn/Noon/Sunset/Night)', '🌤️ 切换全岛天色光影（晨曦/晴昼/晚霞/港夜 · T 键）', () => {
+      world.openWorld?.cycleSky?.();
+    });
+    const evWorldMapBtn = addAction(eventsList, '🗺️ Open 520m GTA Island Map (M)', '🗺️ 打开 520m 全岛战术大地图（M 键）', () => {
+      close();
+      world.openWorld?.toggleMap?.(true);
+    });
+    const evStopAllBtn = addAction(eventsList, '🛑 Stop & Reset All Active Events', '🛑 立即停止并复位所有进行中的大事件', () => {
+      world.disasters?.stopAllEvents?.();
+    });
+
+    // Tab 3: All 10 maps / chapters one-click switcher
     const mapButtons = chapterList.map(([id, en, zh]) => addAction(mapsGrid, en, zh, () => {
       close();
       onSwitchChapter?.(id);
     }));
 
-    // Tab 3: Model showcase buttons (5-character lineup, helicopter, poses, individual roles)
+    // Tab 4: Model showcase buttons (5-character lineup, helicopter, poses, individual roles)
     const lineupBtn = addAction(modelsPrimary, 'Spawn all 5 humans in front', '一键召唤全部 5 套高精度人物到面前', spawnAllHumansLineup, true);
     const truckBtn = addAction(modelsPrimary, 'Summon Drivable 4x4 Truck (Press F)', '🚙 召唤可驾驶 SAR 战术四驱车到面前（按 F 驾驶）', () => {
       world.vehicle?.summonNear?.(world.player);
@@ -291,6 +353,24 @@
       close();
     }));
 
+    function rebuildStages() {
+      if (!stagesGrid) return;
+      stagesGrid.innerHTML = '';
+      const list = world.openWorld?.stageStarts;
+      if (!Array.isArray(list)) return;
+      list.forEach((st, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        if (world.openWorld?.stage === idx) btn.className = 'is-accent';
+        btn.textContent = t(st.en, st.zh);
+        btn.addEventListener('click', () => {
+          world.openWorld?.jumpToStage?.(idx);
+          close();
+        });
+        stagesGrid.append(btn);
+      });
+    }
+
     function rebuildWaypoints() {
       if (!tpGrid) return;
       tpGrid.innerHTML = '';
@@ -321,6 +401,15 @@
       panel.querySelector('[data-flight-help]').textContent = t(
         'Flight · WASD to move, Space to ascend, C to descend, Shift to boost.',
         '飞行 · WASD 移动，空格上升，C 下降，Shift 加速。');
+      panel.querySelector('[data-events-hint]').textContent = t(
+        'Trigger any major cinematic set piece or disaster immediately, or toggle random open-world events:',
+        '所有大场面与灾害事件均可在此一键测试，也可开启「自动随机大事件」在探索大世界时随机触发：');
+      const stagesLbl = panel.querySelector('[data-stages-label]');
+      if (stagesLbl) {
+        const hasStages = Array.isArray(world.openWorld?.stageStarts);
+        stagesLbl.hidden = !hasStages;
+        stagesLbl.textContent = t('Jump to Any City Campaign Stage (1–8):', '一键跳关测试·盐线市 8 关全城串联战役（自动传送+重置本关目标）：');
+      }
       panel.querySelector('[data-maps-hint]').textContent = t(
         'Click any chapter to jump directly into that map:',
         '点击任意章节即可一键直接跳转对应地图：');
@@ -338,12 +427,18 @@
         input.checked = flags[key];
       }
       for (const { button, en, zh } of [
-        inspector, heal, ammo, gull, hound, cut, crashBtn, berthClimaxBtn, clear,
+        inspector, heal, ammo, gull, hound, cut, crashBtn, berthClimaxBtn, tsunamiBtn, clear,
+        evRandomBtn, evAutoRandomBtn, evGunshipBtn, evTsunamiBtn, evStormBtn, evBarrageBtn,
+        evFuelChainBtn, evCrashBtn, evModeToggleBtn, evSkyBtn, evWorldMapBtn, evStopAllBtn,
         ...mapButtons, lineupBtn, truckBtn, heliBtn, expoBtn, streamBtn, doorBtn, clearModelsBtn,
         ...poseButtons, ...roleButtons,
       ]) {
         button.textContent = t(en, zh);
       }
+      const autoOn = world.disasters?.autoRandom ?? true;
+      evAutoRandomBtn.button.textContent = autoOn
+        ? t('🔄 Auto-Random Events: ON', '🔄 自动随机大事件（探索定时触发）：开')
+        : t('🔄 Auto-Random Events: OFF', '🔄 自动随机大事件（探索定时触发）：关');
       const st = world.architecture?.getStats?.();
       if (st) {
         const modeZh = { compact: '省电 80m', standard: '标准 145m', full: '全图常驻' }[st.mode] ?? st.mode;
@@ -353,7 +448,12 @@
       cut.button.hidden = !isCampaign();
       crashBtn.button.hidden = !onTriggerCrash;
       berthClimaxBtn.button.hidden = !onTriggerBerthClimax;
+      tsunamiBtn.button.hidden = !onTriggerTsunami;
+      evGunshipBtn.button.hidden = !(onTriggerBerthClimax || world.berthSlice?.triggerClimaxSetPiece);
+      evCrashBtn.button.hidden = !onTriggerCrash;
+      evWorldMapBtn.button.hidden = !world.openWorld?.toggleMap;
       doorBtn.button.disabled = !showcaseHeli;
+      if (activeTab === 'events') rebuildStages();
       if (activeTab === 'teleport') rebuildWaypoints();
 
       const { x, y, z } = world.player.pos;

@@ -25,6 +25,12 @@
       ability: ['Reinforce armor', '加固护甲'],
       description: ['Halve incoming damage for 8 s. 26 s cooldown.', '在 8 秒内减半所受伤害。冷却 26 秒。'],
       cooldown: 26
+    },
+    assault: {
+      name: ['Assault', '突击兵'],
+      ability: ['Adrenaline surge', '肾上腺素突击'],
+      description: ['Restore 20 health, +1 mag reserve, and -30% damage for 6 s. 22 s cooldown.', '立即回复 20 生命、补充 1 个弹匣备弹，并在 6 秒内减伤 30%。冷却 22 秒。'],
+      cooldown: 22
     }
   };
 
@@ -45,7 +51,10 @@
     const originalDamage = player.damage;
     const isPlaying = () => game.game?.state === 'playing' && Boolean(game.game.conquest) && player.alive;
     player.damage = function (amount, ...args) {
-      if (role === 'engineer' && duration > 0 && isPlaying()) amount *= 0.5;
+      if (duration > 0 && isPlaying()) {
+        if (role === 'engineer') amount *= 0.5;
+        else if (role === 'assault') amount *= 0.7;
+      }
       return originalDamage.call(this, amount, ...args);
     };
 
@@ -123,6 +132,16 @@
         case 'engineer':
           duration = 8;
           break;
+        case 'assault': {
+          const healAmt = Math.min(20, player.maxHealth - player.health);
+          if (healAmt > 0) player.heal(healAmt);
+          const weapon = game.weapon;
+          const ammoAmt = Math.min(weapon.magSize, weapon.magSize * 5 - weapon.reserve);
+          if (ammoAmt > 0) weapon.addAmmo(ammoAmt);
+          duration = 6;
+          showNotice(['Adrenaline surge active!', '肾上腺素突击已激活！']);
+          break;
+        }
       }
       cooldown = roles[role].cooldown;
       renderHud();
@@ -150,7 +169,9 @@
       if (duration > 0) {
         message = role === 'recon'
           ? scan()
-          : translate([`Armor active · ${Math.ceil(duration)}s`, `护甲已加固 · ${Math.ceil(duration)} 秒`]);
+          : role === 'assault'
+            ? translate([`Adrenaline surge · ${Math.ceil(duration)}s`, `肾上腺素突击 · ${Math.ceil(duration)} 秒`])
+            : translate([`Armor active · ${Math.ceil(duration)}s`, `护甲已加固 · ${Math.ceil(duration)} 秒`]);
       }
       setText(status, message);
     }

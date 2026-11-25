@@ -91,3 +91,18 @@ test('campaign gameplay keeps original damage and receives no abilities', () => 
   game.player.damage(20);
   assert.equal(game.player.health, 80);
 });
+
+test('assault adrenaline surge heals, refills one magazine, and reduces damage by 30% for 6s', () => {
+  const {game, loadout} = start('assault');
+  game.player.damage(40);
+  game.weapon.reserve = 90;
+  assert.equal(loadout.activate(), true);
+  assert.equal(game.player.health, 80);
+  assert.equal(game.weapon.reserve, 120);
+  assert.equal(loadout.cooldown, 22);
+  game.player.damage(20);
+  assert.equal(game.player.health, 66);
+  loadout.update(6);
+  game.player.damage(20);
+  assert.equal(game.player.health, 46);
+});

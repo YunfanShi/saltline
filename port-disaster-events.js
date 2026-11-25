@@ -1,0 +1,580 @@
+/* Realistic, Oppressive COD / Battlefield 6-Style Major Disasters & Random Event Director:
+ * - Dynamic Storm-Sky Darkening & Sea-Mist Fog Surge (restores cleanly after disaster ends)
+ * - 12m Dark-Ocean Tsunami (deep slate-teal breaking wall, axial crestRoll, pre-impact sub-tremor)
+ * - Coastal Supercell Lightning Storm (multi-forked bolts + realistic delayed rolling thunderclap)
+ * - Anvil Artillery Barrage (red target rings -> 1.65s warning -> fiery blast + scorched crater decals)
+ * - Harbor Fuel-Tank Chain Explosion (6-stage cascading dock detonation)
+ * - Random Event Director (manual trigger + toggleable open-world auto-random mode). */
+(() => {
+  function injectStyles() {
+    if (document.getElementById('saltline-disaster-style')) return;
+    const style = document.createElement('style');
+    style.id = 'saltline-disaster-style';
+    style.textContent = `
+      .sl-water-vignette{position:fixed;inset:0;z-index:15;pointer-events:none;background:radial-gradient(circle at 50% 50%,rgba(12,48,64,0) 38%,rgba(8,36,50,.78) 100%);opacity:0;transition:opacity .25s ease}
+      .sl-storm-vignette{position:fixed;inset:0;z-index:14;pointer-events:none;background:radial-gradient(circle at 50% 35%,rgba(8,14,20,0) 45%,rgba(5,10,16,.58) 100%);opacity:0;transition:opacity 1.2s ease}
+      .sl-storm-flash{position:fixed;inset:0;z-index:16;pointer-events:none;background:rgba(210,235,255,.78);opacity:0;transition:opacity .07s ease-out}
+      .sl-disaster-banner{position:fixed;top:148px;left:50%;transform:translateX(-50%);z-index:21;background:rgba(10,16,22,.92);border:1px solid rgba(102,217,240,.65);border-left:4px solid #e85842;color:#eef6f8;padding:9px 18px;border-radius:6px;font:700 13px/1.4 system-ui,-apple-system,sans-serif;pointer-events:none;box-shadow:0 8px 26px rgba(0,0,0,.55)}
+      .sl-disaster-banner[hidden]{display:none}
+    `;
+    document.head.appendChild(style);
+  }
+
+  window.createPortDisasterEvents = (world, { onRadio = null } = {}) => {
+    const { THREE, scene, fx, audio } = world;
+    const { Group, Mesh, BoxGeometry, CylinderGeometry, PlaneGeometry, RingGeometry, CircleGeometry,
+      MeshStandardMaterial, MeshBasicMaterial, DoubleSide, Vector3 } = THREE;
+
+    injectStyles();
+    const root = new Group();
+    root.name = 'saltline-disaster-events-root';
+    scene.add(root);
+
+    // =========================================================================
+    // 1. REALISTIC DARK-OCEAN 12m TSUNAMI WALL (deep slate-teal + axial foam roll)
+    // =========================================================================
+    const tsunamiRoot = new Group();
+    tsunamiRoot.name = 'tsunami-root';
+    tsunamiRoot.visible = false;
+    root.add(tsunamiRoot);
+
+    const waveGroup = new Group();
+    waveGroup.name = 'tsunami-wave-wall';
+    tsunamiRoot.add(waveGroup);
+
+    // Procedural dark storm-ocean & turbulent sea-foam PBR textures (zero flat plastic boxes!)
+    function makeOceanTex(baseHex, streakHex, repeatX, repeatY) {
+      if (!THREE.DataTexture) return null;
+      const sz = 128, buf = new Uint8Array(sz * sz * 4);
+      const c0 = new THREE.Color(baseHex), c1 = new THREE.Color(streakHex);
+      let s = (baseHex ^ 0x51a7c3) >>> 0;
+      for (let y = 0; y < sz; y++) {
+        for (let x = 0; x < sz; x++) {
+          s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+          const n = (s >>> 24) / 255;
+          const ripple = Math.sin(x * .22 + Math.cos(y * .14) * 2.2) * .5 + .5;
+          const k = Math.min(1, Math.max(0, ripple * .55 + n * .45));
+          const i = (y * sz + x) * 4;
+          buf[i] = Math.round((c0.r * (1 - k) + c1.r * k) * 255);
+          buf[i + 1] = Math.round((c0.g * (1 - k) + c1.g * k) * 255);
+          buf[i + 2] = Math.round((c0.b * (1 - k) + c1.b * k) * 255);
+          buf[i + 3] = 255;
+        }
+      }
+      const tex = new THREE.DataTexture(buf, sz, sz);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(repeatX, repeatY);
+      tex.needsUpdate = true;
+      return tex;
+    }
+    const seaTex = makeOceanTex(0x071d27, 0x164152, 6, 3);
+    const foamTex = makeOceanTex(0x88a8b4, 0xdbe8ec, 8, 2);
+
+    const waveWaterMat = new MeshStandardMaterial({
+      color: 0x0c2e3c, map: seaTex, bumpMap: seaTex, bumpScale: .18,
+      roughness: .22, metalness: .38, transparent: true, opacity: .94, side: DoubleSide,
+    });
+    const foamMat = new MeshStandardMaterial({
+      color: 0xc2d8df, map: foamTex, bumpMap: foamTex, bumpScale: .12,
+      roughness: .66, metalness: .08, transparent: true, opacity: .86, side: DoubleSide,
+    });
+
+    // Full-Coastline 340m Tsunami Wall covering North Coastal City, Berth 4 & South Drydock/Lighthouse
+    const waveWidth = 340;
+    const waveProfile = [
+      [8.4, 0.0], [5.4, 2.3], [2.4, 5.6], [0.3, 8.8], [-1.4, 11.1], [-3.0, 11.9], [-4.4, 10.6], [-4.8, 8.3],
+    ];
+    for (let i = 0; i < waveProfile.length - 1; i++) {
+      const [x0, y0] = waveProfile[i], [x1, y1] = waveProfile[i + 1];
+      const segLen = Math.hypot(x1 - x0, y1 - y0);
+      const seg = new Mesh(new BoxGeometry(segLen + .16, .60, waveWidth), i >= 4 ? foamMat : waveWaterMat);
+      seg.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0);
+      seg.rotation.z = Math.atan2(y1 - y0, x1 - x0);
+      waveGroup.add(seg);
+    }
+    const crestPivot = new Group();
+    crestPivot.position.set(-3.5, 10.5, 0);
+    crestPivot.rotation.x = Math.PI / 2;
+    const crestRoll = new Mesh(new CylinderGeometry(1.35, 1.35, waveWidth, 16), foamMat);
+    crestPivot.add(crestRoll);
+    waveGroup.add(crestPivot);
+
+    const floodPlane = new Mesh(
+      new PlaneGeometry(280, 340, 16, 12),
+      new MeshStandardMaterial({
+        color: 0x0d2d3b, map: seaTex, bumpMap: seaTex, bumpScale: .15,
+        roughness: .18, metalness: .45, transparent: true, opacity: .88, side: DoubleSide,
+      }),
+    );
+    floodPlane.rotation.x = -Math.PI / 2;
+    floodPlane.position.set(-35, -1, 0);
+    tsunamiRoot.add(floodPlane);
+
+    const debrisItems = [];
+    const crateMat = new MeshStandardMaterial({ color: 0x6b4d33, roughness: .88 });
+    const contRed = new MeshStandardMaterial({ color: 0x6e271e, roughness: .72, metalness: .30 });
+    const contBlue = new MeshStandardMaterial({ color: 0x1d3f59, roughness: .72, metalness: .30 });
+    for (let i = 0; i < 14; i++) {
+      const isCont = i < 5;
+      const mesh = new Mesh(
+        new BoxGeometry(isCont ? 5.6 : 1.5, isCont ? 2.2 : 1.1, isCont ? 2.3 : 1.4),
+        isCont ? (i % 2 ? contRed : contBlue) : crateMat,
+      );
+      tsunamiRoot.add(mesh);
+      debrisItems.push({
+        mesh,
+        startX: 34 + (i % 6) * 7,
+        z: -115 + i * 18,
+        speed: isCont ? 7.5 : 11.5 + (i % 3) * 2.2,
+        spin: (i % 2 ? 1 : -1) * (isCont ? .35 : 1.1),
+      });
+    }
+
+    // =========================================================================
+    // 2. MULTI-FORK LIGHTNING, ARTILLERY TARGET RINGS & SCORCH CRATER DECALS
+    // =========================================================================
+    const fxRoot = new Group();
+    fxRoot.name = 'disaster-fx-root';
+    root.add(fxRoot);
+
+    const boltMat = new MeshBasicMaterial({ color: 0xe6f6ff });
+    const boltGeo = new BoxGeometry(.22, 1, .22);
+    const ringMat = new MeshBasicMaterial({ color: 0xe83b28, transparent: true, opacity: .76, side: DoubleSide, depthWrite: false });
+    const ringGeo = new RingGeometry(2.4, 3.1, 24);
+    const scorchMat = new MeshBasicMaterial({ color: 0x161412, transparent: true, opacity: .72, side: DoubleSide, depthWrite: false });
+    const scorchGeo = CircleGeometry ? new CircleGeometry(2.6, 14) : new PlaneGeometry(4.8, 4.8);
+    const tempBolts = [];
+    const pendingShells = [];
+    const scorchMarks = [];
+
+    function addBranch(boltGroup, x0, y0, z0, x1, y1, z1, thickness = 1) {
+      const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+      const len = Math.hypot(dx, dy, dz);
+      const m = new Mesh(boltGeo, boltMat);
+      m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      m.scale.set(thickness, len, thickness);
+      m.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), new Vector3(dx, dy, dz).normalize());
+      boltGroup.add(m);
+    }
+
+    let flashTimer, thunderTimer;
+    function spawnLightningBolt(targetPos) {
+      const boltGroup = new Group();
+      let cx = targetPos.x, cz = targetPos.z;
+      const segs = 8, topY = 52;
+      for (let i = 0; i < segs; i++) {
+        const y0 = topY * (1 - i / segs);
+        const y1 = topY * (1 - (i + 1) / segs);
+        const nx = i === segs - 1 ? targetPos.x : cx + (Math.random() - .5) * 5.2;
+        const nz = i === segs - 1 ? targetPos.z : cz + (Math.random() - .5) * 5.2;
+        addBranch(boltGroup, cx, y0, cz, nx, y1, nz, 1.15);
+        // Realistic secondary fork off mid-air trunk
+        if (i === 2 || i === 4) {
+          addBranch(boltGroup, nx, y1, nz, nx + (Math.random() - .5) * 9, y1 - 8, nz + (Math.random() - .5) * 9, .52);
+        }
+        cx = nx; cz = nz;
+      }
+      fxRoot.add(boltGroup);
+      tempBolts.push({ group: boltGroup, life: .18 });
+      stormFlash.style.opacity = '.74';
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => { stormFlash.style.opacity = '0'; }, 85);
+      fx?.sparks?.(targetPos, new Vector3(0, 1, 0), 38);
+      // Realistic speed-of-sound delayed rolling thunderclap!
+      const delayMs = 280 + Math.round(Math.random() * 380);
+      clearTimeout(thunderTimer);
+      thunderTimer = setTimeout(() => {
+        audio?.play?.('rail_touchdown', { pos: targetPos, ref: 52, gain: .98, jitter: .14 });
+        world.player?.addShake?.(.48);
+      }, delayMs);
+    }
+
+    function dropArtilleryMarker(pos) {
+      const ring = new Mesh(ringGeo, ringMat.clone());
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(pos.x, pos.y + .14, pos.z);
+      fxRoot.add(ring);
+      pendingShells.push({ ring, pos: pos.clone(), timer: 1.65 });
+    }
+
+    function addScorchCrater(pos) {
+      const mark = new Mesh(scorchGeo, scorchMat);
+      mark.rotation.x = -Math.PI / 2;
+      mark.position.set(pos.x, pos.y + .06, pos.z);
+      fxRoot.add(mark);
+      scorchMarks.push(mark);
+      if (scorchMarks.length > 14) {
+        const old = scorchMarks.shift();
+        fxRoot.remove(old);
+      }
+    }
+
+    // Dynamic oppressive storm atmosphere controller (atmospheric without ever blinding visibility!)
+    let savedFogDensity = null;
+    function setOppressiveAtmosphere(active) {
+      stormVignette.style.opacity = active ? '.35' : '0';
+      if (scene?.fog && typeof scene.fog.density === 'number') {
+        if (active) {
+          if (savedFogDensity === null) savedFogDensity = scene.fog.density;
+          scene.fog.density = Math.min(.0018, Math.max(savedFogDensity, .0014));
+        } else if (savedFogDensity !== null) {
+          scene.fog.density = savedFogDensity;
+          savedFogDensity = null;
+        }
+      }
+    }
+
+    // HUD overlays
+    const vignette = document.createElement('div');
+    vignette.className = 'sl-water-vignette';
+    const stormVignette = document.createElement('div');
+    stormVignette.className = 'sl-storm-vignette';
+    const stormFlash = document.createElement('div');
+    stormFlash.className = 'sl-storm-flash';
+    const banner = document.createElement('div');
+    banner.className = 'sl-disaster-banner';
+    banner.hidden = true;
+    document.body.append(vignette, stormVignette, stormFlash, banner);
+
+    const up = new Vector3(0, 1, 0);
+    let tsunamiActive = false, tsunamiElapsed = 0, waterLevel = -1, sprayTick = 0, submergeDamageTick = 0;
+    const TSUNAMI_DURATION = 32;
+
+    let stormActive = false, stormElapsed = 0, stormBoltTick = 0;
+    const STORM_DURATION = 20;
+
+    let barrageActive = false, barrageElapsed = 0, barrageTick = 0;
+    const BARRAGE_DURATION = 18;
+
+    let chainActive = false, chainElapsed = 0, chainIndex = 0;
+    let chainOrigin = new Vector3(), chainDir = new Vector3(1, 0, 0);
+
+    // Linear campaign by default: disasters trigger strictly on story milestones or manual Dev Menu testing
+    let autoRandom = false;
+    let autoRandomTimer = 60;
+    let lastRandomId = null;
+
+    function announce(zh, en, urgent = true) {
+      if (onRadio) onRadio([en, zh], 6.5);
+      world.tactical?.notify?.(zh, en, urgent, 5.5);
+    }
+
+    function triggerTsunami() {
+      tsunamiActive = true;
+      tsunamiElapsed = 0;
+      waterLevel = -.5;
+      sprayTick = 0;
+      submergeDamageTick = 0;
+      tsunamiRoot.visible = true;
+      waveGroup.visible = true;
+      waveGroup.position.set(105, 0, 0);
+      floodPlane.position.y = -.5;
+      banner.hidden = false;
+      setOppressiveAtmosphere(true);
+      for (const d of debrisItems) {
+        d.mesh.position.set(d.startX, .8, d.z);
+        d.mesh.rotation.set(0, .2, 0);
+      }
+      audio?.play?.('berth_alarm', { pos: world.player?.pos ?? new Vector3(), ref: 24, gain: .95, jitter: 0 });
+      announce(
+        '🌊 海啸红色警报！12 米东海风暴潮正吞噬海堤！立刻撤往高架猫道或 +14m 西岸山顶！',
+        'TSUNAMI WARNING! 12m East Sea storm surge inbound! Climb to high ground NOW!',
+        true,
+      );
+      return true;
+    }
+
+    function triggerLightningStorm() {
+      stormActive = true;
+      stormElapsed = 0;
+      stormBoltTick = .35;
+      banner.hidden = false;
+      setOppressiveAtmosphere(true);
+      announce(
+        '⛈️ 强对流超级雷暴过境！海面能见度骤降，注意多叉落雷与强风震动！',
+        '⛈️ SEVERE SUPERCELL LIGHTNING SQUALL! Visibility dropping across Saltline!',
+        true,
+      );
+      return true;
+    }
+
+    function triggerArtilleryBarrage() {
+      barrageActive = true;
+      barrageElapsed = 0;
+      barrageTick = .2;
+      banner.hidden = false;
+      audio?.play?.('berth_alarm', { pos: world.player?.pos ?? new Vector3(), ref: 28, gain: .88, jitter: 0 });
+      announce(
+        '💥 敌方重炮覆盖警报！铁砧海上炮艇正在向你所在街区齐射，立刻远离地面红圈！',
+        '💥 INCOMING ARTILLERY BARRAGE! Evade the red impact zones!',
+        true,
+      );
+      return true;
+    }
+
+    function triggerFuelChainBlast() {
+      chainActive = true;
+      chainElapsed = 0;
+      chainIndex = 0;
+      const p = world.player?.pos ?? new Vector3(0, 0, 0);
+      const yaw = world.player?.yaw ?? 0;
+      chainDir.set(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
+      chainOrigin.copy(p).addScaledVector(chainDir, 12);
+      banner.hidden = false;
+      announce(
+        '🔥 港区输油管线破裂！前方油罐发生 6 波次连锁大爆炸，注意冲击波与黑烟！',
+        '🔥 HARBOR FUEL LINE RUPTURE! Cascading tank explosions ahead!',
+        true,
+      );
+      return true;
+    }
+
+    function triggerEvent(id) {
+      if (id === 'tsunami') return triggerTsunami();
+      if (id === 'lightning_storm') return triggerLightningStorm();
+      if (id === 'artillery_barrage') return triggerArtilleryBarrage();
+      if (id === 'fuel_chain_blast') return triggerFuelChainBlast();
+      if (id === 'gunship_crane') return !!world.berthSlice?.triggerClimaxSetPiece?.();
+      return false;
+    }
+
+    function triggerRandomEvent() {
+      const pool = ['tsunami', 'lightning_storm', 'artillery_barrage', 'fuel_chain_blast'];
+      if (world.berthSlice?.triggerClimaxSetPiece) pool.push('gunship_crane');
+      const candidates = pool.filter(id => id !== lastRandomId);
+      const pick = candidates[Math.floor(Math.random() * candidates.length)] || pool[0];
+      lastRandomId = pick;
+      triggerEvent(pick);
+      return pick;
+    }
+
+    function stopAllEvents() {
+      clearTimeout(flashTimer);
+      clearTimeout(thunderTimer);
+      tsunamiActive = false;
+      stormActive = false;
+      barrageActive = false;
+      chainActive = false;
+      tsunamiRoot.visible = false;
+      vignette.style.opacity = '0';
+      stormFlash.style.opacity = '0';
+      banner.hidden = true;
+      setOppressiveAtmosphere(false);
+      for (const b of tempBolts.splice(0)) fxRoot.remove(b.group);
+      for (const s of pendingShells.splice(0)) { fxRoot.remove(s.ring); s.ring.material.dispose(); }
+      for (const m of scorchMarks.splice(0)) fxRoot.remove(m);
+    }
+
+    function update(dt, player) {
+      if (!(dt > 0)) return;
+
+      for (let i = tempBolts.length - 1; i >= 0; i--) {
+        tempBolts[i].life -= dt;
+        if (tempBolts[i].life <= 0) {
+          fxRoot.remove(tempBolts[i].group);
+          tempBolts.splice(i, 1);
+        }
+      }
+
+      for (let i = pendingShells.length - 1; i >= 0; i--) {
+        const s = pendingShells[i];
+        s.timer -= dt;
+        const pulse = 1 + Math.sin(s.timer * 18) * .12;
+        s.ring.scale.set(pulse, pulse, 1);
+        if (s.timer <= 0) {
+          fxRoot.remove(s.ring);
+          s.ring.material.dispose();
+          pendingShells.splice(i, 1);
+          addScorchCrater(s.pos);
+          fx?.smoke?.(s.pos, { size: 6.2, life: 6.5, color: 0x1e1a17, alpha: .80, rise: 1.5, count: 12 });
+          fx?.sparks?.(s.pos, up, 48);
+          fx?.debris?.(s.pos, { count: 22 });
+          audio?.play?.('rail_touchdown', { pos: s.pos, ref: 40, gain: .98, jitter: .1 });
+          if (player?.pos) {
+            const dist = player.pos.distanceTo(s.pos);
+            if (dist < 32) player.addShake?.(Math.max(.22, (1 - dist / 32) * .78));
+            if (dist < 4.5 && player.alive) player.damage?.(18, s.pos);
+          }
+        }
+      }
+
+      if (tsunamiActive) {
+        tsunamiElapsed += dt;
+        const waveProgress = Math.min(1, tsunamiElapsed / 13.0);
+        const waveX = 105 - waveProgress * 195;
+        waveGroup.position.set(waveX, Math.sin(tsunamiElapsed * 3.5) * .35, 0);
+        crestRoll.rotation.y += dt * 5.2;
+        waveGroup.visible = tsunamiElapsed < 14.5;
+
+        // Pre-impact low-frequency ocean tremor builds oppression before the wave strikes!
+        if (tsunamiElapsed < 4.5 && player?.addShake) player.addShake(.035);
+
+        if (tsunamiElapsed < 4.5) waterLevel = -.4;
+        else if (tsunamiElapsed < 12.0) {
+          const f = (tsunamiElapsed - 4.5) / 7.5;
+          waterLevel = -.4 + 2.55 * (f * f * (3 - 2 * f));
+        } else if (tsunamiElapsed < 22.0) waterLevel = 2.15 + Math.sin(tsunamiElapsed * 2.1) * .12;
+        else {
+          const f = Math.min(1, (tsunamiElapsed - 22.0) / 10.0);
+          waterLevel = 2.15 * (1 - f) - .5 * f;
+        }
+        floodPlane.position.y = waterLevel;
+
+        sprayTick += dt;
+        if (tsunamiElapsed > 3.2 && tsunamiElapsed < 13.8 && sprayTick >= .12) {
+          sprayTick = 0;
+          const p = new Vector3(waveX - 2, 2.4, (Math.random() - .5) * 38);
+          fx?.smoke?.(p, { size: 5.2, life: 2.6, color: 0xc2d8df, alpha: .62, rise: 2.1, count: 5 });
+          if (player?.pos && Math.abs(player.pos.x - waveX) < 42) {
+            player.addShake?.(.30);
+            audio?.play?.('rail_touchdown', { pos: p, ref: 34, gain: .72, jitter: .12 });
+          }
+        }
+
+        for (const d of debrisItems) {
+          if (tsunamiElapsed > 4.2) {
+            const dtFlow = tsunamiElapsed - 4.2;
+            d.mesh.position.x = d.startX - dtFlow * d.speed;
+            d.mesh.position.y = Math.max(.4, waterLevel - .35 + Math.sin(tsunamiElapsed * 3 + d.z) * .28);
+            d.mesh.rotation.y += d.spin * dt * .4;
+            d.mesh.rotation.z = Math.sin(tsunamiElapsed * 2.4 + d.z) * .18;
+          }
+        }
+
+        if (player?.alive && player.pos) {
+          const depth = waterLevel - player.pos.y;
+          const safe = depth < .35;
+          vignette.style.opacity = safe ? '0' : String(Math.min(.92, depth * .62));
+          if (depth >= .35) {
+            if (player.vel) {
+              player.vel.x -= Math.min(12, depth * 7.5) * dt;
+              player.vel.x *= (1 - Math.min(.25, dt * 1.4));
+              player.vel.z *= (1 - Math.min(.25, dt * 1.4));
+            }
+            submergeDamageTick += dt;
+            if (depth > 1.25 && submergeDamageTick >= 1.2) {
+              submergeDamageTick = 0;
+              player.damage?.(12, player.pos);
+              player.addShake?.(.34);
+            }
+            banner.textContent = `🌊 已被洪峰卷入（水深 ${depth.toFixed(1)}m）！快撤往高架猫道或西岸山顶！`;
+          } else if (tsunamiElapsed < 4.5) {
+            banner.textContent = `🌊 12 米东海海啸迫近！距离拍岸 ${Math.max(1, Math.ceil(4.5 - tsunamiElapsed))} 秒！`;
+          } else if (waterLevel <= .2) {
+            banner.textContent = '🌊 巨浪已撞击海堤！洪峰正在灌入港区！';
+          } else {
+            banner.textContent = `✅ 高地避险中 · 当前洪峰水位 ${waterLevel.toFixed(1)}m（退潮倒计时 ${Math.max(0, Math.ceil(TSUNAMI_DURATION - tsunamiElapsed))}s）`;
+          }
+        }
+
+        if (tsunamiElapsed >= TSUNAMI_DURATION) {
+          tsunamiActive = false;
+          tsunamiRoot.visible = false;
+          vignette.style.opacity = '0';
+          if (!stormActive) setOppressiveAtmosphere(false);
+          world.tactical?.notify?.('🌊 东海风暴潮已退去，港区恢复通行！', '🌊 Storm surge receded!', false, 4.0);
+        }
+      }
+
+      if (stormActive) {
+        stormElapsed += dt;
+        stormBoltTick -= dt;
+        if (stormBoltTick <= 0 && player?.pos) {
+          stormBoltTick = 1.5 + Math.random() * 1.6;
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 14 + Math.random() * 28;
+          spawnLightningBolt(new Vector3(player.pos.x + Math.cos(angle) * dist, player.pos.y, player.pos.z + Math.sin(angle) * dist));
+        }
+        if (!tsunamiActive) banner.textContent = `⛈️ 超级雷暴过境中（剩余 ${Math.max(0, Math.ceil(STORM_DURATION - stormElapsed))}s）· 注意规避落雷！`;
+        if (stormElapsed >= STORM_DURATION) {
+          stormActive = false;
+          if (!tsunamiActive) setOppressiveAtmosphere(false);
+          world.tactical?.notify?.('⛅ 雷暴云团已过境，海面能见度恢复。', '⛅ Lightning squall cleared.', false, 3.5);
+        }
+      }
+
+      if (barrageActive) {
+        barrageElapsed += dt;
+        barrageTick -= dt;
+        if (barrageTick <= 0 && player?.pos) {
+          barrageTick = 1.35 + Math.random() * .8;
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 6 + Math.random() * 18;
+          dropArtilleryMarker(new Vector3(player.pos.x + Math.cos(angle) * dist, player.pos.y, player.pos.z + Math.sin(angle) * dist));
+        }
+        if (!tsunamiActive) banner.textContent = `💥 铁砧重炮齐射覆盖中（剩余 ${Math.max(0, Math.ceil(BARRAGE_DURATION - barrageElapsed))}s）· 远离地面红圈！`;
+        if (barrageElapsed >= BARRAGE_DURATION) {
+          barrageActive = false;
+          world.tactical?.notify?.('🛡️ 敌方炮火覆盖结束！', '🛡️ Artillery barrage ended!', false, 3.5);
+        }
+      }
+
+      if (chainActive) {
+        chainElapsed += dt;
+        const targetIdx = Math.floor(chainElapsed / .72);
+        while (chainIndex <= targetIdx && chainIndex < 6) {
+          const pos = chainOrigin.clone().addScaledVector(chainDir, chainIndex * 7.5);
+          addScorchCrater(pos);
+          fx?.smoke?.(pos, { size: 6.5, life: 8.0, color: 0x1e1916, alpha: .82, rise: 1.7, count: 13 });
+          fx?.sparks?.(pos, up, 52);
+          fx?.debris?.(pos, { count: 24 });
+          audio?.play?.('rail_touchdown', { pos, ref: 42, gain: 1.0, jitter: .06 });
+          player?.addShake?.(.62);
+          chainIndex++;
+        }
+        if (!tsunamiActive && !barrageActive) banner.textContent = `🔥 港区油罐连锁爆炸（第 ${Math.min(6, chainIndex)}/6 波次引爆）！`;
+        if (chainElapsed >= 5.5) chainActive = false;
+      }
+
+      const anyActive = tsunamiActive || stormActive || barrageActive || chainActive;
+      banner.hidden = !anyActive;
+
+      if (autoRandom && !anyActive && player?.alive && !world.openWorld?.freeRoam) {
+        autoRandomTimer -= dt;
+        if (autoRandomTimer <= 0) {
+          autoRandomTimer = 55 + Math.random() * 30;
+          triggerRandomEvent();
+        }
+      }
+    }
+
+    let disposed = false;
+    function dispose() {
+      if (disposed) return;
+      disposed = true;
+      stopAllEvents();
+      const geometries = new Set([boltGeo,ringGeo,scorchGeo]);
+      const surfaces = new Set([boltMat,ringMat,scorchMat,crateMat,contRed,contBlue]);
+      root.traverse(node => {
+        if (node.geometry) geometries.add(node.geometry);
+        if (node.material) surfaces.add(node.material);
+      });
+      geometries.forEach(value => value.dispose());
+      surfaces.forEach(value => value.dispose());
+      seaTex?.dispose();
+      foamTex?.dispose();
+      root.removeFromParent();
+      vignette.remove();
+      stormVignette.remove();
+      stormFlash.remove();
+      banner.remove();
+    }
+
+    return {
+      triggerTsunami,
+      triggerLightningStorm,
+      triggerArtilleryBarrage,
+      triggerFuelChainBlast,
+      triggerEvent,
+      triggerRandomEvent,
+      stopAllEvents,
+      setAutoRandom(v) { autoRandom = !!v; if (autoRandom) autoRandomTimer = Math.min(autoRandomTimer, 45); },
+      get autoRandom() { return autoRandom; },
+      update,
+      dispose,
+      get active() { return tsunamiActive || stormActive || barrageActive || chainActive; },
+      get waterLevel() { return waterLevel; },
+    };
+  };
+})();

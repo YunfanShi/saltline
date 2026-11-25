@@ -253,7 +253,7 @@
         clue('search-cancelled', ['Search cancelled', '取消搜救'], [
           'Control calls the rescue boat back after receiving the departure count.',
           '指挥部收到离港人数后召回了搜救艇。',
-        ], '05:46'),
+        ], '05:50'),
         clue('crack-report', ['Crack report', '裂缝报告'], [
           'The night crew logs a visible crack and requests a halt at the gate.',
           '夜班记录闸门裂缝，并请求停止通行。',

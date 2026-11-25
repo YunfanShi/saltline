@@ -67,38 +67,68 @@
     craneBeacon.position.set(0, 16.0, 11.0);
     cranePivot.add(craneBeacon);
 
-    // 3. Anvil Armed Interceptor Gunship (3D attack/utility helicopter with crimson searchlight & tracers)
+    // 3. Sculpted Anvil Armed Attack Gunship (tapered fuselage, tandem glass canopy, tail rotor, rocket pods)
     const gunship = new Group();
     gunship.name = 'anvil-interceptor-gunship';
     gunship.visible = false;
     root.add(gunship);
 
-    const gunHull = new MeshStandardMaterial({ color: 0x1d2326, roughness: .42, metalness: .68 });
-    const gunAccent = new MeshStandardMaterial({ color: 0x99241b, roughness: .48, metalness: .42 });
-    const gunGlass = new MeshStandardMaterial({ color: 0x0b151c, roughness: .1, metalness: .92 });
-    addPart(gunship, boxGeo, gunHull, 2.3, 1.85, 8.2, 0, 0, 0);
-    addPart(gunship, boxGeo, gunGlass, 1.9, 1.05, 2.2, 0, .25, 3.8);
-    addPart(gunship, boxGeo, gunAccent, 5.4, .28, 1.25, 0, -.15, .6); // Stub weapon wings
-    addPart(gunship, cylGeo, steelDark, .35, 1.9, .35, -2.2, -.45, 1.0).rotation.x = Math.PI / 2;
-    addPart(gunship, cylGeo, steelDark, .35, 1.9, .35, 2.2, -.45, 1.0).rotation.x = Math.PI / 2;
-    addPart(gunship, boxGeo, gunHull, .65, .75, 6.4, 0, .35, -6.2); // Tail boom
-    addPart(gunship, boxGeo, gunAccent, .22, 2.3, 1.35, 0, 1.35, -9.2); // Tail fin
+    const gunHull = new MeshStandardMaterial({ color: 0x1e2529, roughness: .38, metalness: .66 });
+    const gunAccent = new MeshStandardMaterial({ color: 0xa6261c, roughness: .44, metalness: .42 });
+    const gunGlass = new MeshStandardMaterial({ color: 0x0b161f, roughness: .08, metalness: .94 });
+    const gunMetal = new MeshStandardMaterial({ color: 0x4b555a, roughness: .42, metalness: .76 });
+    const noseCone = addPart(gunship, cylGeo, gunHull, .62, 2.6, .88, 0, -.12, 4.4);
+    noseCone.rotation.x = Math.PI / 2;
+    addPart(gunship, boxGeo, gunHull, 1.95, 1.65, 5.4, 0, .05, .8);
+    const canopy = addPart(gunship, new SphereGeometry(1, 16, 12), gunGlass, .88, .72, 2.35, 0, .62, 2.4);
+    canopy.castShadow = false;
+    for (const sx of [-1.05, 1.05]) {
+      const pod = addPart(gunship, cylGeo, gunMetal, .42, 2.4, .42, sx, .78, .2);
+      pod.rotation.x = Math.PI / 2;
+    }
+    addPart(gunship, boxGeo, gunAccent, 5.8, .22, 1.35, 0, -.10, .85);
+    for (const sx of [-2.35, 2.35]) {
+      const rpod = addPart(gunship, cylGeo, gunMetal, .34, 1.85, .34, sx, -.36, 1.15);
+      rpod.rotation.x = Math.PI / 2;
+    }
+    const chinGun = addPart(gunship, cylGeo, steelDark, .09, 1.6, .09, 0, -.78, 4.6);
+    chinGun.rotation.x = Math.PI / 2;
+    const tailBoom = addPart(gunship, cylGeo, gunHull, .38, 6.8, .52, 0, .28, -5.2);
+    tailBoom.rotation.x = Math.PI / 2;
+    addPart(gunship, boxGeo, gunAccent, .18, 2.35, 1.25, 0, 1.15, -8.4);
+    addPart(gunship, boxGeo, gunHull, 2.8, .14, .65, 0, .35, -7.8);
+    const tailRotor = new Group();
+    tailRotor.position.set(.22, 1.55, -8.5);
+    addPart(tailRotor, boxGeo, steelDark, .05, 2.1, .16, 0, 0, 0);
+    addPart(tailRotor, boxGeo, steelDark, .05, .16, 2.1, 0, 0, 0);
+    gunship.add(tailRotor);
+
     const mainRotor = new Group();
-    mainRotor.position.set(0, 1.28, .2);
-    addPart(mainRotor, boxGeo, steelDark, 12.2, .06, .34, 0, 0, 0);
-    addPart(mainRotor, boxGeo, steelDark, .34, .06, 12.2, 0, 0, 0);
+    mainRotor.position.set(0, 1.48, .5);
+    addPart(mainRotor, boxGeo, steelDark, 12.8, .05, .30, 0, 0, 0);
+    addPart(mainRotor, boxGeo, steelDark, .30, .05, 12.8, 0, 0, 0);
     gunship.add(mainRotor);
-    // Crimson targeting spotlight cone
-    const coneMat = new MeshBasicMaterial({ color: 0xff2b1f, transparent: true, opacity: .24, depthWrite: false });
-    const searchCone = new Mesh(new ConeGeometry(3.8, 22, 18, 1, true), coneMat);
-    searchCone.position.set(0, -11.2, 3.2);
-    searchCone.rotation.x = .24;
+    const coneMat = new MeshBasicMaterial({ color: 0xff2b1f, transparent: true, opacity: .22, depthWrite: false });
+    const searchCone = new Mesh(new ConeGeometry(3.4, 22, 16, 1, true), coneMat);
+    searchCone.position.set(0, -10.5, 5.2);
+    searchCone.rotation.x = -.32;
     gunship.add(searchCone);
-    const gunLight = new PointLight(0xff3524, 38, 36, 1.4);
-    gunLight.position.set(0, -1.6, 3.5);
+    const gunLight = new PointLight(0xff3524, 34, 34, 1.4);
+    gunLight.position.set(0, -1.6, 4.0);
     gunship.add(gunLight);
 
-    // Active tracers & dynamic wreck colliders
+    // Smooth aerodynamic 3D CatmullRom flight curve (nose ALWAYS faces flight tangent!)
+    const flightCurve = new THREE.CatmullRomCurve3([
+      new Vector3(-78, 28, -42),
+      new Vector3(-34, 20, -24),
+      new Vector3(-4, 15.5, -10),
+      new Vector3(14, 14.5, -12),
+      new Vector3(36, 17.5, -4),
+      new Vector3(68, 24, 18),
+      new Vector3(115, 34, 48),
+    ]);
+    const gunAhead = new Vector3();
+
     const gunTracers = [];
     const tracerGeo = new CylinderGeometry(.045, .045, 1, 6);
     const tracerMat = new MeshBasicMaterial({ color: 0xff6e2a });
@@ -106,7 +136,7 @@
     const up = new Vector3(0, 1, 0);
 
     function fireGunshipBurst(targetPos) {
-      const origin = gunship.position.clone().add(new Vector3(0, -.9, 2.4));
+      const origin = gunship.position.clone().add(new Vector3(0, -.8, 2.2));
       for (let i = 0; i < 3; i++) {
         const hit = targetPos.clone().add(new Vector3((Math.random() - .5) * 2.4, (Math.random() - .5) * 1.8, (Math.random() - .5) * 2.4));
         const dir = hit.clone().sub(origin);
@@ -122,7 +152,6 @@
       world.player?.addShake?.(.28);
     }
 
-    // 4. Signature Interactive Set Piece: Anvil Gunship Sweep & Real-Time Gantry Crane Collapse
     let climaxTriggered = false;
     function triggerClimaxSetPiece() {
       if (climaxTriggered && sequencer.isPlaying('berth-gunship-collapse')) return false;
@@ -146,9 +175,9 @@
                 'Mara: "Eyes up! Anvil gunship sweeping Berth 4—stay off the open lane!"', true);
             },
           },
-          { at: 4.4, run: () => fireGunshipBurst(strikePoint) },
-          { at: 5.2, run: () => fireGunshipBurst(strikePoint.clone().add(new Vector3(0, -2, 1.5))) },
-          { at: 6.1, run: () => fireGunshipBurst(strikePoint.clone().add(new Vector3(0, 2, -1))) },
+          { at: 4.8, run: () => fireGunshipBurst(strikePoint) },
+          { at: 5.5, run: () => fireGunshipBurst(strikePoint.clone().add(new Vector3(0, -2, 1.5))) },
+          { at: 6.3, run: () => fireGunshipBurst(strikePoint.clone().add(new Vector3(0, 2, -1))) },
           {
             at: 6.8,
             run: () => {
@@ -161,13 +190,11 @@
           {
             at: 10.2,
             run: () => {
-              // Massive crane touchdown impact!
               fx?.smoke?.(crashImpact, { size: 5.8, life: 9.0, color: 0x26221e, alpha: .72, rise: 1.1, count: 14 });
               fx?.sparks?.(crashImpact, up, 52);
               fx?.debris?.(crashImpact, { count: 24 });
               audio?.play?.('rail_touchdown', { pos: crashImpact, ref: 38, gain: 1.0, jitter: 0 });
               world.player?.addShake?.(.85);
-              // Dynamically reshape yard collision along the collapsed jib
               if (physics?.addBox && !wreckColliders.length) {
                 wreckColliders.push(physics.addBox(new Vector3(12.8, 0, 8.2), new Vector3(16.2, 2.4, 15.2), { surface: 'metal' }));
               }
@@ -185,20 +212,21 @@
           },
         ],
         tracks: [
-          // Gunship dramatic banking pass over the harbor
           {
             start: 0, end: 18.0,
             update(raw, eased, dt) {
-              mainRotor.rotation.y += dt * 32;
-              const x = -22 + raw * 88;
-              const y = 21 - Math.sin(raw * Math.PI) * 7.5;
-              const z = -26 + Math.sin(raw * Math.PI * 1.15) * 32;
-              gunship.position.set(x, y, z);
-              gunship.lookAt(14.5, 4, 4.5);
-              gunship.rotation.z = -.24 * Math.sin(raw * Math.PI);
+              mainRotor.rotation.y += dt * 34;
+              tailRotor.rotation.x += dt * 42;
+              const u = Math.min(.995, raw);
+              flightCurve.getPoint(u, gunship.position);
+              flightCurve.getPoint(Math.min(1, u + .02), gunAhead);
+              gunship.lookAt(gunAhead);
+              const bank = Math.sin(raw * Math.PI * 2) * .28;
+              const pitch = raw > .28 && raw < .52 ? -.04 : .12;
+              gunship.rotateX(pitch);
+              gunship.rotateZ(bank);
             },
           },
-          // Real-time 3D Gantry Crane collapse physics curve (accelerating gravity fall + bounce!)
           {
             start: 6.8, end: 10.6,
             update(raw) {
@@ -257,13 +285,19 @@
         }
       }
 
-      // Phase-driven narrative & automatic climax trigger
+      // Phase-driven narrative & organic story-embedded disaster set-pieces (NO shooting random pillars!)
       if (berthPhase && berthPhase !== lastBerthPhase) {
         lastBerthPhase = berthPhase;
         if (berthPhase === 'archive' && !storyBeats.has('phase-archive')) {
           storyBeats.add('phase-archive');
-          companion?.speak('玛拉：「值班板上的签字时间是 05:34，可系统显示他们 05:31 就离港了！快横穿货场去西调度站拿原件！」',
-            'Mara: "Signed at 05:34, yet the registry says departed at 05:31! Move to West Dispatch for the originals!"', true);
+          companion?.speak('玛拉：「值班板上的签字时间是 05:34，可系统显示他们 05:31 就离港了！风暴压过来了，快横穿货场去西调度站拿原件！」',
+            'Mara: "Signed at 05:34, yet the registry says departed at 05:31! Squall closing in—move to West Dispatch for the originals!"', true);
+          world.disasters?.triggerLightningStorm?.();
+        } else if (berthPhase === 'verify' && !storyBeats.has('phase-verify')) {
+          storyBeats.add('phase-verify');
+          companion?.speak('玛拉：「铁砧引爆了货场油罐企图封路！按住 Tab 立刻核验两份记录的时间戳！」',
+            'Mara: "Anvil is blowing the yard fuel drums to box us in! Hold Tab and verify the timestamps now!"', true);
+          world.disasters?.triggerFuelChainBlast?.();
         } else if (berthPhase === 'extract' && !climaxTriggered) {
           triggerClimaxSetPiece();
         }

@@ -3,12 +3,10 @@
     { key: '5', type: 'mark', en: 'Recon', zh: '侦察' },
     { key: '6', type: 'reinforce', en: 'Reinforce', zh: '增援' },
     { key: '7', type: 'supply', en: 'Supply', zh: '补给' },
+    { key: '8', type: 'smoke', en: 'Smoke', zh: '烟幕' },
+    { key: '9', type: 'artillery', en: 'Artillery', zh: '重炮' },
   ];
-  const REQUISITIONS = [
-    ...SUPPORT,
-    { type: 'smoke', en: 'Smoke barrage', zh: '烟幕支援' },
-    { type: 'artillery', en: 'Artillery', zh: '炮击支援' },
-  ];
+  const REQUISITIONS = [...SUPPORT];
   const t = (english, chinese) => window.SaltlineLocale?.t(english, chinese) ?? english;
 
   window.createPortOperations = ({ world, onSupport, onOpen, onClose }) => {
@@ -69,10 +67,18 @@
     requisitionButton.type = 'button';
     requisitionButton.setAttribute('aria-haspopup', 'dialog');
     bar.append(mapButton, requisitionButton, credits);
+    function quickTargetFor(type) {
+      if (!round || (type !== 'smoke' && type !== 'artillery')) return undefined;
+      const available = round.points.filter(p => !p.locked && (type !== 'artillery' || p.owner !== 'blue'));
+      const preferred = (round.activePoint && available.includes(round.activePoint) ? round.activePoint : null)
+        ?? (round.near(world.player.pos) && available.includes(round.near(world.player.pos)) ? round.near(world.player.pos) : null)
+        ?? available[0];
+      return preferred?.id;
+    }
     for (const support of SUPPORT) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.addEventListener('click', () => onSupport(support.type));
+      button.addEventListener('click', () => onSupport(support.type, quickTargetFor(support.type)));
       buttons.set(support.type, button);
       bar.append(button);
     }
@@ -262,7 +268,7 @@
       const item = SUPPORT.find(item => 'Digit' + item.key === event.code);
       if (item) {
         event.preventDefault();
-        onSupport(item.type);
+        onSupport(item.type, quickTargetFor(item.type));
       }
     }
     document.addEventListener('keydown', keydown, { signal: world.chapterSignal });
@@ -274,6 +280,21 @@
       return [x, y];
     }
 
+    const feed = document.createElement('div');
+    feed.className = 'port-tactical-feed';
+    feed.style.cssText = 'position:fixed;right:18px;top:98px;z-index:26;display:flex;flex-direction:column;gap:5px;pointer-events:none;font:700 12px/1.35 system-ui,-apple-system,sans-serif;';
+    feed.hidden = true;
+    document.getElementById('app').append(feed);
+    let lastKills = 0, lastDeaths = 0, lastCaptures = 0, streak = 0;
+    function pushFeed(text, accent = '#64d5ff') {
+      const item = document.createElement('div');
+      item.textContent = text;
+      item.style.cssText = `background:rgba(10,16,22,.88);border:1px solid ${accent};border-left:4px solid ${accent};color:#edf7fa;padding:5px 11px;border-radius:5px;box-shadow:0 4px 14px rgba(0,0,0,.42);`;
+      feed.prepend(item);
+      while (feed.children.length > 4) feed.lastElementChild.remove();
+      setTimeout(() => item.remove(), 4200);
+    }
+
     return {
       get requisitionOpen() { return requisition.open; },
       battleSettings() {
@@ -283,19 +304,40 @@
       show(next) {
         active = Boolean(next);
         panel.hidden = !active;
+        feed.hidden = !active;
         if (!active) {
           map.hidden = true;
           score.hidden = true;
+          feed.replaceChildren();
           closeRequisitions();
           mapButton.setAttribute('aria-expanded', 'false');
         }
-        if (round !== next) lastUpdate = -Infinity;
+        if (round !== next) {
+          lastUpdate = -Infinity;
+          lastKills = next?.kills ?? 0;
+          lastDeaths = next?.deaths ?? 0;
+          lastCaptures = next?.captures ?? 0;
+          streak = 0;
+        }
         round = next;
       },
       update(game, player, enemies) {
         if (!active || game.elapsed < lastUpdate + .12) return;
         lastUpdate = game.elapsed;
         if (!score.hidden) renderScore();
+        if (game.deaths > lastDeaths) { streak = 0; lastDeaths = game.deaths; }
+        if (game.kills > lastKills) {
+          streak += game.kills - lastKills;
+          lastKills = game.kills;
+          const label = streak >= 5 ? t(`🔥 UNSTOPPABLE (${streak} streak) · +RP`, `🔥 战神连杀 (${streak} 连杀) · 支援点飙升`) :
+            streak >= 3 ? t(`⚡ KILLING SPREE (${streak}x) · Press 8/9 for Support`, `⚡ 三连击 (${streak}x) · 按 8 烟幕 / 9 重炮支援`) :
+            streak === 2 ? t('🎯 DOUBLE KILL · +RP', '🎯 双杀连击 · 支援点 +1') : t('✓ HOSTILE ELIMINATED', '✓ 确认击杀敌方单位');
+          pushFeed(label, streak >= 3 ? '#ffb347' : '#64d5ff');
+        }
+        if (game.captures > lastCaptures) {
+          lastCaptures = game.captures;
+          pushFeed(t('🚩 SECTOR CAPTURED · +RP', '🚩 据点夺控成功 · 战线推进'), '#6df5a6');
+        }
         mapButton.textContent = t('M Map', 'M 地图');
         const support = game.support;
         credits.textContent = t('RP ', '支援点 ') + game.supportPoints;
