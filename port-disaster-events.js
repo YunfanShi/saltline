@@ -22,8 +22,8 @@
 
   window.createPortDisasterEvents = (world, { onRadio = null } = {}) => {
     const { THREE, scene, fx, audio } = world;
-    const { Group, Mesh, BoxGeometry, CylinderGeometry, PlaneGeometry, RingGeometry, CircleGeometry,
-      MeshStandardMaterial, MeshBasicMaterial, DoubleSide, Vector3 } = THREE;
+    const { Group, Mesh, BoxGeometry, CylinderGeometry, SphereGeometry, PlaneGeometry, RingGeometry, CircleGeometry,
+      MeshStandardMaterial, MeshBasicMaterial, PointLight, DoubleSide, Vector3 } = THREE;
 
     injectStyles();
     const root = new Group();
@@ -144,9 +144,42 @@
     const ringGeo = new RingGeometry(2.4, 3.1, 24);
     const scorchMat = new MeshBasicMaterial({ color: 0x161412, transparent: true, opacity: .72, side: DoubleSide, depthWrite: false });
     const scorchGeo = CircleGeometry ? new CircleGeometry(2.6, 14) : new PlaneGeometry(4.8, 4.8);
+    const fireballGeo = new SphereGeometry(1, 14, 10);
+    const shockGeo = new RingGeometry(.72, 1.0, 28);
     const tempBolts = [];
     const pendingShells = [];
     const scorchMarks = [];
+    const activeBlasts = [];
+    const activeFlares = [];
+    const blastTimers = [];
+
+    function spawnFireballExplosion(pos, scale = 1.0) {
+      const coreMat = new MeshBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: .95, depthWrite: false });
+      const outerMat = new MeshBasicMaterial({ color: 0xff5a18, transparent: true, opacity: .82, depthWrite: false });
+      const shockMat = new MeshBasicMaterial({ color: 0xffb357, transparent: true, opacity: .76, side: DoubleSide, depthWrite: false });
+      const core = new Mesh(fireballGeo, coreMat);
+      const outer = new Mesh(fireballGeo, outerMat);
+      const shock = new Mesh(shockGeo, shockMat);
+      core.position.set(pos.x, pos.y + 1.1 * scale, pos.z);
+      outer.position.set(pos.x, pos.y + 1.3 * scale, pos.z);
+      shock.rotation.x = -Math.PI / 2;
+      shock.position.set(pos.x, pos.y + .22, pos.z);
+      const light = PointLight ? new PointLight(0xff7724, 55 * scale, 42 * scale, 1.4) : null;
+      if (light) { light.position.set(pos.x, pos.y + 3.2 * scale, pos.z); fxRoot.add(light); }
+      fxRoot.add(core, outer, shock);
+      activeBlasts.push({ core, outer, shock, light, coreMat, outerMat, shockMat, age: 0, dur: .78, scale });
+    }
+
+    function spawnSkyFlare(origin, vx, vy, vz, hex = 0xffc857) {
+      const mat = new MeshBasicMaterial({ color: hex, transparent: true, opacity: .98 });
+      const mesh = new Mesh(fireballGeo, mat);
+      mesh.scale.setScalar(.36);
+      mesh.position.copy(origin);
+      const light = PointLight ? new PointLight(hex, 28, 36, 1.4) : null;
+      if (light) { light.position.copy(origin); fxRoot.add(light); }
+      fxRoot.add(mesh);
+      activeFlares.push({ mesh, mat, light, vel: new Vector3(vx, vy, vz), age: 0, dur: 4.2, trailTick: 0 });
+    }
 
     function addBranch(boltGroup, x0, y0, z0, x1, y1, z1, thickness = 1) {
       const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
@@ -330,6 +363,52 @@
       return true;
     }
 
+    function triggerTideGateDemolition() {
+      const charges = [new Vector3(-34, 4.5, 96), new Vector3(-26, 6.2, 96), new Vector3(-18, 4.5, 96)];
+      charges.forEach((pt, idx) => {
+        blastTimers.push(setTimeout(() => {
+          spawnFireballExplosion(pt, 2.2);
+          fx?.smoke?.(pt, { size: 8.5, life: 9.0, color: 0x1b1815, alpha: .85, rise: 2.2, count: 14 });
+          fx?.sparks?.(pt, up, 58);
+          fx?.debris?.(pt, { count: 28 });
+          audio?.play?.('explosion', { pos: pt, ref: 90, gain: 1.0, jitter: .05 });
+          world.player?.addShake?.(.75);
+        }, idx * 460));
+      });
+      return true;
+    }
+
+    function triggerHighwayAmbush(centerPos) {
+      const c = centerPos ? centerPos.clone() : new Vector3(-26, .6, -76);
+      const pts = [c, c.clone().add(new Vector3(-3.8, .4, -2.5)), c.clone().add(new Vector3(3.8, .4, -2.5))];
+      pts.forEach((pt, idx) => {
+        blastTimers.push(setTimeout(() => {
+          spawnFireballExplosion(pt, 1.35);
+          addScorchCrater(pt);
+          fx?.smoke?.(pt, { size: 5.5, life: 6.0, color: 0x221d19, alpha: .78, rise: 1.5, count: 10 });
+          fx?.sparks?.(pt, up, 40);
+          fx?.debris?.(pt, { count: 22 });
+          audio?.play?.('explosion', { pos: pt, ref: 36, gain: .95, jitter: .08 });
+          world.player?.addShake?.(.58);
+        }, idx * 140));
+      });
+      return true;
+    }
+
+    function triggerVictoryFlareBarrage(centerPos) {
+      const c = centerPos ? centerPos.clone() : new Vector3(-168, 2.0, -188);
+      const colors = [0xffcf5c, 0x58e8ff, 0xff7b42, 0xffcf5c, 0x58e8ff, 0xffd86e];
+      colors.forEach((hex, idx) => {
+        blastTimers.push(setTimeout(() => {
+          const ang = (idx / colors.length) * Math.PI * 2;
+          const origin = new Vector3(c.x + Math.cos(ang) * 8, c.y + 1.5, c.z + Math.sin(ang) * 8);
+          spawnSkyFlare(origin, Math.cos(ang) * 4.5, 22 + (idx % 3) * 3.5, Math.sin(ang) * 4.5, hex);
+          audio?.play?.('rail_touchdown', { pos: origin, ref: 40, gain: .55, jitter: .1 });
+        }, idx * 240));
+      });
+      return true;
+    }
+
     function triggerEvent(id) {
       if (id === 'tsunami') return triggerTsunami();
       if (id === 'lightning_storm') return triggerLightningStorm();
@@ -352,6 +431,7 @@
     function stopAllEvents() {
       clearTimeout(flashTimer);
       clearTimeout(thunderTimer);
+      for (const id of blastTimers.splice(0)) clearTimeout(id);
       tsunamiActive = false;
       stormActive = false;
       barrageActive = false;
@@ -364,10 +444,65 @@
       for (const b of tempBolts.splice(0)) fxRoot.remove(b.group);
       for (const s of pendingShells.splice(0)) { fxRoot.remove(s.ring); s.ring.material.dispose(); }
       for (const m of scorchMarks.splice(0)) fxRoot.remove(m);
+      for (const b of activeBlasts.splice(0)) {
+        fxRoot.remove(b.core, b.outer, b.shock);
+        if (b.light) fxRoot.remove(b.light);
+        b.coreMat.dispose(); b.outerMat.dispose(); b.shockMat.dispose();
+      }
+      for (const f of activeFlares.splice(0)) {
+        fxRoot.remove(f.mesh);
+        if (f.light) fxRoot.remove(f.light);
+        f.mat.dispose();
+      }
     }
 
     function update(dt, player) {
       if (!(dt > 0)) return;
+
+      for (let i = activeBlasts.length - 1; i >= 0; i--) {
+        const b = activeBlasts[i];
+        b.age += dt;
+        const t = Math.min(1, b.age / b.dur);
+        const ease = 1 - Math.pow(1 - t, 3);
+        const rCore = (.8 + ease * 3.8) * b.scale;
+        const rOuter = (1.1 + ease * 5.6) * b.scale;
+        const rShock = (1.4 + ease * 11.5) * b.scale;
+        b.core.scale.setScalar(rCore);
+        b.outer.scale.setScalar(rOuter);
+        b.shock.scale.set(rShock, rShock, 1);
+        b.coreMat.opacity = Math.max(0, (1 - t) * .95);
+        b.outerMat.opacity = Math.max(0, (1 - t) * .82);
+        b.shockMat.opacity = Math.max(0, (1 - t) * .76);
+        if (b.light) b.light.intensity = Math.max(0, (1 - t) * 55 * b.scale);
+        if (b.age >= b.dur) {
+          fxRoot.remove(b.core, b.outer, b.shock);
+          if (b.light) fxRoot.remove(b.light);
+          b.coreMat.dispose(); b.outerMat.dispose(); b.shockMat.dispose();
+          activeBlasts.splice(i, 1);
+        }
+      }
+
+      for (let i = activeFlares.length - 1; i >= 0; i--) {
+        const f = activeFlares[i];
+        f.age += dt;
+        f.vel.y -= 6.8 * dt;
+        f.mesh.position.addScaledVector(f.vel, dt);
+        if (f.light) f.light.position.copy(f.mesh.position);
+        f.trailTick += dt;
+        if (f.trailTick >= .12) {
+          f.trailTick = 0;
+          fx?.smoke?.(f.mesh.position, { size: 1.4, life: 1.8, color: 0xe6eef2, alpha: .42, rise: .3, count: 1 });
+        }
+        const fade = Math.max(0, 1 - f.age / f.dur);
+        f.mat.opacity = fade;
+        if (f.light) f.light.intensity = fade * 28;
+        if (f.age >= f.dur) {
+          fxRoot.remove(f.mesh);
+          if (f.light) fxRoot.remove(f.light);
+          f.mat.dispose();
+          activeFlares.splice(i, 1);
+        }
+      }
 
       for (let i = tempBolts.length - 1; i >= 0; i--) {
         tempBolts[i].life -= dt;
@@ -386,11 +521,12 @@
           fxRoot.remove(s.ring);
           s.ring.material.dispose();
           pendingShells.splice(i, 1);
+          spawnFireballExplosion(s.pos, 1.15);
           addScorchCrater(s.pos);
           fx?.smoke?.(s.pos, { size: 6.2, life: 6.5, color: 0x1e1a17, alpha: .80, rise: 1.5, count: 12 });
           fx?.sparks?.(s.pos, up, 48);
           fx?.debris?.(s.pos, { count: 22 });
-          audio?.play?.('rail_touchdown', { pos: s.pos, ref: 40, gain: .98, jitter: .1 });
+          audio?.play?.('explosion', { pos: s.pos, ref: 42, gain: .98, jitter: .1 });
           if (player?.pos) {
             const dist = player.pos.distanceTo(s.pos);
             if (dist < 32) player.addShake?.(Math.max(.22, (1 - dist / 32) * .78));
@@ -515,12 +651,13 @@
         const targetIdx = Math.floor(chainElapsed / .72);
         while (chainIndex <= targetIdx && chainIndex < 6) {
           const pos = chainOrigin.clone().addScaledVector(chainDir, chainIndex * 7.5);
+          spawnFireballExplosion(pos, 1.45);
           addScorchCrater(pos);
           fx?.smoke?.(pos, { size: 6.5, life: 8.0, color: 0x1e1916, alpha: .82, rise: 1.7, count: 13 });
           fx?.sparks?.(pos, up, 52);
           fx?.debris?.(pos, { count: 24 });
-          audio?.play?.('rail_touchdown', { pos, ref: 42, gain: 1.0, jitter: .06 });
-          player?.addShake?.(.62);
+          audio?.play?.('explosion', { pos, ref: 46, gain: 1.0, jitter: .06 });
+          player?.addShake?.(.66);
           chainIndex++;
         }
         if (!tsunamiActive && !barrageActive) banner.textContent = `🔥 港区油罐连锁爆炸（第 ${Math.min(6, chainIndex)}/6 波次引爆）！`;
@@ -544,7 +681,7 @@
       if (disposed) return;
       disposed = true;
       stopAllEvents();
-      const geometries = new Set([boltGeo,ringGeo,scorchGeo]);
+      const geometries = new Set([boltGeo,ringGeo,scorchGeo,fireballGeo,shockGeo]);
       const surfaces = new Set([boltMat,ringMat,scorchMat,crateMat,contRed,contBlue]);
       root.traverse(node => {
         if (node.geometry) geometries.add(node.geometry);
@@ -566,6 +703,10 @@
       triggerLightningStorm,
       triggerArtilleryBarrage,
       triggerFuelChainBlast,
+      triggerTideGateDemolition,
+      triggerHighwayAmbush,
+      triggerVictoryFlareBarrage,
+      spawnFireballExplosion,
       triggerEvent,
       triggerRandomEvent,
       stopAllEvents,

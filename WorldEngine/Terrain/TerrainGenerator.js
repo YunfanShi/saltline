@@ -244,12 +244,83 @@
 
       const pineInst = buildSpecies(pines, foliage, pineMat, true);
       const cypressInst = buildSpecies(cypresses, foliage, pineMat, true);
-      const shrubInst = buildSpecies(shrubs.map(([x,y,z,size])=>[x,y,z,size*.28]), foliage, pineMat, false);
+      const shrubInst = buildSpecies(shrubs.map(([x, y, z, size]) => [x, y, z, size * .34]), foliage, pineMat, false);
+
+      // Natural hillside fractured granite outcrops & slope-aligned fallen timber logs (ZERO floating saucers/logs!)
+      let rockInst = null, logInst = null;
+      if (typeof DodecahedronGeometry === 'function' && positions.length) {
+        const rockGeo = new DodecahedronGeometry(1, 0);
+        const rPos = rockGeo.attributes?.position;
+        if (rPos) {
+          for (let v = 0; v < rPos.count; v++) {
+            const vx = rPos.getX(v), vy = rPos.getY(v), vz = rPos.getZ(v);
+            const jag = 0.84 + 0.30 * Math.abs(Math.sin(vx * 5.3 + vy * 3.7 + vz * 4.1));
+            rPos.setXYZ(v, vx * jag, vy * jag, vz * jag);
+          }
+          rockGeo.computeVertexNormals();
+        }
+        geos.push(rockGeo);
+        const rockMat = matLib?.get ? matLib.get('granite') : new MeshStandardMaterial({ color: 0x6b6f69, roughness: 0.92 });
+        const rockList = [];
+        for (let i = 0; i < positions.length; i += 2) {
+          const [px, , pz] = positions[i];
+          const rx = px + Math.sin(i * 3.17) * 3.2;
+          const rz = pz + Math.cos(i * 2.41) * 3.0;
+          if (rx > -217.5) continue;
+          const ry = sampleHeight(rx, rz);
+          const sx = 0.75 + (i % 4) * 0.32;
+          const sy = 0.65 + (i % 3) * 0.28;
+          const sz = 0.72 + ((i * 3) % 4) * 0.28;
+          const dhx = sampleHeight(rx + 1.0, rz) - sampleHeight(rx - 1.0, rz);
+          const dhz = sampleHeight(rx, rz + 1.0) - sampleHeight(rx, rz - 1.0);
+          rockList.push([rx, ry - sy * 0.42, rz, sx, sy, sz, Math.atan2(dhz, 2.0), i * 1.13, -Math.atan2(dhx, 2.0)]);
+        }
+        if (rockList.length) {
+          rockInst = new InstancedMesh(rockGeo, rockMat, rockList.length);
+          for (let i = 0; i < rockList.length; i++) {
+            const [rx, ry, rz, sx, sy, sz, rotX, rotY, rotZ] = rockList[i];
+            dummy.position.set(rx, ry, rz);
+            dummy.rotation.set(rotX, rotY, rotZ);
+            dummy.scale.set(sx, sy, sz);
+            dummy.updateMatrix();
+            rockInst.setMatrixAt(i, dummy.matrix);
+          }
+          rockInst.receiveShadow = true;
+          parent.add(rockInst);
+        }
+      }
+      if (trunkGeo && positions.length >= 6) {
+        const logList = [];
+        for (let i = 3; i < positions.length; i += 8) {
+          const [px, , pz] = positions[i];
+          const lx = px + 1.8, lz = pz + 1.5;
+          if (lx > -218.0) continue;
+          const len = 2.6 + (i % 3) * 0.55;
+          const yA = sampleHeight(lx, lz - len * 0.45);
+          const yB = sampleHeight(lx, lz + len * 0.45);
+          const yMid = Math.min(sampleHeight(lx, lz), (yA + yB) * 0.5) + 0.04;
+          const pitch = Math.atan2(yB - yA, len * 0.9);
+          logList.push([lx, yMid, lz, 0.16 + (i % 3) * 0.03, len, pitch]);
+        }
+        if (logList.length) {
+          logInst = new InstancedMesh(trunkGeo, trunkMat, logList.length);
+          for (let i = 0; i < logList.length; i++) {
+            const [lx, ly, lz, r, len, pitch] = logList[i];
+            dummy.position.set(lx, ly, lz);
+            dummy.rotation.set(Math.PI / 2 - pitch, 0, 0);
+            dummy.scale.set(r, len, r);
+            dummy.updateMatrix();
+            logInst.setMatrixAt(i, dummy.matrix);
+          }
+          logInst.receiveShadow = true;
+          parent.add(logInst);
+        }
+      }
 
       if (Array.isArray(updaters)) {
         updaters.push(dt => { windUniform.value += dt; });
       }
-      return { pineInst, cypressInst, shrubInst };
+      return { pineInst, cypressInst, shrubInst, rockInst, logInst };
     }
 
     function dispose() {

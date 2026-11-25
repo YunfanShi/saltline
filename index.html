@@ -402,6 +402,9 @@ kbd { display: inline-block; font: 500 10px/1 var(--f-mono); color: var(--bone);
 <script src="./port-drivable-vehicle.js"></script>
 <script src="./port-disaster-events.js"></script>
 <script src="./developer-menu.js"></script>
+<script src="./port-mp-squad.js"></script>
+<script src="./port-mp-gadgets.js"></script>
+<script src="./port-mp-sync.js"></script>
 <script defer src="./zh.js"></script>
 <script defer src="./port-lan.js"></script>
 <script>
@@ -6444,8 +6447,8 @@ return R(),I}var fM="saltline.settings.v1",XC={quality:"auto",sens:1,invertY:!1,
             <div class="m-actions"><button class="btn primary" type="button" data-act="deploy-mode">Deploy</button></div>
           </div>
           <div id="port-mode-lan-actions" hidden>
-            <p>Cooperative missions are still in development.</p>
-            <button class="btn primary" id="port-lan-open" type="button">Open staging room</button>
+            <p>Up to 8 players over LAN with real-time movement, combat sync, squads and vehicles.</p>
+            <button class="btn primary" id="port-lan-open" type="button">Open LAN room</button>
           </div>
         </div>
       </div>
@@ -6529,19 +6532,19 @@ return R(),I}var fM="saltline.settings.v1",XC={quality:"auto",sens:1,invertY:!1,
  const on=(type,handler)=>dispose(i.events.on(type,handler));
  dispose(()=>commander.stop());
  let e=i.render&&i.render.post||{},t=typeof e.saturation=="number"?e.saturation:1,n=i.player,s=i.level,o=i.hud,r=i.input,a=(P,V,...Y)=>{try{if(P&&typeof P[V]=="function")return P[V](...Y)}catch(L){console.error(`[game] ${V} threw`,L)}},l=pM(i,{
- campaign(){window.SALTLINE_OPEN_WORLD_ROAM=false;i.openWorld?.setFreeRoam?.(false);renderCampaignMenu();l.show("campaign")},
- openworld(){window.SALTLINE_OPEN_WORLD_ROAM=true;if(currentChapter!=="berth"){location.href="?chapter=berth&mode=openworld";return;}i.openWorld?.setFreeRoam?.(true,false);a(i.audio,"resume");r.requestLock();U({quick:!0,skipIntro:!0});i.openWorld?.setFreeRoam?.(true,true);},
+ campaign(){window.SALTLINE_OPEN_WORLD_ROAM=false;renderCampaignMenu();l.show("campaign")},
+ openworld(){window.SALTLINE_OPEN_WORLD_ROAM=true;if(currentChapter!=="berth"){location.href="?chapter=berth&mode=openworld";return;}i.openWorld?.setFreeRoam?.(true,false);a(i.audio,"resume");r.requestLock();U({quick:!0,skipIntro:!0});i.openWorld?.setFreeRoam?.(true,true);i.openWorld?.teleportToSafeStart?.();},
  multiple(){if(currentChapter!=="berth")openMenu("multiplayer");else l.show("multiplayer")},
  home(){l.show("title")},
- "continue-campaign"(){if(i.campaignSave.next)beginChapter(i.campaignSave.next)},
- "replay-berth"(){beginChapter("berth")},
- "replay-rail"(){beginChapter("rail")},
+ "continue-campaign"(){const next=i.prologueSave?.needsPrologue?"prologue":(i.openWorldSave?.next??"ow-0");beginChapter(next)},
+ "replay-berth"(){beginChapter("ow-0",{replay:true})},
+ "replay-rail"(){beginChapter("ow-3",{replay:true})},
  "deploy-mode"(){
   const selected=modePicker.querySelector("input:checked").value;
   if(selected==="conquest"||selected==="breakthrough")startOperation(selected);
  },
  retitle(){openMenu(mode==="mission"?"campaign":"multiplayer")},
- resume(){j(!0)},restart(){if(mode==="mission"){replayCheckpoint=null;i.campaignSave.clearCheckpoint(currentChapter)}a(i.audio,"resume"),r.requestLock(),c.retries++,U({quick:!0,keepRetries:!0,skipIntro:mode!=="mission"})},retry(){a(i.audio,"resume"),r.requestLock(),c.retries++,U({quick:!0,keepRetries:!0,skipIntro:mode!=="mission"})},redeploy(){replayCheckpoint=null;a(i.audio,"resume"),r.requestLock(),U({quick:!0,skipIntro:mode!=="mission"})}});l.applySettings();let mode=s.chapter==="berth"&&["conquest","breakthrough"].includes(i.params.mode)?i.params.mode:"mission",conquest=null,conquestLabel="";let c={time:0,retries:0,relays:[],cut:0,queue:[],waveHot:0,alertT:0,pursuitT:0,pursuitLeft:0,contactSaid:!1,lowSaid:!1,extractHint:0,intensity:.15,used:new Map},u=0,h=Yi.introSeconds,f=!1,p=!1,d=0,v=0,g=!1,x="",y=.8,b=new W,m=new W,A=()=>s&&s.objectives||[],_={state:"title",flow:Yi,run:c,menus:l,get conquest(){return conquest},get campaign(){return campaign},get crash(){return crash},get cinematic(){return cinematic},start(P={}){U({skipIntro:!!P.skipIntro,quick:!!P.quick})},pause(){G()},resume(){j(!1)},update:B,get railRescue(){return railRescue},get prologue(){return hq},get arrival(){return arrivalState}};function storyRadio(line,seconds){
+ resume(){j(!0)},restart(){if(mode==="mission"){replayCheckpoint=null;i.campaignSave.clearCheckpoint(currentChapter)}a(i.audio,"resume"),r.requestLock(),c.retries++,U({quick:!0,keepRetries:!0,skipIntro:!0})},retry(){a(i.audio,"resume"),r.requestLock(),c.retries++,U({quick:!0,keepRetries:!0,skipIntro:!0})},redeploy(){replayCheckpoint=null;a(i.audio,"resume"),r.requestLock(),U({quick:!0,skipIntro:!0})}});l.applySettings();let mode=s.chapter==="berth"&&["conquest","breakthrough"].includes(i.params.mode)?i.params.mode:"mission",conquest=null,conquestLabel="";let c={time:0,retries:0,relays:[],cut:0,queue:[],waveHot:0,alertT:0,pursuitT:0,pursuitLeft:0,contactSaid:!1,lowSaid:!1,extractHint:0,intensity:.15,used:new Map},u=0,h=Yi.introSeconds,f=!1,p=!1,d=0,v=0,g=!1,x="",y=.8,b=new W,m=new W,A=()=>s&&s.objectives||[],_={state:"title",flow:Yi,run:c,menus:l,get conquest(){return conquest},get campaign(){return campaign},get crash(){return crash},get cinematic(){return cinematic},start(P={}){U({skipIntro:!!P.skipIntro,quick:!!P.quick})},pause(){G()},resume(){j(!1)},update:B,get railRescue(){return railRescue},get prologue(){return hq},get arrival(){return arrivalState}};function storyRadio(line,seconds){
  if(cinematic.active)return;
  const [english,chinese]=typeof line==="string"?[line,null]:line;
  o.radio?.(gameText(english,chinese),seconds,{english,chinese});
@@ -6852,7 +6855,7 @@ function descendIntoHarbor(){
   i.prologueDeploy=null;
   if(story){
    i.prologueSave.record("landed");
-   i.campaignSave.saveCheckpoint("berth",{phase:"entry",alarm:false,gateOpen:true,reinforcementCalled:false});
+   i.openWorldSave?.unlockUpTo?.(0);
   }
   n.reset({pos:landing,yaw:berth.playerStart.yaw});
   n.enabled=true;
@@ -6860,7 +6863,14 @@ function descendIntoHarbor(){
   a(i.weapon,"setVisible",!i.params.noweapon);
   o.show(true);
   e.fade=0;
-  updateCampaignPresentation(false);
+  if(i.openWorld){
+   window.SALTLINE_OPEN_WORLD_ROAM=false;
+   i.openWorld.startFromLanding();
+   q();
+   o.setObjective?.(D());
+  }else{
+   updateCampaignPresentation(false);
+  }
   storyRadio(["Control, boots on the ground. Moving in.","指挥部，已落地。正在进港。"],5);
  },{handoff:true});
  if(!started)releaseGloves();
@@ -7064,21 +7074,41 @@ function openMenu(menu){
  if(menu==="campaign")renderCampaignMenu();
  l.show(menu);
 }
-function beginChapter(chapter,{replay=i.campaignSave.status(chapter)==="complete",range=false}={}){
+i.openWorldSave=window.createOpenWorldCampaignProgress?.()??null;
+function beginChapter(chapter,{replay,range=false}={}){
  if(_.state!=="title"&&_.state!=="complete")return;
  const needsPrologue=i.prologueSave.needsPrologue;
- if(chapter==="prologue"||chapter==="berth"&&!replay&&needsPrologue){
+ const isOpenWorldAct=typeof chapter==="string"&&chapter.startsWith("ow-");
+ const isReplay=typeof replay==="boolean"?replay:(isOpenWorldAct?i.openWorldSave?.status(chapter)==="complete":i.campaignSave.status(chapter)==="complete");
+ if(chapter==="prologue"||((isOpenWorldAct||chapter==="berth")&&!isReplay&&needsPrologue)){
   a(i.audio,"resume");
   i.switchChapter("prologue",{prologueMode:range?"range":needsPrologue?"story":"replay",auto:true});
   return;
  }
+ if(isOpenWorldAct&&i.openWorldSave){
+  const stageIdx=i.openWorldSave.stageOf(chapter);
+  if(stageIdx<0||i.openWorldSave.status(chapter)==="locked")return;
+  window.SALTLINE_OPEN_WORLD_ROAM=false;
+  if(currentChapter!=="berth"){
+   i.switchChapter("berth",{replay:isReplay,auto:true,openWorldStage:stageIdx});
+   return;
+  }
+  replayCheckpoint=null;
+  i.chapterReplay=isReplay;
+  i.openWorldStage=stageIdx;
+  mode="mission";
+  a(i.audio,"resume");
+  r.requestLock();
+  U({skipIntro:true,quick:true});
+  return;
+ }
  if(i.campaignSave.status(chapter)==="locked")return;
  if(chapter!==currentChapter){
-  i.switchChapter(chapter,{replay});
+  i.switchChapter(chapter,{replay:isReplay});
   return;
  }
  replayCheckpoint=null;
- i.chapterReplay=replay;
+ i.chapterReplay=isReplay;
  mode="mission";
  a(i.audio,"resume");
  r.requestLock();
@@ -7086,7 +7116,7 @@ function beginChapter(chapter,{replay=i.campaignSave.status(chapter)==="complete
 }
 const campaignMenu=l.root.querySelector('[data-s="campaign"]');
 const campaignOverview=window.createCampaignOverview(campaignMenu,{
- progress:i.campaignSave, prologue:i.prologueSave, launch:beginChapter, initial:i.campaignSave.next, signal:i.chapterSignal
+ progress:i.campaignSave, openWorldProgress:i.openWorldSave, prologue:i.prologueSave, launch:beginChapter, initial:i.openWorldSave?.next??"ow-0", signal:i.chapterSignal
 });
 const renderCampaignMenu=()=>campaignOverview.render();
 renderCampaignMenu();
@@ -7200,9 +7230,48 @@ const developer=i.developer=window.createDeveloperMenu({
   },
 });
 i.loadout=window.createPortLoadout(i);
+const mpSquad=window.createPortMultiplayerSquad?.(i,{
+ getConquest:()=>conquest,
+ getSpawnPos:()=>operationSpawn().pos,
+ onBleedout:()=>{if(conquest&&_.state==="playing")conquest.casualty();},
+})??null;
+const mpGadgets=window.createPortMultiplayerGadgets?.(i,{
+ getConquest:()=>conquest,
+ getSquad:()=>mpSquad,
+ onRemoteEvent:(kind,payload)=>mpSync?.sendEvent?.(kind,payload),
+})??null;
+const mpSync=window.createPortMultiplayerSync?.(i,{
+ getConquest:()=>conquest,
+ getSquad:()=>mpSquad,
+ getGadgets:()=>mpGadgets,
+})??null;
+i.mpSquad=mpSquad;i.mpGadgets=mpGadgets;i.mpSync=mpSync;
+let activeLanSession=null;
+document.addEventListener("saltline:lan-start",ev=>{
+ activeLanSession=ev.detail;
+ const s=activeLanSession?.settings||{};
+ battleSettings={
+  difficulty:s.difficulty||"normal",
+  startingTickets:Number(s.startingTickets)||40,
+  duration:Number(s.duration)||240,
+  aiEnabled:s.aiEnabled!==false,
+ };
+ mode=s.mode==="breakthrough"?"breakthrough":"conquest";
+ a(i.audio,"resume");
+ r.requestLock();
+ U({skipIntro:true});
+ mpSync?.connect?.(activeLanSession);
+},{signal:i.chapterSignal});
+document.addEventListener("saltline:lan-leave",()=>{
+ activeLanSession=null;
+ mpSync?.disconnect?.();
+},{signal:i.chapterSignal});
+i.chapterSignal?.addEventListener?.("abort",()=>{mpSquad?.dispose?.();mpGadgets?.dispose?.();mpSync?.dispose?.();});
 function startOperation(nextMode){
  mode=nextMode;
- battleSettings=operations.battleSettings();
+ activeLanSession=null;
+ mpSync?.disconnect?.();
+ battleSettings={...operations.battleSettings(),aiEnabled:true};
  a(i.audio,"resume");
  r.requestLock();
  U({skipIntro:true});
@@ -7220,18 +7289,19 @@ function M(P){let V=_.state;P!==V&&(_.state=P,u=0,operations.show(P==="playing"?
  explorationFound=false;
  nextSmokeVisual=0;
  const isMission=mode==="mission";
- const checkpoint=isMission?(i.chapterReplay?replayCheckpoint:i.campaignSave.checkpoint(currentChapter)):null;
- const pending=isMission&&!i.chapterReplay?i.campaignSave.pendingEnding(currentChapter):null;
+ const isOpenWorldMission=isMission&&currentChapter==="berth"&&Boolean(i.openWorld);
+ const checkpoint=isMission&&!isOpenWorldMission?(i.chapterReplay?replayCheckpoint:i.campaignSave.checkpoint(currentChapter)):null;
+ const pending=isMission&&!isOpenWorldMission&&!i.chapterReplay?i.campaignSave.pendingEnding(currentChapter):null;
  hq?.reset();
- berthCampaign?.show(isMission);
- berthCampaign?.reset(isMission&&!continuation?checkpoint:null);
- continuation?.show(isMission);
- continuation?.reset(isMission?checkpoint:null);
- campaign=isMission?(hq??continuation??(railChapter
+ berthCampaign?.show(isMission&&!isOpenWorldMission);
+ berthCampaign?.reset(isMission&&!isOpenWorldMission&&!continuation?checkpoint:null);
+ continuation?.show(isMission&&!isOpenWorldMission);
+ continuation?.reset(isMission&&!isOpenWorldMission?checkpoint:null);
+ campaign=isMission?(hq??(isOpenWorldMission?null:(continuation??(railChapter
   ?window.createRailCampaignPrelude({archive:campaignPoints.archive,initialCheckpoint:checkpoint})
-  :berthCampaign)):null;
+  :berthCampaign)))):null;
  crash?.reset();
- campaignSupplies=campaign?window.createCampaignSupplies(ammoSites,{reserveCap:campaignReserveCap}):null;
+ campaignSupplies=(campaign||isOpenWorldMission)?window.createCampaignSupplies(ammoSites,{reserveCap:campaignReserveCap}):null;
  nearbyAmmo=null;
  for(const model of supplyModels.values())model.visible=!!campaignSupplies;
  showTerminals(null);
@@ -7278,6 +7348,15 @@ function M(P){let V=_.state;P!==V&&(_.state=P,u=0,operations.show(P==="playing"?
  o.reset?.();
  e.saturation=t;e.flash=0;
  conquest=mode==="mission"?null:window.createPortConquest(c.relays,{...battleSettings,mode,majorEvents:true});
+ if(conquest){
+  const origSmoke=conquest.smokeBlocks;
+  conquest.smokeBlocks=(from,to)=>origSmoke(from,to)||Boolean(mpGadgets?.smokeBlocks?.(from,to));
+  mpSquad?.start?.(n.pos,{aiEnabled:battleSettings.aiEnabled!==false});
+  mpGadgets?.start?.(n.pos,Wi);
+ }else{
+  mpSquad?.stop?.();
+  mpGadgets?.stop?.();
+ }
  i.loadout?.reset();
  conquestLabel="";
  q();
@@ -7295,7 +7374,10 @@ function q(){
   return;
  }
  const markers=[];
- if(campaign===berthCampaign&&campaign){
+ if(mode==="mission"&&currentChapter==="berth"&&i.openWorld){
+  const owInfo=i.openWorld.currentObjective;
+  if(owInfo?.pos)markers.push({id:"ow-obj",short:"OBJ",label:gameText(owInfo.en,owInfo.zh),pos:owInfo.pos,kind:"story"});
+ }else if(campaign===berthCampaign&&campaign){
   markers.push(...berthCampaign.markers().map(marker=>({...marker,
    label:Array.isArray(marker.label)?gameText(...marker.label):marker.label})));
  }else if(campaign&&campaign===continuation){
@@ -7333,6 +7415,20 @@ function U({skipIntro=false,quick=false,keepRetries=false}={}){
   if(insertion&&i.prologueDeploy)enterHarbor();
   return;
  }
+ if(mode==="mission"&&currentChapter==="berth"&&i.openWorld){
+  e.fade=0;
+  T();
+  if(window.SALTLINE_OPEN_WORLD_ROAM){
+   i.openWorld.teleportToSafeStart?.();
+  }else{
+   const targetStage=Number.isInteger(i.openWorldStage)?i.openWorldStage:(i.openWorld.stage??0);
+   i.openWorldStage=null;
+   i.openWorld.jumpToStage(targetStage);
+  }
+  q();
+  o.setObjective?.(D());
+  return;
+ }
  if(skipIntro||continuation||(campaign&&(i.campaignSave.checkpoint(currentChapter)||replayCheckpoint))||railChapter&&campaign){
   e.fade=0;
   T();
@@ -7359,6 +7455,10 @@ function T(){
 function D(){
  if(conquest)return conquestText();
  if(campaign===hq&&campaign)return gameText(...hq.objective);
+ if(mode==="mission"&&currentChapter==="berth"&&i.openWorld){
+  const owInfo=i.openWorld.currentObjective;
+  return gameText(owInfo?.en??"Saltline Open-World Campaign",owInfo?.zh??"盐线市大地图战役");
+ }
  if(campaign===continuation&&campaign)return gameText(...continuation.objective);
  if(campaign===berthCampaign&&campaign)return gameText(...berthCampaign.objective);
  if(campaign?.phase==="lookout")return gameText("Reach the transport lookout outside customs","到货检棚外的接应点");
@@ -7368,7 +7468,7 @@ function D(){
 function C(P){let V=r.describeMode?r.describeMode():"";l.setLookMode(V),!(!P&&V===x)&&(x=V,_.state==="playing"&&(r.mode==="drag"||r.mode==="lock"&&!r.locked&&!i.params.shot&&!i.params.autostart)?o.message(V,r.mode==="drag"?7:4):_.state==="playing"&&r.locked&&o.message("",0))}dispose(r.onModeChange?.(()=>C(!1)));on("input:lock",P=>{
  if(P.locked)cinematicUnlockPending=false;
  else if(cinematicUnlockPending){cinematicUnlockPending=false;return}
- if(cinematic.active||developer.open||operations.requisitionOpen)return;if(P.locked){g=!0,C(!1);return}_.state==="playing"&&g&&G(),g=!1});listen(document,"visibilitychange",()=>{document.hidden&&_.state==="playing"&&!cinematic.active&&!developer.open&&!operations.requisitionOpen&&G()});listen(window,"keydown",P=>{
+ if(cinematic.active||developer.open||operations.requisitionOpen||i.openWorld?.mapOpen)return;if(P.locked){g=!0,C(!1);return}_.state==="playing"&&g&&G(),g=!1});listen(document,"visibilitychange",()=>{document.hidden&&_.state==="playing"&&!cinematic.active&&!developer.open&&!operations.requisitionOpen&&!i.openWorld?.mapOpen&&G()});listen(window,"keydown",P=>{
  if(_.state==="title"&&!l.panelOpen&&P.code==="Escape"&&(l.screen==="campaign"||l.screen==="multiplayer")){
   P.preventDefault();
   l.show("title");
@@ -7465,6 +7565,10 @@ function ue(dt){
  i.disasters?.update?.(dt,n);
  i.berthSlice?.update?.(dt,{player:n,berthPhase:berthCampaign?.phase});
  const tacBonus=i.tactical?.update?.(dt,{player:n,interact:r.down("interact"),chapterPhase:campaign?.phase,promptProgress:tacticalPromptProgress})??0;
+ if(mode==="mission"&&currentChapter==="berth"&&i.openWorld){
+  q();
+  return;
+ }
  const effDt=dt+(r.down("interact")?tacBonus:0);
  if(campaign===berthCampaign){
   const phase=campaign.phase, gateOpen=berthCampaign.gateOpen;
@@ -7507,7 +7611,7 @@ function ue(dt){
   updateExploration(dt);
  }
 }
-on("enemy:killed",()=>{if(_.state==="playing")conquest?.killedMachine()});on("player:dead",()=>{cinematic.cancel();if(conquest&&_.state==="playing"){conquest.casualty();return}_.state!=="playing"&&_.state!=="paused"||(r.setGameplay&&r.setGameplay(!1),r.exitLock(),o.setPrompt&&o.setPrompt(null),o.show(!1),o.clearRadio&&o.clearRadio(),l.setDead({time:c.time,relays:c.cut,total:c.relays.length}),M("dead"))});function gameText(english,chinese){
+on("enemy:killed",()=>{if(_.state==="playing")conquest?.killedMachine()});on("player:dead",()=>{cinematic.cancel();if(conquest&&_.state==="playing"){if(mpSquad&&!mpSquad.downed&&!i.vehicle?.driving&&mpSquad.enterDowned()){return}conquest.casualty();return}_.state!=="playing"&&_.state!=="paused"||(r.setGameplay&&r.setGameplay(!1),r.exitLock(),o.setPrompt&&o.setPrompt(null),o.show(!1),o.clearRadio&&o.clearRadio(),l.setDead({time:c.time,relays:c.cut,total:c.relays.length}),M("dead"))});function gameText(english,chinese){
  return window.SaltlineLocale?.t(english,chinese??undefined)??english;
 }
 function callSupport(kind,targetId){
@@ -7519,16 +7623,22 @@ function callSupport(kind,targetId){
  if(kind==="supply"){
   n.heal(36);
   i.weapon?.addAmmo?.(60);
+  mpGadgets?.placeAmmoBox?.(n.pos);
+ }else if(kind==="vehicle"){
+  mpGadgets?.airdropVehicle?.(n);
  }
  if(kind==="mark"){
   o.message(gameText("Targets marked on the tactical map","已在战术地图标记敌人"),2.2);
  }else if(kind==="reinforce"){
   o.message(gameText("Reinforcement secured this position","增援正在协助占领据点"),2.2);
  }else if(kind==="supply"){
-  o.message(gameText("Health and ammunition supplied","已补充生命与弹药"),2.2);
+  o.message(gameText("Health and ammo crate supplied","已补充生命并投放实体弹药箱"),2.2);
  }else if(kind==="artillery"){
   o.warn?.(gameText("Artillery in five seconds","炮击将在 5 秒后开始"),5);
+ }else if(kind==="vehicle"){
+  o.message(gameText("SAR 4x4 vehicle airdrop inbound","SAR 四驱战术车已空投至附近"),2.6);
  }
+ mpSync?.sendEvent?.("support",{kind,targetId});
  return true;
 }
 function updateRequisitionEffects(){
@@ -7578,15 +7688,25 @@ function conquestText() {
  return window.SaltlineLocale?.t(english,`蓝方 ${blue} / 红方 ${red} · ${time} · ${marks}`) ?? english;
 }
 function tickConquest(dt) {
- const {captures,respawn}=conquest.update(dt,n,i.enemies.list||[]);
+ const allies=mpSquad?.allies||[];
+ const {captures,respawn}=conquest.update(dt,n,i.enemies.list||[],allies);
+ mpSquad?.update?.(dt,n,i.enemies.list||[]);
+ mpGadgets?.update?.(dt,n,i.enemies.list||[]);
+ mpSync?.update?.(dt,n);
  applyMajorBattleEvents();
  updateRequisitionEffects();
  if(respawn){
-  const spawn=operationSpawn();
-  n.reset(spawn);n.enabled=true;a(i.weapon,"reset");i.loadout?.reset();
-  if(spawn!==s.playerStart)o.message(gameText("Deployed near a secured point","已在安全据点附近部署"),2);
+  const fallbackSpawn=operationSpawn();
+  const finishDeploy=chosen=>{
+   n.reset(chosen||fallbackSpawn);n.enabled=true;a(i.weapon,"reset");i.loadout?.reset();mpGadgets?.resetInventory?.();
+   if((chosen||fallbackSpawn)!==s.playerStart)o.message(gameText("Deployed at tactical point","已在战术部署点重新部署"),2);
+  };
+  if(mpGadgets?.openDeploySelector){
+   suspendBattleInput();
+   mpGadgets.openDeploySelector(fallbackSpawn,chosen=>{finishDeploy(chosen);resumeBattleInput(true);});
+  }else finishDeploy(fallbackSpawn);
  }
- operations.update(conquest,n,i.enemies.list||[]);
+ operations.update(conquest,n,i.enemies.list||[],allies);
  for(const point of captures)F(Math.min(conquest.points.indexOf(point),1));
  const text=conquestText();
  if(text!==conquestLabel){
@@ -7848,7 +7968,7 @@ function initializeCampaignWorld(){
   retry.hidden=true;
   cover.hidden=false;
  }
- async function switchChapter(chapterId,{replay=false,menu=null,auto=false,prologueMode="story",deploy=null}={}){
+ async function switchChapter(chapterId,{replay=false,menu=null,auto=false,prologueMode="story",deploy=null,openWorldStage=null}={}){
   if(attempt)return attempt;
   present(chapterId);
   t.chapterLoading=true;
@@ -7881,6 +8001,7 @@ function initializeCampaignWorld(){
    activeReplay=replay;
    t.prologueMode=prologueMode;
    t.prologueDeploy=deploy;
+   t.openWorldStage=openWorldStage;
    const oldRoots=new Set(t.scene.children);
    try{
     t.level=await loaded(()=>C1(t));
@@ -7910,7 +8031,7 @@ function initializeCampaignWorld(){
    retry.textContent=errorText();
    retry.hidden=false;
    retry.disabled=false;
-   retry.onclick=()=>switchChapter(chapterId,{replay,menu,auto,prologueMode,deploy});
+   retry.onclick=()=>switchChapter(chapterId,{replay,menu,auto,prologueMode,deploy,openWorldStage});
    retry.focus({preventScroll:true});
   }).finally(()=>{clearTimeout(timer);attempt=null});
   timer=setTimeout(()=>load.abort(new Error("Chapter loading timed out")),12000);

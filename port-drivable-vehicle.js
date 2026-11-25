@@ -184,6 +184,19 @@
     add(chassis, boxGeo, bodyMat, 1.98, .50, .12, 0, 1.32, 2.30); // Tailgate
     add(chassis, boxGeo, trimMat, 1.88, .14, .10, 0, 1.82, .96); // Rollbar top
     for (const sx of [-.86, .86]) add(chassis, boxGeo, trimMat, .10, .62, .10, sx, 1.52, .96);
+    // Roof Remote Weapon Station (RWS) 12.7mm Heavy Machine Gun Turret (Battlefield-style armed 4x4!)
+    const turretMount = new Group();
+    turretMount.position.set(0, 1.90, .28);
+    add(turretMount, cylGeo, trimMat, .28, .16, .28, 0, .08, 0);
+    const turretHead = new Group();
+    turretHead.position.set(0, .24, 0);
+    add(turretHead, boxGeo, trimMat, .34, .22, .48, 0, 0, 0);
+    add(turretHead, boxGeo, stripeMat, .36, .06, .34, 0, .06, .04);
+    add(turretHead, cylGeo, rimMat, .042, 1.05, .042, 0, .02, -.72).rotation.x = Math.PI / 2;
+    const muzzleFlash = add(turretHead, cushionGeo, amberBar, .11, .11, .18, 0, .02, -1.30);
+    muzzleFlash.visible = false;
+    turretMount.add(turretHead);
+    chassis.add(turretMount);
     const spare = new Mesh(cylGeo, tireMat);
     spare.position.set(0, 1.26, 1.58); spare.rotation.x = .38; spare.scale.set(.38, .26, .38);
     chassis.add(spare);
@@ -238,7 +251,7 @@
     hud.hidden = true;
     hud.innerHTML = `
       <div class="sl-veh-spd" data-spd>0 KM/H</div>
-      <div class="sl-veh-keys">[F] 下车 · [C] 视角 · [Shift] 加速 · [R] 脱困</div>`;
+      <div class="sl-veh-keys">[左键/J] 车顶机枪 · [F] 下车 · [C] 视角 · [Shift] 涡轮 · [R] 脱困</div>`;
     const promptEl = document.createElement('div');
     promptEl.className = 'sl-veh-prompt';
     promptEl.hidden = true;
@@ -269,7 +282,9 @@
         [-fx * 1.98 + rx * .84, -fz * 1.98 + rz * .84], [-fx * 1.98 - rx * .84, -fz * 1.98 - rz * .84],
       ];
       for (const [ox, oz] of samples) {
-        if (hitsPoint(tx + ox, ty, tz + oz, .28)) return true;
+        const sx = tx + ox, sz = tz + oz;
+        const localGround = typeof physics?.groundHeight === 'function' ? physics.groundHeight(sx, sz, ty + 1.45) : ty;
+        if (hitsPoint(sx, Math.max(ty, localGround), sz, .28)) return true;
       }
       return false;
     };
@@ -280,10 +295,11 @@
     if (hitsSolidWall(pos.x, pos.y, pos.z, startYaw)) pos.set(-48, 0, 5);
     let yaw = startYaw;
     let speed = 0, steerAngle = 0, pitch = 0, roll = 0;
-    let driving = false, lightsOn = true, thirdPerson = true, clock = 0;
+    let driving = false, lightsOn = true, thirdPerson = true, clock = 0, turretCooldown = 0, flashTimer = 0;
     const camPosSmooth = new Vector3();
     const camLookTarget = new Vector3();
-    const keys = { w: false, s: false, a: false, d: false, shift: false, space: false };
+    const muzzleWorld = new Vector3(), aimDir = new Vector3();
+    const keys = { w: false, s: false, a: false, d: false, shift: false, space: false, fire: false };
     const visitedZones = new Set();
 
     root.position.copy(pos);
@@ -292,12 +308,14 @@
     function toggleDrive(player) {
       if (!player?.alive) return;
       if (driving) {
+        keys.fire = false;
+        muzzleFlash.visible = false;
         const exits = [-2.4, 2.4].flatMap(side => [0, .95, -.95].map(along => {
           const x = pos.x + Math.cos(yaw) * side + Math.sin(yaw) * along;
           const z = pos.z - Math.sin(yaw) * side + Math.cos(yaw) * along;
-          const y = physics?.groundHeight?.(x, z, pos.y + .6) ?? pos.y;
+          const y = physics?.groundHeight?.(x, z, pos.y + 1.1) ?? pos.y;
           return new Vector3(x, y + .05, z);
-        })).filter(p => Math.abs(p.y - pos.y) < 1 && !hitsPoint(p.x, p.y, p.z));
+        })).filter(p => Math.abs(p.y - pos.y) < 1.35 && !hitsPoint(p.x, p.y, p.z));
         if (!exits.length) return;
         driving = false;
         headlight.intensity = 0;
@@ -331,6 +349,7 @@
       else if (e.code === 'KeyS') keys.s = down;
       else if (e.code === 'KeyA') keys.a = down;
       else if (e.code === 'KeyD') keys.d = down;
+      else if (e.code === 'KeyJ') keys.fire = down;
       else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = down;
       else if (e.code === 'Space') keys.space = down;
       else if (down && !e.repeat && e.code === 'KeyF') toggleDrive(world.player);
@@ -351,8 +370,14 @@
     }
     const kd = e => onKey(e, true);
     const ku = e => onKey(e, false);
+    const md = e => {
+      if (e.button === 0 && driving && world.game?.state === 'playing' && !document.querySelector('.developer-menu[open]') && !document.querySelector('.menu.open')) keys.fire = true;
+    };
+    const mu = e => { if (e.button === 0) keys.fire = false; };
     window.addEventListener('keydown', kd, { signal: world.chapterSignal });
     window.addEventListener('keyup', ku, { signal: world.chapterSignal });
+    window.addEventListener('mousedown', md, { signal: world.chapterSignal });
+    window.addEventListener('mouseup', mu, { signal: world.chapterSignal });
 
     function unstuckVehicle() {
       const candidates = [
@@ -453,12 +478,12 @@
       const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
       let nextX = Math.max(-222, Math.min(23.2, pos.x + fx * speed * dt));
       let nextZ = Math.max(-222, Math.min(144, pos.z + fz * speed * dt));
-      const nextY = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX, nextZ, pos.y + 1.05) : pos.y;
+      const nextY = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX, nextZ, pos.y + 1.55) : pos.y;
       const checkY = Math.max(pos.y, nextY);
 
       if (hitsSolidWall(nextX, checkY, nextZ)) {
-        const yX = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX, pos.z, pos.y + 1.05) : pos.y;
-        const yZ = typeof physics?.groundHeight === 'function' ? physics.groundHeight(pos.x, nextZ, pos.y + 1.05) : pos.y;
+        const yX = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX, pos.z, pos.y + 1.55) : pos.y;
+        const yZ = typeof physics?.groundHeight === 'function' ? physics.groundHeight(pos.x, nextZ, pos.y + 1.55) : pos.y;
         const canX = !hitsSolidWall(nextX, Math.max(pos.y, yX), pos.z);
         const canZ = !hitsSolidWall(pos.x, Math.max(pos.y, yZ), nextZ);
         if (canX) { nextZ = pos.z; speed *= .88; }
@@ -469,7 +494,7 @@
             const rx = Math.cos(yaw), rz = -Math.sin(yaw);
             for (const [dx, dz] of [[rx * .55, rz * .55], [-rx * .55, -rz * .55], [-fx * .55, -fz * .55], [fx * .55, fz * .55]]) {
               const cx = pos.x + dx, cz = pos.z + dz;
-              const cy = typeof physics?.groundHeight === 'function' ? physics.groundHeight(cx, cz, pos.y + 1.05) : pos.y;
+              const cy = typeof physics?.groundHeight === 'function' ? physics.groundHeight(cx, cz, pos.y + 1.55) : pos.y;
               if (!hitsSolidWall(cx, Math.max(pos.y, cy), cz)) { nextX = cx; nextZ = cz; freed = true; break; }
             }
           }
@@ -477,12 +502,12 @@
         }
       }
 
-      // Smooth ground height sampling for mountain ramp & suspension pitch
-      const gNow = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX, nextZ, pos.y + 1.05) : pos.y;
-      const gFront = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX + fx * 1.8, nextZ + fz * 1.8, pos.y + 1.2) : gNow;
-      const gRear = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX - fx * 1.8, nextZ - fz * 1.8, pos.y + 1.2) : gNow;
-
-      pos.set(nextX, pos.y + (gNow - pos.y) * Math.min(1, dt * 18), nextZ);
+      // Smooth ground height sampling for mountain ramp & suspension pitch (4x4 climbs steep slopes smoothly)
+      const gNow = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX, nextZ, pos.y + 1.55) : pos.y;
+      const gFront = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX + fx * 1.8, nextZ + fz * 1.8, pos.y + 1.85) : gNow;
+      const gRear = typeof physics?.groundHeight === 'function' ? physics.groundHeight(nextX - fx * 1.8, nextZ - fz * 1.8, pos.y + 1.85) : gNow;
+      const climbRate = gNow > pos.y ? Math.min(1, dt * 26) : Math.min(1, dt * 18);
+      pos.set(nextX, pos.y + (gNow - pos.y) * climbRate, nextZ);
       const targetPitch = Math.atan2(gFront - gRear, 3.6);
       const targetRoll = -steerAngle * Math.min(1, Math.abs(speed) / 18) * .14;
       pitch += (targetPitch - pitch) * Math.min(1, dt * 9);
@@ -527,6 +552,25 @@
             world.camera.rotateX(-.085);
           }
         }
+      }
+
+      // Roof RWS 12.7mm Heavy Machine Gun Turret Firing ([Left Click] or [J])
+      turretCooldown = Math.max(0, turretCooldown - dt);
+      flashTimer = Math.max(0, flashTimer - dt);
+      muzzleFlash.visible = flashTimer > 0;
+      if (keys.fire && turretCooldown <= 0) {
+        turretCooldown = .11;
+        flashTimer = .045;
+        muzzleFlash.visible = true;
+        turretHead.getWorldPosition(muzzleWorld);
+        muzzleWorld.y += .18;
+        if (world.camera && thirdPerson) world.camera.getWorldDirection(aimDir);
+        else aimDir.set(fx, Math.sin(pitch) * .45, fz).normalize();
+        world.combat?.playerShot?.(muzzleWorld, aimDir, { damage: 42, range: 185, impulse: 1.4 });
+        world.events?.emit?.('vehicle:fire', { origin: muzzleWorld, dir: aimDir });
+        fx?.sparks?.(muzzleWorld.clone().addScaledVector(aimDir, 1.3), aimDir, 6);
+        audio?.play?.('rail_touchdown', { pos: muzzleWorld, ref: 18, gain: .35, jitter: .14 });
+        player?.addShake?.(.06);
       }
 
       // High-speed ramming combat against enemy Hounds!

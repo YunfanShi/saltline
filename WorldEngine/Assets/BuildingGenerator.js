@@ -571,47 +571,69 @@
     }
 
     function buildFreightExchange(parent, lot, external, collide) {
-      const m=sharedMats, g=new Group();
-      g.name='customs-transit-shed';
-      const {push,flush}=createBatcher(g);
-      const west=lot.x0+1.5,east=lot.x1-1.5,north=lot.z0+2.5,south=lot.z1-2.5;
-      const width=east-west, depth=south-north, x=(west+east)/2, z=(north+south)/2;
-      const placements=[];
-      const ground=.16, eave=6.4, bay=depth/9;
-      const brick=matLib.scannedSurface('brick_wall_001');
+      const m = sharedMats, g = new Group();
+      g.name = 'customs-transit-shed';
+      const { push, flush } = createBatcher(g);
+      const west = lot.x0 + 1.5, east = lot.x1 - 1.5, north = lot.z0 + 2.5, south = lot.z1 - 2.5;
+      const width = east - west, depth = south - north, x = (west + east) / 2, z = (north + south) / 2;
+      const placements = [];
+      const ground = .16, eave = 6.4, bay = depth / 9;
+      const brick = matLib.scannedSurface('brick_wall_001');
+      const stone = matLib.get('granite');
+      const concreteTrim = matLib.get('concrete_aged');
+      const litWin = matLib.get('window_lit');
       // Leave a three-bay entrance for receiving cargo from Coastal Boulevard.
-      for(let i=0;i<9;i++) {
-        const at=north+i*bay;
-        if(i>=3 && i<6) continue;
-        for(let floor=0;floor<2;floor++) {
-          for(const part of ['wall_window_centered_double_01','window_centered_double_01'])
-            placements.push([part,east,ground+floor*3.12,at,Math.PI/2,bay/3,1.04]);
+      for (let i = 0; i < 9; i++) {
+        const at = north + i * bay;
+        if (i >= 3 && i < 6) continue;
+        for (let floor = 0; floor < 2; floor++) {
+          for (const part of ['wall_window_centered_double_01', 'window_centered_double_01'])
+            placements.push([part, east, ground + floor * 3.12, at, Math.PI / 2, bay / 3, 1.04]);
         }
-        placements.push(['wall_pier_standard_01',east,ground,at,Math.PI/2,1,2.08]);
-        collide(east-.20,ground,at,east+.04,eave,at+bay);
+        placements.push(['wall_pier_standard_01', east, ground, at, Math.PI / 2, 1, 2.08]);
+        placements.push(['cornice01_standard_standard_01', east, eave - 0.14, at, Math.PI / 2, bay / 3, 1.0]);
+        collide(east - .20, ground, at, east + .04, eave, at + bay);
       }
-      external.placeFacadeModules(g,placements);
-      for(const end of [north,south]) {
-        push(brick,width,eave,.38,x,eave/2+ground,end);
-        collide(west,ground,end-.19,east,eave,end+.19);
+      external.placeFacadeModules(g, placements);
+      // Granite foundation plinth + brick end walls + stepped stone cornice
+      push(stone, width + .35, .58, depth + .35, x, ground + .29, z);
+      for (const end of [north, south]) {
+        push(brick, width, eave, .42, x, eave / 2 + ground, end);
+        push(stone, width + .5, .28, .62, x, eave + ground + .10, end);
+        collide(west, ground, end - .21, east, eave, end + .21);
       }
-      push(brick,.42,eave,depth,west,eave/2+ground,z);
-      collide(west-.21,ground,north,west+.21,eave,south);
-      const span=width/3, rise=2.15;
-      for(let i=0;i<3;i++) {
-        const center=west+(i+.5)*span;
-        push(m.corrugated,Math.hypot(span,rise),.18,depth+.6,center,eave+rise/2,z,0,0,Math.atan2(rise,span));
-        push(m.smokedPane,.12,rise,depth,center+span/2,eave+rise/2,z);
-        for(let j=0;j<=6;j++) push(m.steelGalv,.19,rise,.12,center+span/2,eave+rise/2,north+j*depth/6);
+      push(brick, .44, eave, depth, west, eave / 2 + ground, z);
+      push(stone, .64, .28, depth + .5, west, eave + ground + .10, z);
+      collide(west - .22, ground, north, west + .22, eave, south);
+      // Recessed sawtooth north-light roof framed by a brick parapet + stone coping (eliminates giant grey flat slab!)
+      const span = width / 3, rise = 1.95;
+      push(brick, .38, 1.15, depth + .2, east - .18, eave + ground + .58, z);
+      push(stone, .58, .20, depth + .45, east - .18, eave + ground + 1.22, z);
+      for (let i = 0; i < 3; i++) {
+        const center = west + (i + .5) * span;
+        push(m.corrugated, Math.hypot(span, rise), .18, depth - .3, center, eave + rise / 2, z, 0, 0, Math.atan2(rise, span));
+        push(m.smokedPane, .12, rise * .86, depth - .6, center + span / 2 - .12, eave + rise / 2, z);
+        for (let j = 0; j <= 6; j++) push(m.steelGalv, .16, rise * .88, .12, center + span / 2 - .10, eave + rise / 2, north + .3 + j * (depth - .6) / 6);
       }
-      // The canopy girders sit directly over the masonry jambs.
-      push(m.steelDark,3.4,.22,bay*3+.6,east+1.5,4.35,z);
-      push(m.steelDark,.32,.55,bay*3+.7,east,5.94,z);
-      for(const side of [-1,1]) {
-        const jamb=z+side*(bay*1.5+.05);
-        push(m.steelDark,.36,eave,.38,east+.03,eave/2+ground,jamb);
-        push(m.steelGalv,3.42,.12,.12,east+1.5,4.95,jamb,0,0,-.34);
+      // Articulated steel loading canopy with fascia beam, knee braces, soffit lights & warm transom clerestory
+      const openSpan = bay * 3;
+      push(m.steelDark, 3.35, .18, openSpan + .7, east + 1.55, 4.35, z);
+      push(concreteTrim, 3.55, .24, openSpan + .9, east + 1.55, 4.52, z);
+      push(m.steelDark, .34, .52, openSpan + .8, east, 5.96, z);
+      push(litWin, .12, 1.12, openSpan - .5, east - .12, 5.15, z);
+      for (let t = -2; t <= 2; t++) push(m.steelDark, .16, 1.22, .10, east - .08, 5.15, z + t * (openSpan / 5));
+      for (const side of [-1, 1]) {
+        const jamb = z + side * (openSpan * .5 + .08);
+        push(m.steelDark, .40, eave, .40, east + .04, eave / 2 + ground, jamb);
+        push(stone, .58, .55, .58, east + .04, ground + .28, jamb);
+        push(m.steelGalv, 3.35, .11, .11, east + 1.52, 4.98, jamb, 0, 0, -.34);
+        push(m.glassWarm, .52, .06, .28, east + 1.85, 4.24, z + side * (openSpan * .28));
       }
+      const exSign = new Mesh(unitBox, matLib.createDecalMaterial('MARITIME EXCHANGE', 'FREIGHT & CUSTOMS HALL 02', 'rgba(24,38,44,0.92)', '#e6c67c'));
+      exSign.scale.set(0.10, 0.88, Math.min(6.4, openSpan * .78));
+      exSign.position.set(east + 3.24, 4.56, z);
+      exSign.matrixAutoUpdate = false; exSign.updateMatrix();
+      g.add(exSign);
       flush(); parent.add(g);
     }
 
@@ -620,44 +642,113 @@
       g.name = 'dispatch-radio-room';
       const { push, flush } = createBatcher(g);
       const m = sharedMats, masonry = matLib.scannedSurface('brick_wall_001');
-      const stone = matLib.get('granite'), pane = m.smokedPane;
+      const stone = matLib.get('granite'), concreteTrim = matLib.get('concrete_aged');
+      const pane = m.smokedPane, litWin = matLib.get('window_lit');
       const front = bx0 + 2.6, back = bx1 - 1.4, z0 = bz0 + .8, z1 = bz1 - 3.6;
-      const mid = (front + back)/2;
-      push(stone, back-front+.7,.24,z1-z0+.7,mid,4.16,(z1+z0)/2);
-      push(masonry,.42,4.18,z1-z0,back,6.28,(z1+z0)/2);
-      for (const z of [z0,z1]) push(masonry,back-front,4.18,.42,mid,6.28,z);
-      const placements=[];
-      const bays = 9, pitch = (z1-z0)/bays;
-      for (let i=0;i<bays;i++) {
-        const end = z0 + (i+1)*pitch;
-        const module = (part,y) => placements.push([part,front,y,end,-Math.PI/2,pitch/3,4.18/3]);
-        module('wall_window_centered_double_01',4.19);
-        module('window_centered_double_01',4.19);
-        module('cornice01_standard_standard_01',8.20);
-        if (i%3===0) module('wall_pier_standard_01',4.19);
+      const mid = (front + back) / 2, midZ = (z1 + z0) / 2;
+      const roofW = back - front, roofD = z1 - z0;
+      const placeCyl = (mat, r, h, x, y, z) => {
+        const c = new Mesh(unitCyl, mat);
+        c.position.set(x, y, z); c.scale.set(r, h, r);
+        c.receiveShadow = true; c.matrixAutoUpdate = false; c.updateMatrix();
+        g.add(c);
+      };
+      // Molded stone belt-course cornice separating ground floor from upper brick story
+      push(stone, roofW + .85, .30, roofD + .85, mid, 4.16, midZ);
+      push(masonry, .44, 4.18, roofD, back, 6.28, midZ);
+      for (const z of [z0, z1]) push(masonry, roofW, 4.18, .44, mid, 6.28, z);
+      const placements = [];
+      const bays = 9, pitch = roofD / bays;
+      for (let i = 0; i < bays; i++) {
+        const end = z0 + (i + 1) * pitch;
+        const module = (part, y) => placements.push([part, front, y, end, -Math.PI / 2, pitch / 3, 4.18 / 3]);
+        module('wall_window_centered_double_01', 4.19);
+        module('window_centered_double_01', 4.19);
+        module('cornice01_standard_standard_01', 8.20);
+        if (i % 3 === 0) module('wall_pier_standard_01', 4.19);
       }
-      externalAssets.placeFacadeModules(g,placements);
-      push(m.steelDark,back-front+1.2,.25,z1-z0+1.2,mid,8.42,(z1+z0)/2);
-      // Offset radio watch room and its projecting roof read above the brick wing.
-      const towerX = back-3.8, towerZ = z0+3.7;
-      push(masonry,7.4,2.25,7.2,towerX,9.65,towerZ);
-      push(pane,7.1,1.48,7,towerX,11.5,towerZ);
-      for (const dx of [-3.45,0,3.45]) for (const dz of [-3.43,3.43])
-        push(m.steelDark,.14,1.5,.14,towerX+dx,11.51,towerZ+dz);
-      push(m.steelDark,8.2,.24,8,towerX,12.38,towerZ);
-      // Deep brick pilasters at street level tie the ribbon windows to the stone plinth.
-      for (const z of [bz0+.52,entZ-7.7,entZ-2.4,entZ+2.4,entZ+7.7,bz1-.52])
-        push(masonry,.80,3.68,.74,bx0-.17,2.01,z);
+      externalAssets.placeFacadeModules(g, placements);
+      // Warm glowing interior backing behind select upper brick windows so night.jpg & dusk look lived-in!
+      for (let i = 0; i < bays; i++) {
+        if (i % 3 === 1 || i === 4) {
+          push(litWin, .08, 1.95, pitch * .62, front + .28, 6.18, z0 + (i + .5) * pitch);
+        }
+      }
+      // Articulated Roof Deck with Perimeter Brick Parapet + Beveled Stone Coping + Membrane Seams + HVAC + Skylights!
+      const roofY = 8.42;
+      push(concreteTrim, roofW + .4, .26, roofD + .4, mid, roofY, midZ);
+      const parH = .72;
+      for (const pz of [z0, z1]) {
+        push(masonry, roofW + .4, parH, .34, mid, roofY + parH / 2 + .10, pz);
+        push(stone, roofW + .64, .14, .48, mid, roofY + parH + .14, pz);
+      }
+      for (const px of [front, back]) {
+        push(masonry, .34, parH, roofD + .2, px, roofY + parH / 2 + .10, midZ);
+        push(stone, .48, .14, roofD + .48, px, roofY + parH + .14, midZ);
+      }
+      for (let rz = z0 + 3.5; rz < z1 - 2.5; rz += 4.6) {
+        push(m.steelDark, roofW - 1.2, .05, .14, mid, roofY + .15, rz);
+      }
+      for (const sz of [midZ + 4.2, midZ - 1.8]) {
+        push(m.steelDark, 4.6, .42, 2.8, mid - 2.2, roofY + .32, sz);
+        push(pane, 4.3, .22, 2.5, mid - 2.2, roofY + .62, sz);
+        push(m.steelGalv, 4.5, .08, .12, mid - 2.2, roofY + .76, sz);
+      }
+      for (const hz of [midZ + 7.8, midZ + 10.6]) {
+        push(m.steelWorn, 2.6, 1.25, 1.85, mid + 2.4, roofY + .76, hz);
+        push(m.steelDark, 2.2, .16, 1.45, mid + 2.4, roofY + 1.44, hz);
+        push(m.steelGalv, .52, .48, 3.6, mid + 2.4, roofY + .55, hz - 2.2);
+      }
+      push(m.steelGalv, 1.6, .58, 1.4, mid - 5.2, roofY + .42, midZ + 7.2);
+      for (const vz of [midZ - 4.5, midZ + 2.2, midZ + 8.8]) placeCyl(m.steelGalv, 0.22, 1.35, back - 2.2, roofY + .85, vz);
+      // Offset radio watch room penthouse with beveled roof overhang & comms mast
+      const towerX = back - 3.8, towerZ = z0 + 3.7;
+      push(masonry, 7.4, 2.25, 7.2, towerX, 9.65, towerZ);
+      push(stone, 7.75, .20, 7.55, towerX, 10.76, towerZ);
+      push(pane, 7.1, 1.48, 7, towerX, 11.5, towerZ);
+      push(litWin, 6.6, 1.25, 6.5, towerX, 11.48, towerZ);
+      for (const dx of [-3.45, 0, 3.45]) for (const dz of [-3.43, 3.43])
+        push(m.steelDark, .14, 1.5, .14, towerX + dx, 11.51, towerZ + dz);
+      push(m.steelDark, 8.4, .28, 8.2, towerX, 12.38, towerZ);
+      push(stone, 8.6, .12, 8.4, towerX, 12.56, towerZ);
+      placeCyl(m.steelGalv, 0.09, 4.2, towerX + 2.2, 14.6, towerZ - 2.0);
+      push(m.redCore || m.steelDark, .24, .28, .24, towerX + 2.2, 16.8, towerZ - 2.0);
+      // Deep brick pilasters with granite bases & caps at street level tying ribbon windows to upper brick wing
+      for (const z of [bz0 + .52, entZ - 7.7, entZ - 2.4, entZ + 2.4, entZ + 7.7, bz1 - .52]) {
+        push(stone, .94, .68, .88, bx0 - .17, .50, z);
+        push(masonry, .82, 3.12, .74, bx0 - .17, 2.38, z);
+        push(stone, .92, .22, .86, bx0 - .17, 3.98, z);
+      }
       flush();
       parent.add(g);
       return g;
+    }
+
+    function createCoastalBuildingTask(parent, spec) {
+      let step = 0;
+      let builtGroup = null;
+      return {
+        step() {
+          if (step === 0) {
+            step = 1;
+            return false;
+          }
+          if (step === 1) {
+            builtGroup = buildCoastalBuilding(parent, spec);
+            step = 2;
+            return true;
+          }
+          return true;
+        },
+        get group() { return builtGroup; },
+      };
     }
 
     function dispose() {
       for (const geo of createdGeos) geo.dispose?.();
     }
 
-    return { buildCoastalBuilding, buildFreightExchange, buildDistantBuilding, buildDispatchWing, dispose };
+    return { buildCoastalBuilding, createCoastalBuildingTask, buildFreightExchange, buildDistantBuilding, buildDispatchWing, dispose };
   }
 
   WE.createBuildingGenerator = createBuildingGenerator;

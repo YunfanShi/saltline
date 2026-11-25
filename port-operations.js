@@ -5,6 +5,7 @@
     { key: '7', type: 'supply', en: 'Supply', zh: '补给' },
     { key: '8', type: 'smoke', en: 'Smoke', zh: '烟幕' },
     { key: '9', type: 'artillery', en: 'Artillery', zh: '重炮' },
+    { key: '0', type: 'vehicle', en: 'SAR 4x4', zh: '载具空投' },
   ];
   const REQUISITIONS = [...SUPPORT];
   const t = (english, chinese) => window.SaltlineLocale?.t(english, chinese) ?? english;
@@ -321,7 +322,7 @@
         }
         round = next;
       },
-      update(game, player, enemies) {
+      update(game, player, enemies, allies = []) {
         if (!active || game.elapsed < lastUpdate + .12) return;
         lastUpdate = game.elapsed;
         if (!score.hidden) renderScore();
@@ -385,6 +386,7 @@
         }
         if (support.smokeUntil > game.elapsed) dot(support.smokePosition, '#cbd3d9', 10);
         if (support.artillery?.remaining) dot(support.artillery.position, '#ffb347', 10);
+        for (const ally of allies) if (ally?.alive && ally.pos) dot(ally.pos, '#8ef7c0', 4);
         const [x, y] = dot(player.pos, '#64d5ff', 5);
         const yaw = player.yaw || 0;
         context.beginPath();context.moveTo(x, y);

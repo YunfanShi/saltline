@@ -10,14 +10,19 @@
     return edge;
   }
 
-  window.createCampaignOverview = (root, { progress, prologue, launch, initial, signal }) => {
-    const intro = { id: 'prologue', title: ['Prologue · Dispatch', '序章 · 出勤'],
+  window.createCampaignOverview = (root, { progress, openWorldProgress, prologue, launch, initial, signal }) => {
+    const intro = { id: 'prologue', art: './art/campaign-prologue.jpg', title: ['Prologue · Dispatch', '序章 · 出勤'],
       description: ['Report to SAR Headquarters, visit the range or head to the helipad.',
         '到应急救援总部听取简报，可先去训练场，再前往停机坪。'] };
-    const chapters = prologue ? [intro, ...window.SaltlineCampaign.chapters] : window.SaltlineCampaign.chapters;
+    const useOpenWorld = Boolean(openWorldProgress && Array.isArray(window.SaltlineOpenWorldActs) && window.SaltlineOpenWorldActs.length);
+    const actList = useOpenWorld ? window.SaltlineOpenWorldActs : window.SaltlineCampaign.chapters;
+    const chapters = prologue ? [intro, ...actList] : actList;
+    const activeProgress = useOpenWorld ? openWorldProgress : progress;
     const statusFor = id => id === 'prologue'
       ? prologue.needsPrologue ? 'next' : 'available'
-      : id === 'berth' && prologue?.needsPrologue ? 'locked' : progress.status(id);
+      : useOpenWorld
+        ? (prologue?.needsPrologue ? 'locked' : openWorldProgress.status(id))
+        : (id === 'berth' && prologue?.needsPrologue ? 'locked' : progress.status(id));
     const art = root.querySelector('.campaign-cover-art');
     const title = root.querySelector('[data-campaign-location]');
     const description = root.querySelector('[data-preview-description]');
@@ -26,6 +31,7 @@
     const list = root.querySelector('.campaign-chapter-list');
     const previous = [];
     if (prologue?.needsPrologue) initial = 'prologue';
+    else if (useOpenWorld && !initial) initial = openWorldProgress.next ?? 'ow-0';
     let selected = chapters.findIndex(chapter => chapter.id === initial && statusFor(chapter.id) !== 'locked');
     const ui = chapters.map((chapter, index) => {
       const item = document.createElement('li');
@@ -56,22 +62,25 @@
     }
 
     function render() {
-      if (selected < 0) selected = progress.next ? chapters.findIndex(chapter => chapter.id === progress.next) : chapters.length - 1;
+      if (selected < 0) selected = activeProgress.next ? chapters.findIndex(chapter => chapter.id === activeProgress.next) : chapters.length - 1;
+      if (selected < 0) selected = 0;
       const chapter = chapters[selected];
       const status = statusFor(chapter.id);
       if (art.dataset.chapter !== chapter.id) {
-        art.src = './art/campaign-' + chapter.id + '.jpg';
+        art.src = chapter.art ?? ('./art/campaign-' + chapter.id + '.jpg');
         art.dataset.chapter = chapter.id;
       }
       title.textContent = local(...chapter.title);
       description.textContent = local(...chapter.description);
       main.disabled = status === 'locked';
-      main.textContent = status === 'locked' ? local('Chapter locked', '章节未解锁') :
+      main.textContent = status === 'locked' ? local('Act locked', '章节未解锁') :
         chapter.id === 'prologue' ? status !== 'next' ? local('Replay prologue', '回放序章') :
           prologue.phase === 'unstarted' ? local('Start prologue', '开始序章') : local('Continue prologue', '继续序章') :
-        status === 'complete' ? local('Replay chapter', '章节回放') :
-        chapter.id === 'berth' && !progress.checkpoint(chapter.id) && !progress.pendingEnding?.(chapter.id)
-          ? local('Start campaign', '开始战役') : local('Continue campaign', '继续战役');
+        status === 'complete' ? local('Replay act', '重玩本幕') :
+        useOpenWorld
+          ? (chapter.id === 'ow-0' && openWorldProgress.completedCount === 0 ? local('Start open-world campaign', '开始大地图战役') : local('Continue open-world campaign', '继续大地图战役'))
+          : (chapter.id === 'berth' && !progress.checkpoint(chapter.id) && !progress.pendingEnding?.(chapter.id)
+              ? local('Start campaign', '开始战役') : local('Continue campaign', '继续战役'));
       if (range) range.textContent = local('Training ground', '训练场');
       ui.forEach(({ button, name, status: label }, index) => {
         const entry = chapters[index];
@@ -81,7 +90,7 @@
         button.dataset.progress = availability;
         name.textContent = local(...entry.title);
         label.textContent = availability === 'complete' ? local('Complete', '已完成') :
-          availability === 'next' ? local('Current', '当前章节') : availability === 'available' ? local('Available', '可回放') : local('Locked', '未解锁');
+          availability === 'next' ? local('Current', '当前进度') : availability === 'available' ? local('Available', '可回放') : local('Locked', '未解锁');
       });
     }
 

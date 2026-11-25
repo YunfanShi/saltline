@@ -8,15 +8,7 @@
   ];
   const chapterList = [
     ['prologue', '00 Prologue · HQ', '00 序章 · 总部与停机坪'],
-    ['berth', '01 Berth 4', '01 四号泊位'],
-    ['rail', '02 Rail Yard', '02 铁路货场'],
-    ['drydock', '03 Old Drydock', '03 旧船坞'],
-    ['tidegate', '04 South Tide Gate', '04 防潮闸'],
-    ['anchorage', '05 Outer Anchorage', '05 外锚地'],
-    ['return-harbor', '06 Return Harbor', '06 归港'],
-    ['night-record', '07 Night Record', '07 夜班录音'],
-    ['last-pilot', '08 Last Pilot', '08 最后一班引航'],
-    ['reopen', '09 Reopen Berth 4', '09 重新开航'],
+    ['berth', '01 Saltline Open World (7 Districts)', '01 盐线市大地图（7 大连通区 · 8 幕战役）'],
   ];
   const humanRoles = [
     ['pilot', 'SAR Pilot', '飞行员'],
@@ -103,7 +95,7 @@
     const tabDefs = [
       ['controls', 'Controls', '常用调试'],
       ['events', 'Set Pieces', '大事件测试'],
-      ['maps', 'Maps (10)', '一键切图'],
+      ['maps', 'Maps (2)', '一键切图'],
       ['models', 'Models', '人物与载具展台'],
       ['teleport', 'Teleport', '快速传送'],
     ];

@@ -240,6 +240,11 @@ async function main() {
         const s=SALTLINE_GET_STATS();
         cycles.push({loc,geometries:s.gpuGeometries,textures:s.gpuTextures,disposals:s.totalDisposals,active:s.loadedCount});
       }
+      const geoDrift = Math.abs(cycles[3].geometries - cycles[1].geometries);
+      const texDrift = Math.abs(cycles[3].textures - cycles[1].textures);
+      if (geoDrift > 40 || texDrift > 4 || cycles[3].disposals <= cycles[0].disposals) {
+        throw Error('GPU resource leak detected across streaming cycles: ' + JSON.stringify({ geoDrift, texDrift, cycles }));
+      }
       const door=__G.openWorld.interactables.find(v=>v.id==='city-precinct-door');
       function crossDoor(){
         const p=__G.player.pos.clone().set(-14.8,.30,-55);
@@ -248,9 +253,16 @@ async function main() {
       }
       const closed=crossDoor(); door.use(); const opened=crossDoor(); door.use();
       if(closed>-13.3 || opened < -13) throw Error('Door collider '+JSON.stringify({closed,opened}));
-      return {imports,cycles,door:{closed,opened}};
+      return {imports,cycles,geoDrift,texDrift,door:{closed,opened}};
     })()`);
     fs.writeFileSync(path.join(OUT_DIR,'streaming.json'),JSON.stringify(lifecycle,null,2));
+    for (const r of results) {
+      const sz = fs.statSync(path.join(OUT_DIR, r.file)).size;
+      if (sz < 25000) throw Error(`Rendered screenshot too small / blank: ${r.file} (${sz} bytes)`);
+    }
+    if (cdp.consoleErrors.length) {
+      throw Error('Browser console errors during render audit: ' + cdp.consoleErrors.join(' | '));
+    }
     const avg = (arr) => (arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2)) : null);
     const validFps = results.map((r) => r.fps).filter((v) => typeof v === 'number' && v > 0);
     const validFrame = results.map((r) => r.frameTimeMs).filter((v) => typeof v === 'number' && v > 0);

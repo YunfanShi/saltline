@@ -1,0 +1,63 @@
+{
+  "imports": {
+    "metal_office_desk": 2,
+    "vintage_radio_transceiver": 1,
+    "desk_lamp_arm_01": 2,
+    "painted_wooden_chair_02": 5,
+    "industrial_wall_lamp": 2,
+    "office_notepads": 2,
+    "modular_factory_facade": 2
+  },
+  "cycles": [
+    {
+      "loc": [
+        -215,
+        0.2,
+        140
+      ],
+      "geometries": 1328,
+      "textures": 366,
+      "disposals": 553,
+      "active": 15
+    },
+    {
+      "loc": [
+        -26,
+        0.2,
+        -55
+      ],
+      "geometries": 1335,
+      "textures": 366,
+      "disposals": 915,
+      "active": 28
+    },
+    {
+      "loc": [
+        -215,
+        0.2,
+        140
+      ],
+      "geometries": 1193,
+      "textures": 366,
+      "disposals": 1173,
+      "active": 15
+    },
+    {
+      "loc": [
+        -26,
+        0.2,
+        -55
+      ],
+      "geometries": 1334,
+      "textures": 366,
+      "disposals": 1534,
+      "active": 28
+    }
+  ],
+  "geoDrift": 1,
+  "texDrift": 0,
+  "door": {
+    "closed": -13.795000000000002,
+    "opened": -12.30000000000001
+  }
+}

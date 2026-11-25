@@ -5,8 +5,8 @@
   const DURATION = 240;
   const START_TICKETS = 40;
   const SUPPORT_CAP = 12;
-  const SUPPORTS = Object.freeze({ mark: 2, reinforce: 4, supply: 3, smoke: 4, artillery: 7 });
-  const SUPPORT_DURATION = { mark: 15, reinforce: 18, supply: 3, smoke: 22, artillery: 35 };
+  const SUPPORTS = Object.freeze({ mark: 2, reinforce: 4, supply: 3, smoke: 4, artillery: 7, vehicle: 6 });
+  const SUPPORT_DURATION = { mark: 15, reinforce: 18, supply: 3, smoke: 22, artillery: 35, vehicle: 45 };
   const SMOKE_RADIUS = 6;
   const FIRST_EVENT = 35;
   const EVENT_COOLDOWN = 28;
@@ -33,7 +33,7 @@
     const tickets = { blue: startingTickets, red: breakthrough ? points.length : startingTickets };
     const support = {
       markUntil: 0, reinforceUntil: 0, supplyUntil: 0, reinforcePosition: null,
-      smokeUntil: 0, smokePosition: null, artilleryUntil: 0, artillery: null,
+      smokeUntil: 0, smokePosition: null, artilleryUntil: 0, artillery: null, vehicleUntil: 0,
     };
     let sector = 0;
     let supportPoints = 3;

@@ -50,14 +50,56 @@ test('a descending ray intersects the rendered escarpment and misses the drydock
   assert.equal(terrain.intersectRay({x:10,y:8,z:92},{x:0,y:-1,z:0},12),null);
 });
 
-test('leaving a partially built cell cancels it and re-entry builds from scratch',()=>{
-  let step=0,unloads=0;
-  const sector={center:0,streamRadius:9,shell:{},detail:{},
-    onBuild(){return ++step===2},onUnload(){step=0;unloads++}};
+test('leaving a partially built cell cancels it, disposes streamOwned GPU assets, and re-entry builds cleanly',()=>{
+  let step=0,unloads=0,disposals=0;
+  const builtGeos=[];
+  const sector={center:0,streamRadius:9,
+    shell:{traverse(fn){for(const g of builtGeos) fn({geometry:g});}},
+    detail:{traverse(){}},
+    onBuild(){
+      builtGeos.push({userData:{streamOwned:true},dispose(){disposals++}});
+      return ++step===2;
+    },
+    onUnload(){builtGeos.length=0;step=0;unloads++}};
   const mgr=engine.createChunkManager({sectors:[sector],hysteresis:1});
   const move=x=>mgr.update(.016,{distanceTo:()=>x});
   assert.equal(move(1).loadedCount,0);
-  move(15); assert.equal(unloads,1);
-  assert.equal(move(1).loadedCount,0); assert.equal(move(1).loadedCount,1);
-  mgr.dispose(); assert.equal(unloads,2);
+  assert.equal(builtGeos.length,1);
+  // Leaving before step 2 completes MUST dispose the partially built streamOwned geometry (no GPU leak!)
+  move(15);
+  assert.equal(unloads,1);
+  assert.equal(disposals,1);
+  assert.equal(move(1).loadedCount,0);
+  assert.equal(move(1).loadedCount,1);
+  mgr.dispose();
+  assert.equal(unloads,2);
+  assert.equal(disposals,3);
+});
+
+test('LightingSystem invalidates stale light cache and modulates dynamic night lights + emissive windows',()=>{
+  const scopeL = vm.createContext({window:{}, performance});
+  vm.runInContext(fs.readFileSync(require.resolve('../WorldEngine/Rendering/LightingSystem.js'),'utf8'),scopeL);
+  class FakeColor { constructor(h=0){this.h=h;} setHex(h){this.h=h;return this;} lerp(){return this;} getHex(){return this.h;} }
+  class FakeVec3 { constructor(x=0,y=0,z=0){this.x=x;this.y=y;this.z=z;} copy(v){Object.assign(this,v);return this;} multiplyScalar(s){this.x*=s;this.y*=s;this.z*=s;return this;} }
+  const scene = { children: [], fog: { color: new FakeColor(), density: 0.001 }, traverse(fn){ for(const c of this.children) fn(c); } };
+  const sunA = { isDirectionalLight: true, parent: scene, position: new FakeVec3(), color: new FakeColor(), intensity: 1 };
+  scene.children.push(sunA);
+  const ls = scopeL.window.WorldEngine.createLightingSystem({ Color: FakeColor, Vector3: FakeVec3 }, { scene, renderer: {} });
+  const lamp = { parent: scene, intensity: 0 };
+  const winMat = { emissiveIntensity: 0 };
+  ls.registerDynamicLight(lamp, { dayIntensity: 0, nightIntensity: 24 });
+  ls.registerEmissiveMaterial(winMat, { day: 0.25, night: 1.6 });
+
+  ls.setTimeOfDay(13.0); // Noon
+  assert.equal(lamp.intensity, 0);
+  assert.ok(Math.abs(winMat.emissiveIntensity - 0.25) < 0.01);
+
+  // Dynamically add a second light to the scene — cache must refresh automatically!
+  const sunB = { isDirectionalLight: true, parent: scene, position: new FakeVec3(), color: new FakeColor(), intensity: 0 };
+  scene.children.push(sunB);
+  ls.setTimeOfDay(23.0); // Night
+  assert.ok(sunB.intensity > 0.5, 'newly added directional light should be updated after cache refresh');
+  assert.equal(lamp.intensity, 24);
+  assert.ok(Math.abs(winMat.emissiveIntensity - 1.6) < 0.01);
+  ls.dispose();
 });

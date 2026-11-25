@@ -181,33 +181,35 @@
           {
             at: 6.8,
             run: () => {
-              companion?.speak('玛拉：「他们打断了龙门吊主钢缆！快闪开——龙门吊要塌了！」',
-                'Mara: "They severed the gantry crane cables! Move—it’s coming down!"', true);
-              fx?.sparks?.(strikePoint, up, 40);
-              audio?.play?.('rail_touchdown', { pos: strikePoint, ref: 32, gain: .95, jitter: 0 });
+              companion?.speak('玛拉：「里德下令把四号泊位一起埋掉！他们打断了龙门吊主钢缆——快闪开，龙门吊要塌了！」',
+                'Mara: "Reed ordered Berth 4 buried! They severed the gantry crane cables—move!"', true);
+              world.disasters?.spawnFireballExplosion?.(strikePoint, 1.5);
+              fx?.sparks?.(strikePoint, up, 48);
+              audio?.play?.('explosion', { pos: strikePoint, ref: 36, gain: .98, jitter: 0 });
+              world.player?.addShake?.(.52);
             },
           },
           {
             at: 10.2,
             run: () => {
-              fx?.smoke?.(crashImpact, { size: 5.8, life: 9.0, color: 0x26221e, alpha: .72, rise: 1.1, count: 14 });
-              fx?.sparks?.(crashImpact, up, 52);
-              fx?.debris?.(crashImpact, { count: 24 });
-              audio?.play?.('rail_touchdown', { pos: crashImpact, ref: 38, gain: 1.0, jitter: 0 });
-              world.player?.addShake?.(.85);
+              world.disasters?.spawnFireballExplosion?.(crashImpact, 2.1);
+              fx?.smoke?.(crashImpact, { size: 6.4, life: 10.0, color: 0x221d19, alpha: .78, rise: 1.3, count: 16 });
+              fx?.sparks?.(crashImpact, up, 58);
+              fx?.debris?.(crashImpact, { count: 28 });
+              audio?.play?.('explosion', { pos: crashImpact, ref: 44, gain: 1.0, jitter: 0 });
+              world.player?.addShake?.(.92);
               if (physics?.addBox && !wreckColliders.length) {
                 wreckColliders.push(physics.addBox(new Vector3(12.8, 0, 8.2), new Vector3(16.2, 2.4, 15.2), { surface: 'metal' }));
               }
-              world.tactical?.notify?.('💥 龙门吊轰然倒塌切断中路！沿右侧残骸冲向南端接应艇！',
-                '💥 GANTRY CRANE COLLAPSED! Flank around the burning wreck to the South Ladder!', true, 6.0);
-              companion?.moveTo(new Vector3(26.5, 0, 15.5));
+              world.tactical?.notify?.('💥 18 米龙门吊轰然倒塌！按 [G]/[F] 驾驶 SAR 四驱车冲出北门沿海大道！',
+                '💥 18M GANTRY CRANE COLLAPSED! Press [G]/[F] to break out north in the SAR 4x4!', true, 6.0);
             },
           },
           {
-            at: 14.0,
+            at: 13.8,
             run: () => {
-              companion?.speak('玛拉：「接应艇已经冲进南端航道了！我掩护你，全速撤到南梯登船！」',
-                'Mara: "The extraction cutter is racing into the south slip! I’ll cover—sprint for the ladder!"', true);
+              companion?.speak('玛拉：「四号泊位彻底封死了！跟我上 SAR 四驱车，沿沿海大道向北撞穿沃德的封锁线！」',
+                'Mara: "Berth 4 is sealed! Into the SAR 4x4—we smash Ward’s blockade north on Coastal Blvd!"', true);
             },
           },
         ],

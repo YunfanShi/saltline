@@ -94,9 +94,9 @@
       },
       {
         id: 'moonlit', zh: '🌙 真实夜色港', en: 'True Night Harbor', hour: 23.0,
-        fog: 0x0f1a29, density: 0.00078,
-        sun: 0x7aa4d6, sunInt: 1.05, hemiSky: 0x334d70, hemiGnd: 0x111924, hemiInt: 0.58,
-        envTop: 0x060d18, envHor: 0x172840, envSea: 0x050b14, sunElev: 0.62, exposure: 0.90,
+        fog: 0x0e1a2b, density: 0.00072,
+        sun: 0x86b2e6, sunInt: 1.32, hemiSky: 0x3b5880, hemiGnd: 0x141e2b, hemiInt: 0.72,
+        envTop: 0x07101f, envHor: 0x1b304d, envSea: 0x060d18, sunElev: 0.62, exposure: 0.98,
       },
     ];
 
@@ -105,40 +105,88 @@
 
     const dayKeys = [{ ...presets[3], hour: 4.3 }, ...presets];
     const previousEnvironment = scene?.environment;
-    let lights, skyUniforms, reflectionSlot, elapsed = 0;
+    let lights = null, skyUniforms = null, cachedSceneChildCount = -1, reflectionSlot, elapsed = 0;
+    const dynamicLights = [];
+    const emissiveMats = [];
     const mixed = new THREE.Color(), other = new THREE.Color();
-    const blendColor = (a,b,t) => mixed.setHex(a).lerp(other.setHex(b),t).getHex();
+    const blendColor = (a, b, t) => mixed.setHex(a).lerp(other.setHex(b), t).getHex();
+
+    function invalidateLightCache() {
+      lights = null;
+      skyUniforms = null;
+      cachedSceneChildCount = -1;
+    }
+
+    function registerDynamicLight(light, { dayIntensity = 0, nightIntensity = 14 } = {}) {
+      if (!light) return null;
+      const rec = { light, dayIntensity, nightIntensity };
+      dynamicLights.push(rec);
+      return rec;
+    }
+
+    function registerEmissiveMaterial(mat, { day = 0.28, night = 1.55 } = {}) {
+      if (!mat) return null;
+      const rec = { mat, day, night };
+      emissiveMats.push(rec);
+      return rec;
+    }
+
+    function computeNightFactor(hour) {
+      if (hour >= 20.0 || hour < 5.0) return 1.0;
+      if (hour >= 17.5 && hour < 20.0) return (hour - 17.5) / 2.5;
+      if (hour >= 5.0 && hour < 7.5) return 1.0 - (hour - 5.0) / 2.5;
+      return 0.0;
+    }
+
+    function syncSceneLightCache() {
+      const childCount = scene?.children?.length ?? 0;
+      const stale = !lights || childCount !== cachedSceneChildCount || lights.some(l => !l.parent);
+      if (!stale) return;
+      lights = [];
+      skyUniforms = [];
+      cachedSceneChildCount = childCount;
+      scene?.traverse?.(node => {
+        if (node.isDirectionalLight || node.isHemisphereLight) lights.push(node);
+        const u = node.material?.uniforms;
+        if (u?.uZen && u.uHor) skyUniforms.push(u);
+      });
+    }
+
     function setTimeOfDay(hour) {
       timeOfDay = (hour % 24 + 24) % 24;
       let end = dayKeys.findIndex(p => p.hour > timeOfDay);
       if (end < 0) end = 0;
-      const a = dayKeys[(end+dayKeys.length-1)%dayKeys.length], b=dayKeys[end];
-      const t = ((timeOfDay-a.hour+24)%24)/((b.hour-a.hour+24)%24);
+      const a = dayKeys[(end + dayKeys.length - 1) % dayKeys.length], b = dayKeys[end];
+      const t = ((timeOfDay - a.hour + 24) % 24) / ((b.hour - a.hour + 24) % 24);
       const p = {};
-      for (const key of ['sun','fog','hemiSky','hemiGnd','envTop','envHor','envSea'])
-        p[key] = blendColor(a[key],b[key],t);
-      for (const key of ['density','sunInt','hemiInt','exposure','sunElev'])
-        p[key] = a[key] + (b[key]-a[key])*t;
-      const rain=Math.max(0,Math.min(1,world.ground?.rainLevel ?? 0));
-      p.sunInt *= 1-.25*rain;
-      p.density += rain*.00016;
-      p.hemiInt *= 1-.08*rain;
-      if (!lights) {
-        lights=[]; skyUniforms=[];
-        scene?.traverse?.(node => {
-          if (node.isDirectionalLight || node.isHemisphereLight) lights.push(node);
-          const u=node.material?.uniforms;
-          if (u?.uZen && u.uHor) skyUniforms.push(u);
-        });
-      }
-      const az = (timeOfDay-6)*Math.PI/12-Math.PI*.35;
-      const dir = new THREE.Vector3(Math.cos(az)*Math.cos(p.sunElev),Math.sin(p.sunElev),Math.sin(az)*Math.cos(p.sunElev));
+      for (const key of ['sun', 'fog', 'hemiSky', 'hemiGnd', 'envTop', 'envHor', 'envSea'])
+        p[key] = blendColor(a[key], b[key], t);
+      for (const key of ['density', 'sunInt', 'hemiInt', 'exposure', 'sunElev'])
+        p[key] = a[key] + (b[key] - a[key]) * t;
+      const rain = Math.max(0, Math.min(1, world.ground?.rainLevel ?? 0));
+      p.sunInt *= 1 - .25 * rain;
+      p.density += rain * .00016;
+      p.hemiInt *= 1 - .08 * rain;
+      syncSceneLightCache();
+      const az = (timeOfDay - 6) * Math.PI / 12 - Math.PI * .35;
+      const dir = new THREE.Vector3(Math.cos(az) * Math.cos(p.sunElev), Math.sin(p.sunElev), Math.sin(az) * Math.cos(p.sunElev));
       for (const light of lights) {
         if (light.isDirectionalLight) {
           light.position.copy(dir).multiplyScalar(110);
-          light.color.setHex(p.sun); light.intensity=p.sunInt;
+          light.color.setHex(p.sun); light.intensity = p.sunInt;
         } else {
-          light.color.setHex(p.hemiSky); light.groundColor.setHex(p.hemiGnd); light.intensity=p.hemiInt;
+          light.color.setHex(p.hemiSky); light.groundColor.setHex(p.hemiGnd); light.intensity = p.hemiInt;
+        }
+      }
+      const nightFactor = computeNightFactor(timeOfDay);
+      for (let i = dynamicLights.length - 1; i >= 0; i--) {
+        const dl = dynamicLights[i];
+        if (!dl.light.parent) { dynamicLights.splice(i, 1); continue; }
+        dl.light.intensity = dl.dayIntensity + (dl.nightIntensity - dl.dayIntensity) * nightFactor;
+      }
+      for (const em of emissiveMats) {
+        if ('emissiveIntensity' in em.mat) {
+          em.mat.emissiveIntensity = em.day + (em.night - em.day) * nightFactor;
         }
       }
       for (const u of skyUniforms) {
@@ -147,32 +195,36 @@
       }
       if (scene?.fog) {
         scene.fog.color.setHex(p.fog);
-        if ('density' in scene.fog) scene.fog.density=p.density;
+        if ('density' in scene.fog) scene.fog.density = p.density;
       }
-      if (renderer) renderer.toneMappingExposure=p.exposure;
-      const slot=Math.floor(timeOfDay*2);
-      if (reflectionSlot!==slot) {
-        buildProceduralEnvMap(p.envTop,p.envHor,p.envSea,p.sun,p.sunElev,dir);
-        reflectionSlot=slot;
+      if (renderer) renderer.toneMappingExposure = p.exposure;
+      const slot = Math.floor(timeOfDay * 2);
+      if (reflectionSlot !== slot) {
+        buildProceduralEnvMap(p.envTop, p.envHor, p.envSea, p.sun, p.sunElev, dir);
+        reflectionSlot = slot;
       }
+      p.nightFactor = nightFactor;
       return p;
     }
-    function applyPreset(idx, silent=false) {
-      currentIdx=((idx%presets.length)+presets.length)%presets.length;
-      const p=presets[currentIdx];
+    function applyPreset(idx, silent = false) {
+      currentIdx = ((idx % presets.length) + presets.length) % presets.length;
+      const p = presets[currentIdx];
       setTimeOfDay(p.hour);
-      if (!silent) world.tactical?.notify?.(p.zh,p.en,false,2.8);
+      if (!silent) world.tactical?.notify?.(p.zh, p.en, false, 2.8);
       return p;
     }
     function advance(dt) {
-      elapsed+=dt;
-      if (elapsed<.5) return;
-      const p=setTimeOfDay(timeOfDay+elapsed/150);
-      elapsed=0;
+      elapsed += dt;
+      if (elapsed < .5) return;
+      const p = setTimeOfDay(timeOfDay + elapsed / 150);
+      elapsed = 0;
       return p;
     }
 
     function dispose() {
+      dynamicLights.length = 0;
+      emissiveMats.length = 0;
+      invalidateLightCache();
       if (scene?.environment === envRT?.texture && scene) scene.environment = previousEnvironment;
       if (envRT) { envRT.dispose?.(); envRT = null; }
     }
@@ -182,6 +234,9 @@
       applyPreset,
       cycle: () => applyPreset(currentIdx + 1),
       setTimeOfDay, advance,
+      invalidateLightCache,
+      registerDynamicLight,
+      registerEmissiveMaterial,
       get current() { return presets[currentIdx]; },
       get index() { return currentIdx; },
       get timeOfDay() { return timeOfDay; },

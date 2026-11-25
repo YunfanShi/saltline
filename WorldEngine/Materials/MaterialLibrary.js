@@ -209,12 +209,37 @@
             rough = roughness * (1 - puddle) + 0.14 * puddle;
             mix = (agg - 0.5) * 0.2 - puddle * 0.25;
           } else if (kind === 'plaster') {
-            const panelSeam = (y % 64 < 2) ? 0.28 : 0;
-            const drip = Math.max(0, streak - 0.55) * weathering * (1 - v * 0.35);
-            h = 0.55 - panelSeam + fine * 0.16;
-            mix = drip * 1.15 + (fbm - 0.5) * 0.35;
-            rough = roughness - drip * 0.12;
-            ao = panelSeam > 0 ? 0.65 : 0.94 - drip * 0.15;
+            const panelSeam = (y % 64 < 2) ? 0.24 : 0;
+            const drip = Math.max(0, streak - 0.58) * weathering * (1 - v * 0.42);
+            h = 0.56 - panelSeam + fine * 0.14;
+            mix = drip * 0.85 + (fbm - 0.5) * 0.26;
+            rough = roughness - drip * 0.10;
+            ao = panelSeam > 0 ? 0.68 : 0.94 - drip * 0.14;
+          } else if (kind === 'sidewalk_paver') {
+            const rows = 4, cols = 4;
+            const bv = (v * rows) % 1, bu = (u * cols) % 1;
+            const joint = bv < 0.035 || bu < 0.035;
+            const slabTone = hash2(Math.floor(u * cols), Math.floor(v * rows), seed + 83);
+            h = joint ? 0.18 : 0.66 + (slabTone - 0.5) * 0.08 + fine * 0.14;
+            mix = joint ? 0.62 : (slabTone - 0.5) * 0.24 + (fbm - 0.5) * 0.22;
+            rough = joint ? 0.96 : roughness + (slabTone - 0.5) * 0.10;
+            ao = joint ? 0.46 : 0.92 - (fbm * 0.08);
+          } else if (kind === 'tank_industrial') {
+            const weldH = (y % 64 < 2) ? 0.36 : 0;
+            const weldV = (x % 128 < 2) ? 0.30 : 0;
+            const rivet = ((y % 64 === 4 || y % 64 === 60) && (x % 16 < 2)) ? 0.22 : 0;
+            const rustStreak = Math.max(0, streak - 0.62) * weathering * 1.45;
+            const panelVar = hash2(Math.floor(u * 2), Math.floor(v * 4), seed + 47);
+            h = 0.56 - weldH - weldV + rivet + fine * 0.12;
+            mix = rustStreak + weldH * 0.55 + (panelVar - 0.5) * 0.18 + (fbm - 0.5) * 0.22;
+            rough = roughness * (1 - rustStreak * 0.5) + 0.92 * (rustStreak * 0.5) + (fine - 0.5) * 0.14;
+            ao = (weldH > 0 || weldV > 0) ? 0.56 : 0.92 - rustStreak * 0.20;
+          } else if (kind === 'plaster_interior') {
+            const fineGrain = (fine - 0.5) * 0.12 + (fbm - 0.5) * 0.10;
+            h = 0.55 + fineGrain;
+            mix = fineGrain * 0.65;
+            rough = roughness + (fine - 0.5) * 0.08;
+            ao = 0.94 + (fbm - 0.5) * 0.06;
           }
 
           const damp = wetness * Math.max(0, 0.7 - fbm * 0.5);
@@ -272,31 +297,41 @@
       const roughnessMap = prepTex(cRgh, false);
       const normalMap = prepTex(cNrm, false);
       const aoMap = prepTex(cAo, false);
-      const mat = new THREE.MeshStandardMaterial({
+      const matOpts = {
         map, roughnessMap, normalMap, aoMap, aoMapIntensity: 0.72,
         roughness: 1.0, metalness,
-      });
+      };
+      if (opts.emissiveHex !== undefined) {
+        matOpts.emissive = new THREE.Color(opts.emissiveHex);
+        matOpts.emissiveMap = map;
+        matOpts.emissiveIntensity = opts.emissiveIntensity ?? 0.45;
+      }
+      const mat = new THREE.MeshStandardMaterial(matOpts);
+      if (opts.nightEmissive) mat.userData.nightEmissive = opts.nightEmissive;
       materials.push(mat);
       cache.set(key, mat);
       return mat;
     }
 
     const presets = {
-      concrete_dry:     { baseHex: 0x7c7f7b, accentHex: 0x5c5f5c, kind: 'concrete', weathering: 0.35, wetness: 0.05, roughness: 0.88, metalness: 0.04, seed: 11, resolution: 256 },
-      concrete_wet:     { baseHex: 0x5d615e, accentHex: 0x3b3f3d, kind: 'concrete', weathering: 0.55, wetness: 0.65, roughness: 0.72, metalness: 0.06, seed: 22, resolution: 256 },
-      concrete_aged:    { baseHex: 0x6f6e67, accentHex: 0x45443e, kind: 'concrete_cracked', weathering: 0.68, wetness: 0.25, roughness: 0.88, metalness: 0.04, seed: 33, resolution: 512 },
+      concrete_dry:     { baseHex: 0x7c7f7b, accentHex: 0x5c5f5c, kind: 'concrete', weathering: 0.28, wetness: 0.05, roughness: 0.88, metalness: 0.04, seed: 11, resolution: 256 },
+      concrete_wet:     { baseHex: 0x5d615e, accentHex: 0x3b3f3d, kind: 'concrete', weathering: 0.45, wetness: 0.58, roughness: 0.72, metalness: 0.06, seed: 22, resolution: 256 },
+      concrete_aged:    { baseHex: 0x74736c, accentHex: 0x4c4b45, kind: 'concrete_cracked', weathering: 0.55, wetness: 0.22, roughness: 0.86, metalness: 0.04, seed: 33, resolution: 512 },
+      sidewalk_paver:   { baseHex: 0x8a8c88, accentHex: 0x555855, kind: 'sidewalk_paver', weathering: 0.44, wetness: 0.28, roughness: 0.84, metalness: 0.04, seed: 37, resolution: 512, normalStrength: 2.8 },
+      tank_industrial:  { baseHex: 0xc8cbc6, accentHex: 0x6f5542, kind: 'tank_industrial', weathering: 0.58, wetness: 0.18, roughness: 0.52, metalness: 0.34, seed: 39, resolution: 512, normalStrength: 2.6 },
+      plaster_interior: { baseHex: 0x9fa39e, accentHex: 0x7c827e, kind: 'plaster_interior', weathering: 0.18, wetness: 0.0, roughness: 0.88, metalness: 0.02, seed: 41, resolution: 256, normalStrength: 1.2 },
       brick_red:        { baseHex: 0x7e483a, accentHex: 0x4a342c, kind: 'brick', weathering: 0.55, wetness: 0.18, roughness: 0.86, metalness: 0.04, seed: 44, resolution: 512 },
       brick_coastal:    { baseHex: 0x6d5548, accentHex: 0x403732, kind: 'brick', weathering: 0.62, wetness: 0.25, roughness: 0.88, metalness: 0.04, seed: 55, resolution: 512 },
       roof_tile:        { baseHex: 0x7f4432, accentHex: 0x4e291e, kind: 'roof_tile', weathering: 0.50, wetness: 0.22, roughness: 0.78, metalness: 0.05, seed: 59, resolution: 512, normalStrength: 3.2 },
       granite:          { baseHex: 0x898a84, accentHex: 0x595b57, kind: 'granite', weathering: 0.42, wetness: 0.15, roughness: 0.80, metalness: 0.06, seed: 62, resolution: 512 },
       wood_timber:      { baseHex: 0x6b4e38, accentHex: 0x3e2d1f, kind: 'wood', weathering: 0.58, wetness: 0.20, roughness: 0.84, metalness: 0.03, seed: 64, resolution: 256 },
-      plaster_cream:    { baseHex: 0x9b9587, accentHex: 0x69645a, kind: 'plaster', weathering: 0.52, wetness: 0.20, roughness: 0.84, metalness: 0.03, seed: 66, resolution: 512 },
-      plaster_slate:    { baseHex: 0x757f85, accentHex: 0x4a5358, kind: 'plaster', weathering: 0.58, wetness: 0.28, roughness: 0.80, metalness: 0.06, seed: 77, resolution: 512 },
+      plaster_cream:    { baseHex: 0x9b9587, accentHex: 0x69645a, kind: 'plaster', weathering: 0.46, wetness: 0.18, roughness: 0.84, metalness: 0.03, seed: 66, resolution: 512 },
+      plaster_slate:    { baseHex: 0x757f85, accentHex: 0x4a5358, kind: 'plaster', weathering: 0.50, wetness: 0.24, roughness: 0.80, metalness: 0.06, seed: 77, resolution: 512 },
       metal_rusted:     { baseHex: 0x4c565c, accentHex: 0x733a22, kind: 'metal_rusted', weathering: 0.72, wetness: 0.22, roughness: 0.52, metalness: 0.68, seed: 88, resolution: 256 },
       metal_painted:    { baseHex: 0x3a4d59, accentHex: 0x26323a, kind: 'metal_rusted', weathering: 0.35, wetness: 0.20, roughness: 0.46, metalness: 0.58, seed: 99, resolution: 256 },
       corrugated_steel: { baseHex: 0x435058, accentHex: 0x6b3e28, kind: 'corrugated', weathering: 0.52, wetness: 0.24, roughness: 0.56, metalness: 0.55, seed: 105, resolution: 512, normalStrength: 3.4 },
       window_office:    { baseHex: 0x263945, accentHex: 0x698899, kind: 'window_glass', weathering: 0.15, wetness: 0.1, roughness: 0.14, metalness: 0.65, seed: 108, resolution: 256, normalStrength: 0.6 },
-      window_lit:       { baseHex: 0xa4824d, accentHex: 0xf4d59f, kind: 'window_glass', weathering: 0.10, wetness: 0.0, roughness: 0.22, metalness: 0.20, seed: 109, resolution: 256, normalStrength: 0.5 },
+      window_lit:       { baseHex: 0xb89054, accentHex: 0xffe0a8, kind: 'window_glass', weathering: 0.08, wetness: 0.0, roughness: 0.20, metalness: 0.18, seed: 109, resolution: 256, normalStrength: 0.5, emissiveHex: 0xffc978, emissiveIntensity: 0.42, nightEmissive: { day: 0.28, night: 1.55 } },
       road_asphalt:     { baseHex: 0x2d3236, accentHex: 0x1b1e21, kind: 'asphalt', weathering: 0.50, wetness: 0.45, roughness: 0.86, metalness: 0.05, seed: 111, resolution: 512 },
       cliff_stone:      { baseHex: 0x545952, accentHex: 0x333732, kind: 'stone', weathering: 0.72, wetness: 0.30, roughness: 0.92, metalness: 0.04, seed: 123, resolution: 512 },
       grass_coastal:    { baseHex: 0x354a33, accentHex: 0x223020, kind: 'concrete', weathering: 0.62, wetness: 0.22, roughness: 0.94, metalness: 0.02, seed: 131, resolution: 256 },

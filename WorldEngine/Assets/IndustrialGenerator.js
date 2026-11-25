@@ -69,13 +69,15 @@
       return g;
     }
 
-    // 2. LatheGeometry Domed Cryogenic / Pressurized Chemical Tank Cluster
+    // 2. LatheGeometry Domed Cryogenic / Pressurized Chemical Tank Cluster (weathered riveted PBR + valves + safety catwalk)
     function buildCryoTankCluster(parent, x, z, count = 3, spacing = 5.4) {
       const g = new Group();
       g.position.set(x, 0.16, z);
-      const tankMat = sharedMats.craneWhite || matLib.get('metal_painted');
-      const bandMat = sharedMats.steelGalv;
+      const tankMat = matLib.get('tank_industrial');
+      const bandMat = matLib.get('metal_rusted');
       const darkMat = sharedMats.steelDark;
+      const galvMat = sharedMats.steelGalv;
+      const hazardMat = sharedMats.hazard || bandMat;
 
       let tankGeo = null;
       if (typeof THREE.LatheGeometry === 'function' && typeof Vector2 === 'function') {
@@ -90,41 +92,86 @@
           new Vector2(0.45, 9.95),
           new Vector2(0.05, 10.0),
         ];
-        tankGeo = new THREE.LatheGeometry(pts, 20);
+        tankGeo = new THREE.LatheGeometry(pts, 24);
+        if (matLib?.applyWorldUV) matLib.applyWorldUV(tankGeo, 3.2);
         geos.push(tankGeo);
       }
-      const padGeo = new BoxGeometry(count * spacing + 2.4, 0.42, 5.6);
-      const legGeo = new CylinderGeometry(0.14, 0.18, 1.8, 8);
-      const ringGeo = new CylinderGeometry(2.02, 2.02, 0.24, 16);
-      geos.push(padGeo, legGeo, ringGeo);
+      const padGeo = new BoxGeometry(count * spacing + 2.8, 0.48, 6.2);
+      const curbGeo = new BoxGeometry(count * spacing + 3.0, 0.16, 0.24);
+      const legGeo = new CylinderGeometry(0.16, 0.22, 1.85, 10);
+      const ringGeo = new CylinderGeometry(2.01, 2.01, 0.22, 20);
+      const valveGeo = new CylinderGeometry(0.28, 0.34, 0.85, 10);
+      const pipeGeo = new CylinderGeometry(0.11, 0.11, 1.0, 8);
+      const railGeo = new BoxGeometry(1, 1, 1);
+      geos.push(padGeo, curbGeo, legGeo, ringGeo, valveGeo, pipeGeo, railGeo);
 
       const pad = new Mesh(padGeo, matLib.get('concrete_aged'));
-      pad.position.set(0, 0.21, 0);
+      pad.position.set(0, 0.24, 0);
       pad.receiveShadow = true; pad.matrixAutoUpdate = false; pad.updateMatrix();
       g.add(pad);
+      for (const cz of [-2.98, 2.98]) {
+        const curb = new Mesh(curbGeo, hazardMat);
+        curb.position.set(0, 0.54, cz);
+        curb.matrixAutoUpdate = false; curb.updateMatrix();
+        g.add(curb);
+      }
 
       const startX = -((count - 1) * spacing) / 2;
       for (let i = 0; i < count; i++) {
         const tx = startX + i * spacing;
         const body = tankGeo
           ? new Mesh(tankGeo, tankMat)
-          : new Mesh(new CylinderGeometry(1.9, 1.9, 8.8, 14), tankMat);
+          : new Mesh(new CylinderGeometry(1.9, 1.9, 8.8, 16), tankMat);
         body.position.set(tx, tankGeo ? 0.35 : 5.2, 0);
         body.receiveShadow = true; body.matrixAutoUpdate = false; body.updateMatrix();
         g.add(body);
-        for (const ry of [3.2, 7.6]) {
-          const ring = new Mesh(ringGeo, ry > 5 ? bandMat : darkMat);
+        for (const ry of [2.6, 5.4, 8.1]) {
+          const ring = new Mesh(ringGeo, ry === 5.4 ? bandMat : darkMat);
           ring.position.set(tx, ry, 0);
           ring.matrixAutoUpdate = false; ring.updateMatrix();
           g.add(ring);
         }
+        const valve = new Mesh(valveGeo, galvMat);
+        valve.position.set(tx, 10.65, 0);
+        valve.matrixAutoUpdate = false; valve.updateMatrix();
+        g.add(valve);
+        const standpipe = new Mesh(pipeGeo, galvMat);
+        standpipe.scale.set(1, 7.4, 1);
+        standpipe.position.set(tx + 2.08, 4.9, 0.45);
+        standpipe.matrixAutoUpdate = false; standpipe.updateMatrix();
+        g.add(standpipe);
         for (let l = 0; l < 4; l++) {
           const ang = (l / 4) * Math.PI * 2 + 0.4;
           const leg = new Mesh(legGeo, darkMat);
-          leg.position.set(tx + Math.cos(ang) * 1.42, 1.15, Math.sin(ang) * 1.42);
+          leg.position.set(tx + Math.cos(ang) * 1.42, 1.18, Math.sin(ang) * 1.42);
           leg.matrixAutoUpdate = false; leg.updateMatrix();
           g.add(leg);
         }
+      }
+      const header = new Mesh(pipeGeo, galvMat);
+      header.scale.set(1.5, (count - 1) * spacing + 1.2, 1.5);
+      header.rotation.z = Math.PI / 2;
+      header.position.set(0, 9.8, 1.65);
+      header.matrixAutoUpdate = false; header.updateMatrix();
+      g.add(header);
+      const walk = new Mesh(railGeo, darkMat);
+      walk.scale.set((count - 1) * spacing + 2.4, 0.14, 1.05);
+      walk.position.set(0, 9.3, -1.75);
+      walk.matrixAutoUpdate = false; walk.updateMatrix();
+      g.add(walk);
+      const railLen = (count - 1) * spacing + 2.4;
+      const rail = new Mesh(railGeo, sharedMats.yellowPaint || hazardMat);
+      rail.scale.set(railLen, 0.08, 0.08);
+      rail.position.set(0, 10.25, -2.24);
+      rail.matrixAutoUpdate = false; rail.updateMatrix();
+      g.add(rail);
+      for (let p = 0; p <= count; p++) {
+        const px = -railLen / 2 + (p / count) * railLen;
+        const post = new Mesh(railGeo, sharedMats.yellowPaint || hazardMat);
+        post.scale.set(0.07, 0.96, 0.07);
+        post.position.set(px, 9.78, -2.24);
+        post.matrixAutoUpdate = false; post.updateMatrix();
+        g.add(post);
       }
       parent.add(g);
       return g;

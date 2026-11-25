@@ -82,6 +82,28 @@
       chunk.dormantClock = 0;
     }
 
+    function disposeUntrackedOwned(rootObj) {
+      if (!rootObj?.traverse) return;
+      const seen = new Set();
+      rootObj.traverse(node => {
+        if (node.geometry && node.geometry.userData?.streamOwned && !resourceRefs.has(node.geometry) && !seen.has(node.geometry)) {
+          seen.add(node.geometry);
+          node.geometry.dispose?.();
+          totalDisposals++;
+        }
+        if (node.material) {
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          for (const m of mats) {
+            if (m && m.userData?.streamOwned && !resourceRefs.has(m) && !seen.has(m)) {
+              seen.add(m);
+              m.dispose?.();
+              totalDisposals++;
+            }
+          }
+        }
+      });
+    }
+
     function unloadChunk(chunk) {
       const { sec } = chunk;
       if (sec.detailed) {
@@ -94,6 +116,10 @@
         syncColliders?.(sec, false);
         trackObjectResources(sec.shell, -1);
         trackObjectResources(sec.detail, -1);
+      } else if (sec._started) {
+        // Dispose any streamOwned GPU resources created during a cancelled partial onBuild()
+        disposeUntrackedOwned(sec.shell);
+        disposeUntrackedOwned(sec.detail);
       }
       if (typeof sec.onUnload === 'function' && sec._started) {
         sec.onUnload();

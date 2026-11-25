@@ -15,6 +15,160 @@
  *   - Realistic Weathered PBR Aesthetic (matches Berth 4, no cartoony blocks) + Interactive [E] Doors,
  *     Medical Triage, Ammo Lockers, Stealth Indicator, 8-Act 《失联名单》 Campaign & Free-Roam Sightseeing. */
 (() => {
+  const OPEN_WORLD_STORAGE_KEY = 'saltline.openworld.campaign.v1';
+  const OPEN_WORLD_ACTS = Object.freeze([
+    {
+      id: 'ow-0', stage: 0, art: './art/campaign-berth.jpg',
+      title: ['Act I · Berth 4 Lockdown', '第一幕 · 四号泊位破局'],
+      description: [
+        'Destroy two Anvil air-defense jammers at Berth 4, survive the gunship ambush & crane collapse, and secure Old Hawke’s 05:31/05:34 discrepancy.',
+        '摧毁四号泊位 2 座铁砧防空干扰塔，触发炮艇空袭与 18 米龙门吊坍塌，锁定老霍克 05:31/05:34 篡改证物。'
+      ]
+    },
+    {
+      id: 'ow-1', stage: 1, art: './art/campaign-return-harbor.jpg',
+      title: ['Act II · Coastal Boulevard Breach', '第二幕 · 沿海大道高速撞卡'],
+      description: [
+        'Summon the SAR 4x4 ([G]/[F]) and smash through Anvil’s downtown highway blockade along Coastal Boulevard.',
+        '按 [G] 召唤并驾驶 SAR 战术四驱车，沿沿海大道向北高速撞穿铁砧城区主干道路障。'
+      ]
+    },
+    {
+      id: 'ow-2', stage: 2, art: './art/campaign-night-record.jpg',
+      title: ['Act III · SW Cryo Depot & Clinic', '第三幕 · 西南冷雾库与雷暴急救'],
+      description: [
+        'Push south into the Southwest Cold-Storage & Field Triage Clinic to destroy two cryo-locks under an incoming coastal lightning storm.',
+        '沿西线内陆大道南下西南冷雾库与战地分诊中心，击毁 2 台冷库锁控箱，在强雷暴中抢出第 17 人档案。'
+      ]
+    },
+    {
+      id: 'ow-3', stage: 3, art: './art/campaign-rail.jpg',
+      title: ['Act IV · West Rail Freight Yard', '第四幕 · 西区铁路货场截停专列'],
+      description: [
+        'Storm the West Rail Freight Yard and blow two marshalling signal breakers to halt Anvil’s manifest train amidst a fuel chain blast.',
+        '北上西区铁路编组货场，炸毁 2 处铁路信号主控闸，在油罐连爆冲击中迫停铁砧证物专列。'
+      ]
+    },
+    {
+      id: 'ow-4', stage: 4, art: './art/campaign-last-pilot.jpg',
+      title: ['Act V · Mountain Ridge Comms (+14m)', '第五幕 · 西岸山地卫星站登顶狙击'],
+      description: [
+        'Climb the West Mountain switchback to the +14m radar bunker and snipe three satellite cooling cores to hijack the broadcast link.',
+        '沿盘山高架公路爬升至 +14m 西岸山顶，狙击 3 个卫星散热芯劫持全城雷达链路。'
+      ]
+    },
+    {
+      id: 'ow-5', stage: 5, art: './art/campaign-tidegate.jpg',
+      title: ['Act VI · 12m East Sea Storm Surge', '第六幕 · 12 米东海海啸高地求生'],
+      description: [
+        'Anvil blew the South Tide Gate. Hold the +14m mountain summit for 12 seconds as a 12-meter tsunami engulfs the harbor below.',
+        '铁砧炸毁南防潮闸引发 12 米风暴巨浪——死守 +14m 西岸山顶高地 12 秒，俯瞰巨浪吞没港区。'
+      ]
+    },
+    {
+      id: 'ow-6', stage: 6, art: './art/campaign-drydock.jpg',
+      title: ['Act VII · South Drydock & Lighthouse', '第七幕 · 南港船坞炮火点灯'],
+      description: [
+        'Push through artillery fire into the South Drydock peninsula and destroy two power jammers to relight the 22m headland lighthouse.',
+        '顶着重炮覆盖冲向南港旧船坞与海角，摧毁 2 座电源干扰器，重启 22 米岸角灯塔指引救援舰队。'
+      ]
+    },
+    {
+      id: 'ow-7', stage: 7, art: './art/campaign-reopen.jpg',
+      title: ['Act VIII · Coastal Airfield Exfil', '第八幕 · 海岸应急机场跑道撤离'],
+      description: [
+        'Race north to the NW Coastal Airfield under runway artillery and drive into the arched rescue hangar to complete the campaign.',
+        '全速北上西北沿海应急机场，沿 110 米跑道穿过炮火冲进拱形机库，完成全城战役撤离。'
+      ]
+    }
+  ]);
+
+  function createOpenWorldCampaignProgress(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+    const clampStage = n => (Number.isInteger(n) && n >= 0 && n < OPEN_WORLD_ACTS.length) ? n : -1;
+    const stageOf = id => {
+      if (typeof id === 'number') return clampStage(id);
+      if (typeof id === 'string') {
+        const m = /^ow-(\d+)$/.exec(id);
+        if (m) return clampStage(Number(m[1]));
+      }
+      return -1;
+    };
+    const read = () => {
+      try {
+        const raw = storage?.getItem?.(OPEN_WORLD_STORAGE_KEY);
+        if (!raw) return { unlocked: 0, completed: [] };
+        const parsed = JSON.parse(raw);
+        const completed = Array.from(new Set((Array.isArray(parsed?.completed) ? parsed.completed : []).map(clampStage).filter(i => i >= 0))).sort((a, b) => a - b);
+        const maxCompletedNext = completed.length ? Math.min(OPEN_WORLD_ACTS.length - 1, completed[completed.length - 1] + 1) : 0;
+        const unlocked = Math.max(0, Math.min(OPEN_WORLD_ACTS.length - 1, Number.isInteger(parsed?.unlocked) ? parsed.unlocked : 0, OPEN_WORLD_ACTS.length - 1), maxCompletedNext);
+        return { unlocked, completed };
+      } catch {
+        return { unlocked: 0, completed: [] };
+      }
+    };
+    const write = state => {
+      try { storage?.setItem?.(OPEN_WORLD_STORAGE_KEY, JSON.stringify(state)); } catch {}
+    };
+    const nextStageIndex = state => {
+      for (let i = 0; i < OPEN_WORLD_ACTS.length; i++) {
+        if (!state.completed.includes(i)) return Math.min(i, state.unlocked);
+      }
+      return OPEN_WORLD_ACTS.length;
+    };
+    return {
+      acts: OPEN_WORLD_ACTS,
+      stageOf,
+      get unlocked() { return read().unlocked; },
+      get completed() { return read().completed; },
+      get completedCount() { return read().completed.length; },
+      get nextIndex() { return nextStageIndex(read()); },
+      get next() {
+        const idx = nextStageIndex(read());
+        return idx < OPEN_WORLD_ACTS.length ? `ow-${idx}` : null;
+      },
+      status(id) {
+        const idx = stageOf(id);
+        if (idx < 0) return 'locked';
+        const state = read();
+        if (state.completed.includes(idx)) return 'complete';
+        const nextIdx = nextStageIndex(state);
+        if (idx === nextIdx) return 'next';
+        if (idx <= state.unlocked) return 'available';
+        return 'locked';
+      },
+      completeStage(id) {
+        const idx = stageOf(id);
+        if (idx < 0) return read();
+        const state = read();
+        if (!state.completed.includes(idx)) state.completed = [...state.completed, idx].sort((a, b) => a - b);
+        state.unlocked = Math.max(state.unlocked, Math.min(OPEN_WORLD_ACTS.length - 1, idx + 1));
+        write(state);
+        return state;
+      },
+      unlockUpTo(id) {
+        const idx = stageOf(id);
+        if (idx < 0) return read();
+        const state = read();
+        state.unlocked = Math.max(state.unlocked, idx);
+        write(state);
+        return state;
+      },
+      reset() {
+        const state = { unlocked: 0, completed: [] };
+        write(state);
+        return state;
+      },
+    };
+  }
+
+  if (typeof window !== 'undefined') {
+    window.SaltlineOpenWorldActs = OPEN_WORLD_ACTS;
+    window.createOpenWorldCampaignProgress = createOpenWorldCampaignProgress;
+  }
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { OPEN_WORLD_ACTS, createOpenWorldCampaignProgress, OPEN_WORLD_STORAGE_KEY };
+  }
+
   function injectStyles() {
     if (document.getElementById('saltline-world-perf-style')) return;
     const style = document.createElement('style');
@@ -30,11 +184,32 @@
       .sl-stealth-pill.alert{background:rgba(235,88,68,.2);color:#ff9486;border-color:rgba(255,148,134,.45)}
       .sl-interact-prompt{position:fixed;left:50%;bottom:136px;transform:translateX(-50%);z-index:24;background:rgba(10,16,21,.92);border:1px solid rgba(240,196,108,.65);border-left:4px solid #f0c46c;border-radius:6px;padding:8px 16px;color:#f5f8fa;font:700 13px/1.3 system-ui,-apple-system,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none;display:none}
       .sl-interact-prompt.on{display:block}
-      .sl-act-card{position:fixed;left:50%;top:19%;transform:translate(-50%,-10px);z-index:32;pointer-events:none;text-align:center;opacity:0;transition:opacity .45s ease,transform .45s ease;background:linear-gradient(90deg,rgba(8,14,19,0),rgba(8,14,19,.88) 18%,rgba(8,14,19,.88) 82%,rgba(8,14,19,0));padding:14px 48px;border-top:1px solid rgba(240,185,78,.58);border-bottom:1px solid rgba(240,185,78,.58)}
-      .sl-act-card.show{opacity:1;transform:translate(-50%,0)}
-      .sl-act-kicker{font:700 11px/1 ui-monospace,monospace;letter-spacing:.32em;color:#f0b94e;text-transform:uppercase;margin-bottom:6px}
-      .sl-act-title{font:800 26px/1.15 system-ui,-apple-system,sans-serif;color:#f4fafc;letter-spacing:.08em;text-shadow:0 2px 14px rgba(0,0,0,.75)}
-      .sl-act-sub{font:500 13px/1.35 system-ui,-apple-system,sans-serif;color:#a8dce8;margin-top:5px}
+      .sl-act-card{position:fixed;left:50%;top:18%;transform:translate(-50%,-14px) scale(.97);z-index:32;pointer-events:none;text-align:center;opacity:0;transition:opacity .55s ease,transform .55s cubic-bezier(.22,1,.36,1);background:linear-gradient(90deg,rgba(8,14,19,0),rgba(8,14,19,.92) 16%,rgba(8,14,19,.92) 84%,rgba(8,14,19,0));padding:16px 56px;border-top:1px solid rgba(240,185,78,.68);border-bottom:1px solid rgba(240,185,78,.68)}
+      .sl-act-card.show{opacity:1;transform:translate(-50%,0) scale(1)}
+      .sl-act-kicker{font:700 11px/1 ui-monospace,monospace;letter-spacing:.34em;color:#f0b94e;text-transform:uppercase;margin-bottom:6px}
+      .sl-act-title{font:800 28px/1.15 system-ui,-apple-system,sans-serif;color:#f4fafc;letter-spacing:.1em;text-shadow:0 2px 16px rgba(0,0,0,.8)}
+      .sl-act-sub{font:500 13.5px/1.38 system-ui,-apple-system,sans-serif;color:#b2e2ee;margin-top:6px}
+      .sl-cinema-bar{position:fixed;left:0;right:0;height:0;z-index:30;background:#04080c;pointer-events:none;transition:height .65s cubic-bezier(.22,1,.36,1)}
+      .sl-cinema-bar.top{top:0;border-bottom:1px solid rgba(240,185,78,.28)}
+      .sl-cinema-bar.bottom{bottom:0;border-top:1px solid rgba(240,185,78,.28)}
+      .sl-cinema-bar.on{height:58px}
+      .sl-story-box{position:fixed;left:50%;bottom:74px;transform:translate(-50%,10px);z-index:33;width:min(680px,88vw);background:rgba(7,13,18,.90);border:1px solid rgba(102,217,240,.38);border-left:4px solid #66d9f0;border-radius:6px;padding:10px 16px;color:#edf7fa;pointer-events:none;opacity:0;transition:opacity .35s ease,transform .35s ease;box-shadow:0 10px 28px rgba(0,0,0,.55);backdrop-filter:blur(6px)}
+      .sl-story-box.show{opacity:1;transform:translate(-50%,0)}
+      .sl-story-box.hostile{border-left-color:#f05442;border-color:rgba(240,84,66,.45)}
+      .sl-story-box.rescue{border-left-color:#42d982;border-color:rgba(66,217,130,.45)}
+      .sl-story-speaker{font:700 11px/1 ui-monospace,monospace;letter-spacing:.16em;color:#66d9f0;margin-bottom:5px;text-transform:uppercase}
+      .sl-story-box.hostile .sl-story-speaker{color:#ff8978}
+      .sl-story-box.rescue .sl-story-speaker{color:#72f0a8}
+      .sl-story-line{font:600 14px/1.45 system-ui,-apple-system,sans-serif;color:#f3fafc}
+      .sl-finale-card{position:fixed;inset:0;z-index:62;background:rgba(5,10,15,.82);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;color:#eef8fb}
+      .sl-finale-card.open{display:flex}
+      .sl-finale-inner{width:min(580px,92vw);background:rgba(11,18,25,.96);border:1px solid rgba(240,185,78,.55);border-radius:10px;padding:28px 32px;text-align:center;box-shadow:0 22px 54px rgba(0,0,0,.72)}
+      .sl-finale-kicker{font:700 11.5px/1 ui-monospace,monospace;letter-spacing:.28em;color:#f0b94e;margin-bottom:10px}
+      .sl-finale-title{font:800 28px/1.2 system-ui,sans-serif;color:#ffffff;margin-bottom:12px}
+      .sl-finale-copy{font:500 14px/1.65 system-ui,sans-serif;color:#b8d7e0;margin-bottom:22px;text-align:left}
+      .sl-finale-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+      .sl-finale-btn{background:rgba(102,217,240,.18);color:#dff8ff;border:1px solid rgba(102,217,240,.55);border-radius:6px;padding:9px 20px;font:700 13px/1 system-ui,sans-serif;cursor:pointer}
+      .sl-finale-btn.primary{background:rgba(240,185,78,.24);color:#fff2cc;border-color:rgba(240,185,78,.72)}
       .sl-photo-pill{position:fixed;right:18px;bottom:16px;z-index:25;background:rgba(8,14,19,.72);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:5px 12px;color:#d6eef2;font:600 11px/1 system-ui,sans-serif;pointer-events:none;display:none}
       .sl-photo-pill.on{display:block}
       .sl-minimap{position:fixed;left:18px;bottom:92px;z-index:18;width:194px;background:rgba(8,14,20,.86);border:1.5px solid rgba(102,217,240,.42);border-radius:9px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);backdrop-filter:blur(6px);transition:opacity .25s;pointer-events:auto;cursor:pointer}
@@ -48,7 +223,6 @@
       .sl-obj-pin{position:fixed;z-index:22;transform:translate(-50%,-50%);color:rgba(255,232,168,.95);font:700 11px/1 ui-monospace,monospace;text-shadow:0 1px 6px rgba(0,0,0,.92);letter-spacing:.06em;white-space:nowrap;pointer-events:none;display:none}
       .sl-obj-pin b{color:#ffffff;margin-left:3px;font-weight:700}
       .sl-guide-strip{display:none!important}
-      .sl-world-hud,.sl-minimap,.sl-pin-layer{display:none!important}
       .sl-interact-prompt{background:rgba(8,12,16,.72)!important;border:none!important;border-left:2px solid rgba(255,255,255,.8)!important;border-radius:2px!important;padding:5px 12px!important;font:600 12.5px/1.3 system-ui,sans-serif!important;box-shadow:none!important}
       .sl-map-overlay{position:fixed;inset:0;z-index:60;background:rgba(6,11,16,.84);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;color:#e6f4f7}
       .sl-map-overlay.open{display:flex}
@@ -80,7 +254,7 @@
     document.head.appendChild(style);
   }
 
-  window.createPortOpenWorld = (world, { chapterId = 'berth' } = {}) => {
+  if (typeof window !== 'undefined') window.createPortOpenWorld = (world, { chapterId = 'berth' } = {}) => {
     if (chapterId !== 'berth') return null;
     const { THREE, scene, physics, fx, audio } = world;
     const { Group, Mesh, BoxGeometry, CylinderGeometry, ConeGeometry, SphereGeometry,
@@ -366,18 +540,28 @@
     function addInteractiveDoor(parent, { id, labelZh, x, y, z, width = 3.8, height = 3.4, axis = 'z', initiallyOpen = false }) {
       const frame = new Group();
       frame.position.set(x, y, z);
-      const leaf = new Mesh(boxGeo, M.steelWorn);
+      const doorMat = matLib ? matLib.get('metal_painted') : M.steelWorn;
+      const leaf = new Mesh(boxGeo, doorMat);
       const isX = axis === 'x';
-      leaf.scale.set(isX ? width : .28, height, isX ? .28 : width);
+      leaf.scale.set(isX ? width : .24, height, isX ? .24 : width);
       leaf.position.set(0, height / 2, 0);
+      const railTop = new Mesh(boxGeo, M.steelDark);
+      railTop.scale.set(isX ? width + .2 : .34, .18, isX ? .34 : width + .2);
+      railTop.position.set(0, height - .06, 0);
+      const visionGlass = new Mesh(boxGeo, smokedPane);
+      visionGlass.scale.set(isX ? width * .46 : .28, .52, isX ? .28 : width * .46);
+      visionGlass.position.set(0, height * .64, 0);
+      const kickPlate = new Mesh(boxGeo, M.steelDark);
+      kickPlate.scale.set(isX ? width * .96 : .28, .38, isX ? .28 : width * .96);
+      kickPlate.position.set(0, .20, 0);
       const stripe = new Mesh(boxGeo, M.hazard);
-      stripe.scale.set(isX ? width * .92 : .32, .26, isX ? .32 : width * .92);
-      stripe.position.set(0, 1.1, 0);
+      stripe.scale.set(isX ? width * .94 : .29, .14, isX ? .29 : width * .94);
+      stripe.position.set(0, .96, 0);
       const lamp = new Mesh(boxGeo, initiallyOpen ? M.greenSignal : M.redCore);
-      lamp.scale.set(.26, .26, .26);
+      lamp.scale.set(.22, .22, .22);
       lamp.position.set(isX ? width / 2 + .3 : .35, 1.7, isX ? .35 : width / 2 + .3);
       const doorLeafGroup = new Group();
-      doorLeafGroup.add(leaf, stripe);
+      doorLeafGroup.add(leaf, railTop, visionGlass, kickPlate, stripe);
       frame.add(doorLeafGroup, lamp);
       parent.add(frame);
 
@@ -1350,13 +1534,24 @@
     for (let x = -100; x <= -38; x += 8) addBox(horizonRoot, M.yellowPaint, 3.6, .012, .18, x, .222, 42);
     for (let x = -100; x <= -38; x += 8) addBox(horizonRoot, M.yellowPaint, 3.6, .012, .18, x, .222, 122);
 
-    // CONTINUOUS WESTERN FORESTED CLIFF ESCARPMENT (WorldEngine Stratified Vertex-Color Cliff + Wind-Swaying Instanced Pine Forest)
+    // CONTINUOUS WESTERN FORESTED CLIFF ESCARPMENT (Organic multi-elevation clusters — NO soldier-row spacing!)
     {
       const pinePositions = [];
-      for (let pz=-124;pz<=140;pz+=8.5) {
-        const x=-225.5+Math.sin(pz*1.3)*1.6, x2=-231.5+Math.cos(pz*.9)*2;
-        pinePositions.push([x,terrainGen.sampleHeight(x,pz),pz,1.15+Math.abs(Math.sin(pz*.7))*.45]);
-        pinePositions.push([x2,terrainGen.sampleHeight(x2,pz+4.2),pz+4.2,1.3+Math.abs(Math.cos(pz*.5))*.35]);
+      const rngForest = matLib?.mulberry32 ? matLib.mulberry32(7331) : (() => 0.5);
+      for (let pz = -124; pz <= 140; pz += 6.2) {
+        const z1 = pz + (rngForest() - 0.5) * 4.4;
+        const x1 = -221.5 - rngForest() * 6.5;
+        pinePositions.push([x1, terrainGen.sampleHeight(x1, z1), z1, 0.85 + rngForest() * 0.72]);
+        if (rngForest() > 0.25) {
+          const z2 = pz + (rngForest() - 0.5) * 5.2;
+          const x2 = -227.5 - rngForest() * 9.5;
+          pinePositions.push([x2, terrainGen.sampleHeight(x2, z2), z2, 1.05 + rngForest() * 0.68]);
+        }
+        if (rngForest() > 0.58) {
+          const z3 = pz + (rngForest() - 0.5) * 4.0;
+          const x3 = -217.8 - rngForest() * 3.4;
+          pinePositions.push([x3, terrainGen.sampleHeight(x3, z3), z3, 0.68 + rngForest() * 0.42]);
+        }
       }
       if (terrainGen) {
         terrainGen.buildWindPineForest(horizonRoot, crown, cylGeo, M.wood, pinePositions, updaters);
@@ -1460,10 +1655,44 @@
     // =========================================================================
     const city = makeSector('city', '沿海城区与滨海长廊', 'Coastal City & Seafront', [-42, 0, -86], 155);
     const quarter = WE.planCoastalQuarter(M);
-    for (const [west,east,z,width] of quarter.crossStreets)
-      addBox(city.shell,M.asphalt,east-west,.05,width,(west+east)/2,.185,z);
-    for (const [x0,z0,x1,z1] of quarter.sidewalks)
-      solid(city,city.shell,M.concrete,x0,.15,z0,x1,.30,z1,'concrete',true);
+    const paverMat = matLib ? matLib.get('sidewalk_paver') : M.concrete;
+    const curbStoneMat = matLib ? matLib.get('granite') : M.concreteDirty;
+    const interiorWallMat = matLib ? matLib.get('plaster_interior') : M.plasterGrey;
+    const facadeCleanMat = matLib ? matLib.get('plaster_cream') : M.plasterGrey;
+    if (lightingSys && matLib) {
+      lightingSys.registerEmissiveMaterial?.(matLib.get('window_lit'), { day: 0.28, night: 1.65 });
+    }
+    for (const [west, east, z, width] of quarter.crossStreets)
+      addBox(city.shell, M.asphalt, east - west, .05, width, (west + east) / 2, .185, z);
+    // Upgraded Coastal Quarter Sidewalks: stone-paver slabs + beveled granite curbs + dark gutter channel + cast-iron storm drains
+    for (const [x0, z0, x1, z1] of quarter.sidewalks) {
+      solid(city, city.shell, paverMat, x0, .15, z0, x1, .31, z1, 'concrete', true);
+      const swW = x1 - x0, swD = z1 - z0;
+      if (swD > swW) {
+        const roadEdgeX = x0 < -26 ? x1 - .14 : x0 + .14;
+        const gutterX = x0 < -26 ? x1 + .22 : x0 - .22;
+        addBox(city.detail, curbStoneMat, .28, .20, swD, roadEdgeX, .24, (z0 + z1) / 2);
+        addBox(city.detail, M.steelDark, .42, .02, swD, gutterX, .212, (z0 + z1) / 2);
+        for (let dz = z0 + 5; dz < z1 - 3; dz += 12) {
+          addBox(city.detail, M.steelWorn, .44, .026, .76, gutterX, .216, dz);
+        }
+      } else {
+        const roadEdgeZ = z0 > -84 ? z0 + .14 : z1 - .14;
+        addBox(city.detail, curbStoneMat, swW, .20, .28, (x0 + x1) / 2, .24, roadEdgeZ);
+      }
+    }
+    // Street trees in granite-bordered planters + cast-iron pedestrian bollards along Coastal Blvd
+    for (const [px, pz] of [[-35.2, -41.5], [-35.2, -68.5], [-16.6, -40.5], [-16.6, -69.5]]) {
+      addBox(city.detail, curbStoneMat, 1.95, .28, 1.95, px, .38, pz);
+      addBox(city.detail, M.coastalGrass, 1.55, .14, 1.55, px, .46, pz);
+      addPineTree(city.detail, px, .48, pz, .62);
+    }
+    for (const bz of [-45.5, -49.5, -60.5, -64.5]) {
+      addCyl(city.detail, M.steelDark, .09, .86, -18.55, .74, bz);
+      addCyl(city.detail, M.steelGalv, .10, .08, -18.55, 1.18, bz);
+      addCyl(city.detail, M.steelDark, .09, .86, -33.45, .74, bz);
+      addCyl(city.detail, M.steelGalv, .10, .08, -33.45, 1.18, bz);
+    }
     for (let z = -34; z >= -140; z -= 6.5) addBox(city.detail, M.yellowPaint, .18, .015, 3.2, -26, .24, z);
     for (let x = -100; x <= 18; x += 6.5) {
       if (Math.abs(x + 26) < 9) continue;
@@ -1482,8 +1711,8 @@
       addBox(city.detail, M.redCore, .24, .24, .40, tx + (tx < -26 ? 4.8 : -4.8), 6.4, tz);
     }
     for (let pz = -138; pz <= -36; pz += 12) {
-      addBox(city.detail, M.wood, .7, .48, 2.4, 21.6, .24, pz); // Seafront benches
-      addBox(city.detail, M.steelGalv, .10, 1.05, 11.8, 23.4, 1.45, pz); // Seawall safety rail
+      addBox(city.detail, M.wood, .7, .48, 2.4, 21.6, .24, pz);
+      addBox(city.detail, M.steelGalv, .10, 1.05, 11.8, 23.4, 1.45, pz);
     }
     // Smashable Anvil Highway Roadblock at Downtown Intersection (-26, 0, -76)
     for (let i = -2; i <= 2; i++) {
@@ -1498,21 +1727,21 @@
     for (const blk of blocks) {
       solid(city, city.shell, M.concreteDirty, blk.x0 - 2.0, -.04, blk.z0 - 2.0, blk.x1 + 2.0, .16, blk.z1 + 2.0, 'concrete', true);
       if (blk.facility) {
-        buildingGen.buildFreightExchange(city.shell,blk,externalAssets,(x0,y0,z0,x1,y1,z1) =>
-          city.colliderSpecs.push({min:new Vector3(x0,y0,z0),max:new Vector3(x1,y1,z1),surface:'concrete'}));
-        for (const z of [blk.cz-8,blk.cz+8]) {
-          placePortProp(city,city.detail,'shelf_rack',blk.x0+4,.16,z,Math.PI/2);
-          placePortProp(city,city.detail,'pallet_stack',blk.cx,.16,z,.13);
+        buildingGen.buildFreightExchange(city.shell, blk, externalAssets, (x0, y0, z0, x1, y1, z1) =>
+          city.colliderSpecs.push({ min: new Vector3(x0, y0, z0), max: new Vector3(x1, y1, z1), surface: 'concrete' }));
+        for (const z of [blk.cz - 8, blk.cz + 8]) {
+          placePortProp(city, city.detail, 'shelf_rack', blk.x0 + 4, .16, z, Math.PI / 2);
+          placePortProp(city, city.detail, 'pallet_stack', blk.cx, .16, z, .13);
         }
-        placePortProp(city,city.detail,'forklift',blk.cx+2,.16,blk.cz-3,-.4);
+        placePortProp(city, city.detail, 'forklift', blk.cx + 2, .16, blk.cz - 3, -.4);
         placePortProp(city, city.detail, 'guard_booth', blk.x1 + .6, .16, blk.z1 - 4.2, -Math.PI / 2);
         placePortProp(city, city.detail, 'jersey_barrier', blk.x1 + 1.4, .16, blk.z0 + 5.5, Math.PI / 2);
         placePortProp(city, city.detail, 'dumpster', blk.x0 - 1.8, .16, blk.z0 + 6.5, 0);
       } else if (blk.enterable) {
         const bx0 = blk.x0 + 1.5, bx1 = blk.x1 - 1.5, bz0 = blk.z0 + 1.5, bz1 = blk.z1 - 1.5;
-        solid(city, city.shell, blk.mat, bx0, .16, bz0, bx1, 3.8, bz0 + .5, 'concrete', true);
-        solid(city, city.shell, blk.mat, bx1 - .5, .16, bz0, bx1, 3.8, bz1, 'concrete', true);
-        solid(city, city.shell, blk.mat, bx0, .16, bz1 - .5, bx1, 3.8, bz1, 'concrete', true);
+        solid(city, city.shell, facadeCleanMat, bx0, .16, bz0, bx1, 3.8, bz0 + .5, 'concrete', true);
+        solid(city, city.shell, facadeCleanMat, bx1 - .5, .16, bz0, bx1, 3.8, bz1, 'concrete', true);
+        solid(city, city.shell, facadeCleanMat, bx0, .16, bz1 - .5, bx1, 3.8, bz1, 'concrete', true);
         const entZ = (bz0 + bz1) / 2;
         const windowBays = [bz0 + 5.2, bz0 + 10.2, bz1 - 10.2, bz1 - 5.2];
         for (const [low, high, glazed] of [[.16, 1.18, false], [1.18, 3.02, true],
@@ -1521,76 +1750,101 @@
           if (low < 3.6) gaps.push([entZ - 2, entZ + 2]);
           let start = bz0;
           for (const [end, next] of [...gaps.sort((a, b) => a[0] - b[0]), [bz1, bz1]]) {
-            if (end > start) solid(city, city.shell, blk.mat, bx0, low, start, bx0 + .5, high, end, 'concrete', true);
+            if (end > start) solid(city, city.shell, low < 1.1 ? curbStoneMat : facadeCleanMat, bx0, low, start, bx0 + .5, high, end, 'concrete', true);
             start = next;
           }
         }
         solid(city, city.shell, M.concrete, bx0, 3.8, bz0, bx1, 4.1, bz1, 'concrete', true);
         buildingGen.buildDispatchWing(city.shell, { bx0, bx1, bz0, bz1, entZ, externalAssets });
-        const precinctSign = new Mesh(boxGeo,makeSignMat('COASTAL PRECINCT 04','HARBOR DISPATCH HQ','#182f42'));
-        precinctSign.scale.set(5.0,.92,.12); precinctSign.position.set(bx0-2.65,4.42,entZ);
+        const precinctSign = new Mesh(boxGeo, makeSignMat('COASTAL PRECINCT 04', 'HARBOR DISPATCH HQ', '#182f42'));
+        precinctSign.scale.set(5.0, .92, .12); precinctSign.position.set(bx0 - 2.65, 4.46, entZ);
         city.detail.add(precinctSign);
         precinctSign.rotation.y = -Math.PI / 2; precinctSign.updateMatrix();
-        addBox(city.shell, M.concrete, 2.4, .22, 6.2, bx0 - 1.2, .11, entZ);
-        addBox(city.shell, M.steelDark, 2.8, .22, 6.2, bx0 - 1.4, 3.85, entZ);
-        for (const sz of [entZ - 2.4, entZ + 2.4]) {
-          addBox(city.detail, M.steelGalv, .14, 3.8, .14, bx0 - 2.6, 1.9, sz);
-          addBox(city.detail, M.concreteDirty, .42, 3.6, .42, bx0 + .05, 1.96, sz);
+        // Articulated entrance porch: granite threshold step + fascia canopy + diagonal steel tie-rods + recessed soffit lamps
+        addBox(city.shell, curbStoneMat, 2.5, .26, 6.4, bx0 - 1.25, .15, entZ);
+        addBox(city.shell, M.steelDark, 2.9, .24, 6.4, bx0 - 1.45, 3.88, entZ);
+        addBox(city.detail, curbStoneMat, 3.05, .12, 6.55, bx0 - 1.45, 4.04, entZ);
+        for (const sz of [entZ - 2.45, entZ + 2.45]) {
+          addBox(city.detail, M.steelDark, .18, 3.7, .18, bx0 - 2.65, 2.02, sz);
+          addBox(city.detail, curbStoneMat, .36, .48, .36, bx0 - 2.65, .44, sz);
+          const brace = addBox(city.detail, M.steelGalv, 2.45, .07, .07, bx0 - 1.38, 4.32, sz);
+          brace.rotation.z = .36; brace.updateMatrix();
         }
+        for (const lz of [entZ - 1.4, entZ + 1.4]) addBox(city.detail, M.glassWarm, .48, .05, .24, bx0 - 1.5, 3.74, lz);
         for (const wy of [2.1]) {
           for (const wz of windowBays) {
-            for (const side of [-1, 1]) addBox(city.detail, M.steelDark, .20, 1.84, .08, bx0 + .26, wy, wz + side * 1.36);
+            for (const side of [-1, 1]) addBox(city.detail, M.steelDark, .24, 1.84, .10, bx0 + .24, wy, wz + side * 1.36);
             solid(city, city.detail, lobbyGlass, bx0 + .28, wy - .92, wz - 1.36, bx0 + .31, wy + .92, wz + 1.36, 'glass', true);
-            addBox(city.detail, M.steelDark, .10, 1.84, .055, bx0 + .23, wy, wz);
-            addBox(city.detail, M.concrete, .48, .18, 3.05, bx0 - .14, wy - 1.02, wz);
-            addBox(city.detail, M.steelWorn, .44, .12, 3.00, bx0 - .12, wy + 1.00, wz);
+            addBox(city.detail, M.steelDark, .12, 1.84, .065, bx0 + .21, wy, wz);
+            addBox(city.detail, M.steelDark, .12, .065, 2.74, bx0 + .21, wy + .44, wz);
+            addBox(city.detail, curbStoneMat, .52, .18, 3.12, bx0 - .14, wy - 1.02, wz);
+            addBox(city.detail, curbStoneMat, .46, .14, 3.08, bx0 - .12, wy + 1.00, wz);
           }
         }
-        // Short returns split public waiting, interview and radio operator spaces.
+        // Short returns split public waiting, interview and radio operator spaces (clean interior plaster + timber wainscot!)
         for (const side of [-1, 1]) {
           const edge = entZ + side * 8;
-          solid(city, city.shell, M.plasterGrey, bx0+5,.16,edge,bx1-.5,3.8,edge+.22,'concrete',true);
-          solid(city, city.shell, M.plasterGrey, bx0+12,.16,Math.min(edge,entZ+side*3),bx0+12.25,3.8,Math.max(edge,entZ+side*3),'concrete',true);
+          solid(city, city.shell, interiorWallMat, bx0 + 5, .16, edge, bx1 - .5, 3.8, edge + .22, 'concrete', true);
+          solid(city, city.shell, interiorWallMat, bx0 + 12, .16, Math.min(edge, entZ + side * 3), bx0 + 12.25, 3.8, Math.max(edge, entZ + side * 3), 'concrete', true);
         }
         const floor = matLib.get('granite');
-        solid(city,city.shell,floor,bx0+.5,.16,bz0+.5,bx1-.5,.205,bz1-.5,'concrete',true);
-        for (const z of [entZ-3.7,entZ+3.4]) {
-          solid(city,city.shell,M.plasterGrey,bx0+3.2,.205,z,bx0+8.8,3.80,z+.18,'concrete',true);
-          addBox(city.detail,M.wood,5.62,.13,.20,bx0+6,.30,z+.09);
+        solid(city, city.shell, floor, bx0 + .5, .16, bz0 + .5, bx1 - .5, .205, bz1 - .5, 'concrete', true);
+        for (const z of [entZ - 3.7, entZ + 3.4]) {
+          solid(city, city.shell, interiorWallMat, bx0 + 3.2, .205, z, bx0 + 8.8, 3.80, z + .18, 'concrete', true);
+          addBox(city.detail, M.wood, 5.64, .14, .22, bx0 + 6, .28, z + .09);
+          addBox(city.detail, M.steelDark, 5.64, .88, .21, bx0 + 6, .74, z + .09);
+          addBox(city.detail, M.wood, 5.68, .08, .25, bx0 + 6, 1.22, z + .09);
         }
-        const stationX = bx0+5.4;
-        const stationZ = entZ-1.15;
-        placeExternal(city.detail,'metal_office_desk',stationX,.205,stationZ,-Math.PI/2);
-        placeExternal(city.detail,'vintage_radio_transceiver',stationX,.993,stationZ-.48,-Math.PI/2);
-        placeExternal(city.detail,'desk_lamp_arm_01',stationX+.15,.993,stationZ+.69,-.9);
-        externalAssets.place(city.detail,'office_notepads',stationX-.13,.994,stationZ+.14,-1.25,1,'office_notepads_a4_stack');
-        placeExternal(city.detail,'painted_wooden_chair_02',stationX+.91,.205,stationZ+.16,1.35,.83);
-        city.colliderSpecs.push({min:new Vector3(stationX-.46,.16,stationZ-1),max:new Vector3(stationX+.46,.978,stationZ+1),surface:'metal'});
-        for (const dz of [-3.5,-2.68,3.4]) placeExternal(city.detail,'painted_wooden_chair_02',bx0+1.55,.205,entZ+dz,-1.56,.83);
-        for (const dz of [-2.4,2.4]) placeExternal(city.detail,'industrial_wall_lamp',bx0-.55,2.75,entZ+dz,-Math.PI/2);
-        // A second operator works at right angles to receiving, facing the street windows.
-        const secondX=stationX+3.6, secondZ=entZ+2.12;
-        placeExternal(city.detail,'metal_office_desk',secondX,.205,secondZ,Math.PI);
-        placeExternal(city.detail,'painted_wooden_chair_02',secondX+.18,.205,secondZ-.82,-.14,.83);
-        placeExternal(city.detail,'desk_lamp_arm_01',secondX+.68,.993,secondZ+.08,2.64);
-        externalAssets.place(city.detail,'office_notepads',secondX-.38,.993,secondZ+.05,.17,1,'office_notepads_yellow_pad');
-        city.colliderSpecs.push({min:new Vector3(secondX-1,.205,secondZ-.46),max:new Vector3(secondX+1,.993,secondZ+.46),surface:'metal'});
-        const workLight=new THREE.PointLight(0xffdcad,9,9,2);
-        workLight.position.set(stationX+.19,2.05,stationZ+.56);
+        // Exposed ceiling steel joists aligned cleanly BETWEEN light troffers (ZERO clipping!)
+        for (const cxBeam of [bx0 + 3.4, bx0 + 7.6, bx0 + 10.8]) {
+          addBox(city.detail, M.steelDark, .22, .22, 15.6, cxBeam, 3.69, entZ);
+        }
+        for (const fz of [entZ - 3.1, entZ - 2.3]) {
+          addBox(city.detail, M.steelWorn, .68, 1.48, .54, bx0 + 11.4, .95, fz);
+          addBox(city.detail, M.steelGalv, .05, .04, .22, bx0 + 11.04, 1.38, fz);
+          addBox(city.detail, M.steelGalv, .05, .04, .22, bx0 + 11.04, .98, fz);
+          addBox(city.detail, M.steelGalv, .05, .04, .22, bx0 + 11.04, .58, fz);
+        }
+        const chartBoard = new Mesh(boxGeo, makeSignMat('SALTLINE HARBOR CHART', 'BERTH 01–07  ·  TIDE & RADAR SECTOR', '#1c333b'));
+        chartBoard.position.set(bx0 + 6.0, 2.22, entZ - 3.48);
+        chartBoard.scale.set(2.4, 1.15, .05);
+        city.detail.add(chartBoard);
+        const stationX = bx0 + 5.4;
+        const stationZ = entZ - 1.15;
+        placeExternal(city.detail, 'metal_office_desk', stationX, .205, stationZ, -Math.PI / 2);
+        placeExternal(city.detail, 'vintage_radio_transceiver', stationX, .993, stationZ - .48, -Math.PI / 2);
+        placeExternal(city.detail, 'desk_lamp_arm_01', stationX + .15, .993, stationZ + .69, -.9);
+        externalAssets.place(city.detail, 'office_notepads', stationX - .13, .994, stationZ + .14, -1.25, 1, 'office_notepads_a4_stack');
+        placeExternal(city.detail, 'painted_wooden_chair_02', stationX + .91, .205, stationZ + .16, 1.35, .83);
+        city.colliderSpecs.push({ min: new Vector3(stationX - .46, .16, stationZ - 1), max: new Vector3(stationX + .46, .978, stationZ + 1), surface: 'metal' });
+        for (const dz of [-3.5, -2.68, 3.4]) placeExternal(city.detail, 'painted_wooden_chair_02', bx0 + 1.55, .205, entZ + dz, -1.56, .83);
+        for (const dz of [-2.4, 2.4]) placeExternal(city.detail, 'industrial_wall_lamp', bx0 - .55, 2.75, entZ + dz, -Math.PI / 2);
+        const secondX = stationX + 3.6, secondZ = entZ + 2.12;
+        placeExternal(city.detail, 'metal_office_desk', secondX, .205, secondZ, Math.PI);
+        placeExternal(city.detail, 'painted_wooden_chair_02', secondX + .18, .205, secondZ - .82, -.14, .83);
+        placeExternal(city.detail, 'desk_lamp_arm_01', secondX + .68, .993, secondZ + .08, 2.64);
+        externalAssets.place(city.detail, 'office_notepads', secondX - .38, .993, secondZ + .05, .17, 1, 'office_notepads_yellow_pad');
+        city.colliderSpecs.push({ min: new Vector3(secondX - 1, .205, secondZ - .46), max: new Vector3(secondX + 1, .993, secondZ + .46), surface: 'metal' });
+        const workLight = new THREE.PointLight(0xffdcad, 11, 12, 1.8);
+        workLight.position.set(stationX + .19, 2.15, stationZ + .56);
         city.detail.add(workLight);
+        const lobbyFill = new THREE.PointLight(0xeef5ff, 6.5, 14, 1.6);
+        lobbyFill.position.set(bx0 + 6.5, 3.35, entZ + .6);
+        city.detail.add(lobbyFill);
         const board = new Mesh(boxGeo, makeSignMat('HARBOR DISPATCH', 'WATCH 04    /    COASTAL RADIO', '#243d3d'));
-        board.position.set(bx0+12.05,2.25,entZ);
-        board.scale.set(4.5,.86,.06);
-        board.rotation.y=-Math.PI/2;
+        board.position.set(bx0 + 12.05, 2.25, entZ);
+        board.scale.set(4.5, .86, .06);
+        board.rotation.y = -Math.PI / 2;
         city.detail.add(board);
-        addBox(city.detail,M.wood,.24,2.5,5.5,bx0+12.25,1.65,entZ);
-        for (const dz of [-5,0,5]) {
-          addBox(city.detail,M.steelDark,3,.12,.42,bx0+5.5,3.68,entZ+dz);
-          addBox(city.detail,M.glassWarm,2.86,.04,.34,bx0+5.5,3.595,entZ+dz);
+        addBox(city.detail, M.wood, .24, 2.5, 5.5, bx0 + 12.25, 1.65, entZ);
+        for (const dz of [-5, 0, 5]) {
+          addBox(city.detail, M.steelDark, 3.1, .12, .52, bx0 + 5.5, 3.68, entZ + dz);
+          addBox(city.detail, M.steelGalv, 3.16, .04, .58, bx0 + 5.5, 3.63, entZ + dz);
+          addBox(city.detail, M.glassWarm, 2.86, .04, .34, bx0 + 5.5, 3.595, entZ + dz);
         }
         addInteractiveDoor(city.shell, { id: 'city-precinct-door', labelZh: '沿海警务调度楼防爆门', x: bx0 + .2, y: .16, z: (bz0 + bz1) / 2, width: 3.9, height: 3.4, axis: 'z', initiallyOpen: false });
         addInteractiveTerminal(city.shell, {
-          id: 'city-garage-call', promptZh: '按 [E] 城区警务车库召唤 SAR 四驱车', x: -16.5, y: .16, z: -56, colorMat: M.glassWarm,
+          id: 'city-garage-call', promptZh: '按 [E] 城区警务车库召唤 SAR 四驱车', x: bx0 - .62, y: .31, z: entZ + 3.1, colorMat: M.glassWarm,
           onUse() {
             world.vehicle?.setPosition?.(new Vector3(-22, .15, -56));
             audio?.play?.('rail_touchdown', { pos: new Vector3(-22, 1, -56), ref: 18, gain: .5, jitter: .05 });
@@ -1599,38 +1853,56 @@
         });
       } else {
         const lot = makeParcel(blk.style, blk.cx, blk.cz, 172, 95);
-        const skyline = buildingGen.buildDistantBuilding(root,blk);
-        let architecture;
+        const skyline = buildingGen.buildDistantBuilding(root, blk);
+        let architecture = null;
+        let buildTask = null;
         lot.onBuild = () => {
-          architecture = WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane });
-          architecture.buildCoastalBuilding(lot.shell, blk);
-          skyline.visible = false;
+          if (!architecture) {
+            architecture = WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane });
+            buildTask = architecture.createCoastalBuildingTask(lot.shell, blk);
+          }
+          const done = buildTask.step();
+          if (done) skyline.visible = false;
+          return done;
         };
         lot.onUnload = () => {
           lot.shell.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
           lot.shell.clear();
-          architecture.dispose();
+          architecture?.dispose?.();
+          architecture = null;
+          buildTask = null;
           skyline.visible = true;
         };
         const bounds = (cx, cz, w, d) => lot.colliderSpecs.push({
-          min: new Vector3(cx - w/2, .16, cz - d/2),
-          max: new Vector3(cx + w/2, blk.h, cz + d/2), surface: 'concrete'
+          min: new Vector3(cx - w / 2, .16, cz - d / 2),
+          max: new Vector3(cx + w / 2, blk.h, cz + d / 2), surface: 'concrete'
         });
         if (blk.style === 'harbor_apartment') {
           bounds(blk.cx, blk.cz - blk.depth * .21, blk.width, blk.depth * .58);
           for (const side of [-1, 1]) bounds(blk.cx + side * blk.width * .33, blk.cz + blk.depth * .29, blk.width * .34, blk.depth * .42);
-          lot.colliderSpecs.push({min:new Vector3(blk.cx-blk.width/2,.16,blk.cz-blk.depth/2),max:new Vector3(blk.cx+blk.width/2,.81,blk.cz+blk.depth/2),surface:'concrete'});
+          lot.colliderSpecs.push({ min: new Vector3(blk.cx - blk.width / 2, .16, blk.cz - blk.depth / 2), max: new Vector3(blk.cx + blk.width / 2, .81, blk.cz + blk.depth / 2), surface: 'concrete' });
         } else bounds(blk.cx, blk.cz, blk.width, blk.depth);
       }
     }
-    // Seafront Promenade Streetlamps & Pines along x = +21 facing the open East Sea!
+    // Seafront Promenade Streetlamps, Warm Night Streetlight Pools & Pines along Coastal Blvd + x = +21!
     for (const z of [-44, -66, -92, -114]) {
       addStreetLamp(city.detail, -36.5, .16, z, 1);
       addStreetLamp(city.detail, -15.5, .16, z, -1);
       addStreetLamp(city.detail, 22.0, .16, z, -1);
       addPineTree(city.detail, 19.2, .16, z + 8, .85);
+      if (typeof THREE.PointLight === 'function') {
+        const lampPool = new THREE.PointLight(0xffb86c, 0, 26, 1.55);
+        lampPool.position.set(z % 4 === 0 ? -21.5 : -30.5, 5.7, z);
+        city.detail.add(lampPool);
+        lightingSys?.registerDynamicLight?.(lampPool, { dayIntensity: 0, nightIntensity: 28 });
+      }
     }
-    // Park sedans strictly off Coastal Blvd in side aprons so all traffic lanes (x: -33..-19) stay 100% unobstructed
+    if (typeof THREE.PointLight === 'function') {
+      const porchGlow = new THREE.PointLight(0xffd298, 2.5, 16, 1.6);
+      porchGlow.position.set(-15.8, 3.6, -55.0);
+      city.detail.add(porchGlow);
+      lightingSys?.registerDynamicLight?.(porchGlow, { dayIntensity: 1.5, nightIntensity: 20 });
+    }
     addParkedSedan(city.detail, -38.4, .18, -52, 0, M.sedanDark);
     addParkedSedan(city.detail, 17.5, .18, -64, Math.PI, M.sedanGrey);
     addParkedSedan(city.detail, -38.4, .18, -106, 0, M.sedanBurgundy);
@@ -1642,25 +1914,30 @@
     placePortProp(city, city.detail, 'generator', -64, .16, -92.5, Math.PI / 2);
     placePortProp(city, city.detail, 'tarp_cargo', 6, .16, -75, .12);
     placePortProp(city, city.detail, 'cable_reel', 14, .16, -75.5, .4);
-    // High-Density Downtown Upgrade: Elevated Glass Pedestrian Skybridge at z = -104 & Off-Lane Transit Shelter
-    addBox(horizonRoot, M.steelDark, 24.5, .36, 3.6, -26, 6.2, -104);
-    addBox(horizonRoot, M.steelDark, 24.5, .36, 3.6, -26, 9.2, -104);
-    for (const sz of [-105.7, -102.3]) addBox(horizonRoot, smokedPane, 23.6, 2.65, .14, -26, 7.7, sz);
+    // Articulated Steel-Truss & Mullioned Glass Pedestrian Skybridge at z = -104 & Off-Lane Transit Shelter
+    addBox(horizonRoot, M.steelDark, 24.5, .42, 3.8, -26, 6.2, -104);
+    addBox(horizonRoot, M.steelDark, 24.5, .36, 4.1, -26, 9.25, -104);
+    addBox(horizonRoot, curbStoneMat, 24.8, .16, 4.25, -26, 9.48, -104);
+    for (const sz of [-105.7, -102.3]) {
+      addBox(horizonRoot, smokedPane, 23.6, 2.65, .14, -26, 7.7, sz);
+      for (let mx = -36; mx <= -16; mx += 2.5) addBox(city.detail, M.steelGalv, .14, 2.75, .20, mx, 7.7, sz);
+    }
     for (const sx of [-37.8, -14.2]) {
-      addBox(horizonRoot, M.concrete, 1.6, 6.2, 3.8, sx, 3.1, -104);
-      addBox(city.detail, M.steelGalv, 2.2, .16, 4.2, sx, 6.2, -104);
+      addBox(horizonRoot, curbStoneMat, 1.8, 6.2, 4.0, sx, 3.1, -104);
+      addBox(city.detail, M.steelGalv, 2.2, .18, 4.3, sx, 6.2, -104);
     }
     addBox(city.detail, M.steelDark, 1.8, .12, 5.6, -15.2, 2.82, -44);
-    for (const z of [-46.5,-41.5]) addBox(city.detail,M.steelGalv,.09,2.58,.09,-14.45,1.57,z);
+    for (const z of [-46.5, -41.5]) addBox(city.detail, M.steelGalv, .09, 2.58, .09, -14.45, 1.57, z);
     addBox(city.detail, smokedPane, .10, 2.2, 5.2, -14.4, 1.56, -44);
     addBox(city.detail, M.wood, .55, .48, 3.8, -15.0, .50, -44);
     addParkedSedan(city.detail, 17.5, .18, -110, Math.PI, M.sedanDark);
     addParkedSedan(city.detail, -38.4, .18, -40, 0, M.sedanGrey);
-    placeExternal(city.detail, 'utility_box_01', -16.2, .16, -61.5, -Math.PI / 2, 1.0);
+    // Cleanly placed street utilities & AC units mounted on solid rear/side walls (ZERO glass window clipping!)
+    placeExternal(city.detail, 'utility_box_01', -15.6, .31, -66.8, -Math.PI / 2, 1.0);
     placeExternal(city.detail, 'utility_box_01', -35.8, .16, -91.5, Math.PI / 2, 1.0);
     placeExternal(city.detail, 'portable_generator', -38.5, .16, -54.0, .4, 1.0);
-    placeExternal(city.detail, 'exterior_aircon_unit', -13.6, 2.2, -62.5, -Math.PI / 2, 1.0);
-    placeExternal(city.detail, 'exterior_aircon_unit', -13.6, 2.2, -48.5, -Math.PI / 2, 1.0);
+    placeExternal(city.detail, 'exterior_aircon_unit', 14.8, 1.8, -62.5, Math.PI / 2, 1.0);
+    placeExternal(city.detail, 'exterior_aircon_unit', 14.8, 1.8, -48.5, Math.PI / 2, 1.0);
     placeExternal(city.detail, 'modular_electricity_poles', -36.5, .16, -122.0, 0, 1.0);
     placeExternal(city.detail, 'modular_electricity_poles', -68.0, .16, -122.0, 0, 1.0);
 
@@ -2485,64 +2762,154 @@
     const actCard = document.createElement('div');
     actCard.className = 'sl-act-card';
     actCard.innerHTML = `<div class="sl-act-kicker" data-k></div><div class="sl-act-title" data-t></div><div class="sl-act-sub" data-s></div>`;
-    document.body.appendChild(actCard);
-    let actCardTimer = null;
+    const cinemaTop = document.createElement('div');
+    cinemaTop.className = 'sl-cinema-bar top';
+    const cinemaBot = document.createElement('div');
+    cinemaBot.className = 'sl-cinema-bar bottom';
+    const storyBox = document.createElement('div');
+    storyBox.className = 'sl-story-box';
+    storyBox.innerHTML = `<div class="sl-story-speaker" data-sp></div><div class="sl-story-line" data-ln></div>`;
+    const finaleCard = document.createElement('div');
+    finaleCard.className = 'sl-finale-card';
+    finaleCard.innerHTML = `
+      <div class="sl-finale-inner">
+        <div class="sl-finale-kicker">SALTLINE: MISSING MANIFEST · 战役通关</div>
+        <div class="sl-finale-title">《失联名单》真相已公之于众</div>
+        <div class="sl-finale-copy">
+          05:31 与 05:34 的伪造时间差、05:50 搜救艇召回令，以及第 17 名失联者托马斯·万斯的原始水文档案已通过山顶卫星与海岸机场全部回传海事局。随着 22 米南角灯塔重燃，东海救援舰队已突破风暴线入港，港务局长里德与铁砧指挥官沃德面临紧急通缉。
+        </div>
+        <div class="sl-finale-btns">
+          <button class="sl-finale-btn primary" data-finale-roam>🌏 自由漫游盐线市 [M]</button>
+          <button class="sl-finale-btn" data-finale-replay>🔄 从第一幕重玩</button>
+        </div>
+      </div>`;
+    document.body.append(actCard, cinemaTop, cinemaBot, storyBox, finaleCard);
+    let actCardTimer = null, cinemaTimer = null, storyHideTimer = null;
+    const storyTimers = [];
+    let finaleSpinActive = false;
+
+    function setLetterbox(on, autoOffMs = 0) {
+      cinemaTop.classList.toggle('on', !!on);
+      cinemaBot.classList.toggle('on', !!on);
+      if (cinemaTimer) clearTimeout(cinemaTimer);
+      if (on && autoOffMs > 0) { cinemaTimer = setTimeout(() => setLetterbox(false), autoOffMs); }
+    }
+
+    function clearStoryTimers() {
+      for (const id of storyTimers.splice(0)) clearTimeout(id);
+      if (storyHideTimer) { clearTimeout(storyHideTimer); storyHideTimer = null; }
+      storyBox.classList.remove('show');
+    }
+
+    function showStoryBeat(speaker, line, tone = 'ally', durMs = 5200) {
+      if (freeRoam || isMultiplayer()) return;
+      storyBox.className = 'sl-story-box show' + (tone === 'hostile' ? ' hostile' : tone === 'rescue' ? ' rescue' : '');
+      storyBox.querySelector('[data-sp]').textContent = speaker;
+      storyBox.querySelector('[data-ln]').textContent = line;
+      world.hud?.radio?.(`${speaker}：${line}`, durMs / 1000);
+      if (storyHideTimer) clearTimeout(storyHideTimer);
+      storyHideTimer = setTimeout(() => storyBox.classList.remove('show'), durMs);
+    }
+
+    function playStorySequence(beats) {
+      clearStoryTimers();
+      if (!Array.isArray(beats) || freeRoam) return;
+      for (const b of beats) {
+        storyTimers.push(setTimeout(() => showStoryBeat(b.speaker, b.line, b.tone, b.dur ?? 5200), (b.at ?? 0) * 1000));
+      }
+    }
+
+    finaleCard.querySelector('[data-finale-roam]').addEventListener('click', () => {
+      finaleCard.classList.remove('open');
+      setLetterbox(false);
+      setFreeRoam(true, true);
+    });
+    finaleCard.querySelector('[data-finale-replay]').addEventListener('click', () => {
+      finaleCard.classList.remove('open');
+      setLetterbox(false);
+      jumpToStage(0, { teleport: true, clearEnemies: true });
+    });
 
     const actScripts = [
       {
         kicker: 'ACT I · 05:34 · BERTH 4 HARBOR',
         title: '四号泊位 · 失联名单',
-        sub: '摧毁 2 座铁砧防空干扰塔，核验老霍克 05:31/05:34 篡改记录',
-        radio: '玛拉：「林恩，老霍克 05:34 还签了值班条，里德却把回执改成 05:31 离港！先打爆两座干扰塔，我掩护你突围！」',
+        sub: '摧毁 2 座铁砧防空干扰塔，揭开老霍克 05:31 / 05:34 伪造撤离记录',
+        beats: [
+          { at: .2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '林恩，我拿到老霍克 05:34 亲笔签的值班交接条——可里德的封港系统却伪造他在 05:31 就离港了！' },
+          { at: 5.8, speaker: 'REED · PORT DIRECTOR（截获频道）', tone: 'hostile', line: '四号泊位已经封存！沃德，别让 SAR 的人把货单带出码头，干扰塔全功率压制！' },
+          { at: 11.4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '先打爆货场和码头这两座防空干扰塔！打掉它们，我们的救援信号就能冲破封锁！' },
+        ],
         spawns: [['hound', -10, 0, -12], ['hound', 10, 0, 6]],
       },
       {
         kicker: 'ACT II · COASTAL CITY BOULEVARD',
         title: '沿海城区 · 高速撞卡',
-        sub: '驾驶 SAR 四驱车高速撞碎铁砧十字路口路障',
-        radio: '沃德（敌方频道截获）：「05:50 搜救艇已召回！封死沿海主干道，绝不准他们把十七人名单带进市区！」',
+        sub: '驾驶武装 SAR 四驱车高速撞碎铁砧封城路障，杀出沿海主干道',
+        beats: [
+          { at: .4, speaker: 'WARD · ANVIL COMMANDER（敌方频道）', tone: 'hostile', line: '05:50 搜救艇早已召回！所有单位封死沿海大道十字路口，连人带车给我拦截下来！' },
+          { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '按 [G] 召唤四驱车、[F] 上车！车顶 12.7mm 机枪按左键就能扫射——油门踩到底，直接撞穿前面路障！' },
+        ],
         spawns: [['hound', -22, 0, -68], ['hound', -30, 0, -82], ['gull', -26, 12, -74]],
       },
       {
         kicker: 'ACT III · SW COLD-STORAGE & CLINIC',
-        title: '西南冷雾库 · 雷暴急救',
-        sub: '沿西线内陆大道南下，击毁 2 台冷库锁控箱解救医疗样本与第 17 人记录',
-        radio: '玛拉：「我哥托马斯·万斯的名字单独登在第十七人档案里——就在西南冷雾库和战地分诊中心！快打掉冷库锁控箱！」',
+        title: '西南冷雾库 · 第十七人',
+        sub: '攻入西南冷雾库与战地分诊中心，击毁 2 台冷库锁控箱抢出托马斯的原始档案',
+        beats: [
+          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '我哥托马斯·万斯是名单里被抹掉的第十七人——他生前发现铁砧借冷链集装箱走私军用干扰舱！' },
+          { at: 6.2, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '冷库主控已锁死！切掉西南片区高压配电，让风暴替我们把那批档案彻底封冻！' },
+        ],
         spawns: [['hound', -146, 0, 70], ['hound', -144, 0, 96], ['gull', -154, 12, 78]],
       },
       {
         kicker: 'ACT IV · WEST RAIL FREIGHT YARD',
         title: '西区铁路货场 · 截停专列',
-        sub: '北上进入西区铁路货场，炸毁 2 处铁路编组信号闸迫停铁砧证物专列',
-        radio: '玛拉：「铁砧下达了针对证人的拦截命令！货运专列正准备转移原始货单，炸毁两处信号闸拦停它！」',
+        sub: '雷暴中北上西区编组站，炸毁 2 处铁路信号主控闸迫停铁砧证物专列',
+        beats: [
+          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '雷暴已经压过来了！铁砧正把四号泊位全部原始货单装上西区货运专列，准备钻进山洞转移！' },
+          { at: 6.2, speaker: 'LIN · SAR-04', tone: 'ally', line: '收到，绝不能让专列出谷！我会炸毁东股道和西塔台两处信号闸，把整列火车逼停在货场里！' },
+        ],
         spawns: [['hound', -142, 0, -6], ['hound', -184, 0, 12], ['gull', -164, 13, 0]],
       },
       {
         kicker: 'ACT V · WEST MOUNTAIN RIDGE +14M',
-        title: '西岸山地卫星站 · 登顶狙击',
-        sub: '沿西线盘山公路爬升 +14m 登顶，狙击 3 个卫星散热芯劫持雷达',
-        radio: '沃德：「你们已经无路可逃！山顶卫星正在向总部发送清场授权——全员守住雷达站！」',
+        title: '西岸山地卫星站 · 登顶劫持',
+        sub: '沿盘山高架公路爬升 +14m 登顶，狙击 3 个卫星散热芯向全城公开《失联名单》',
+        beats: [
+          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '油罐连爆把专列彻底截停了！十七人的证物链齐了——开车冲上 +14m 西岸山顶，劫持卫星大锅公开广播！' },
+          { at: 6.4, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '全员死守山顶雷达站！如果他们连上海事局卫星，立刻启动「零号泄洪」，炸毁南防潮闸淹掉整座港区！' },
+        ],
         spawns: [['hound', -180, 14, -84], ['hound', -182, 14, -70], ['gull', -190, 26, -78]],
       },
       {
-        kicker: 'ACT VI · EAST SEA STORM SURGE',
-        title: '12 米海啸 · 高地求生',
-        sub: '铁砧炸毁防潮闸！在 +14m 西岸山顶俯瞰 12 米东海巨浪吞没港区',
-        radio: '玛拉：「他们炸了南防潮闸！12 米风暴潮正从东海扑向四号泊位——死守山顶高地 12 秒！」',
+        kicker: 'ACT VI · SLUICE ZERO · 12M TSUNAMI',
+        title: '零号泄洪 · 12 米东海海啸',
+        sub: '沃德炸毁南防潮闸企图毁尸灭迹！死守 +14m 山顶俯瞰 12 米巨浪吞没港区',
+        beats: [
+          { at: .2, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '引爆南防潮闸！既然证据藏不住了，就让东海把整座盐线港冲干净！' },
+          { at: 5.5, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '名单已经上传完毕！抓紧掩体，12 米风暴潮正在拍碎海堤——在 +14m 山顶撑过这 12 秒！' },
+        ],
         spawns: [],
       },
       {
         kicker: 'ACT VII · SOUTH DRYDOCK & HEADLAND',
-        title: '南港船坞 · 炮火点灯',
-        sub: '顶着炮火南下旧船坞与南角灯塔，炸毁干扰器重启 22 米海湾灯塔',
-        radio: '玛拉：「救援舰队已在东海雾外待命，但南角灯塔被铁砧切断了电源！冲向南港岸角重启灯塔！」',
+        title: '南港船坞 · 风暴点灯',
+        sub: '顶着海上重炮覆盖冲向南港海角，摧毁 2 座电源干扰器重启 22 米灯塔指引舰队',
+        beats: [
+          { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: 'SAR-04，已收到十七人《失联名单》铁证！救援舰队已抵东海雾墙外，但南角灯塔熄灭，请求立刻复明！' },
+          { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '洪峰退了！冲下盘山路直奔南港旧船坞——小心敌舰炮火，炸掉灯塔旁的干扰器点亮海湾！' },
+        ],
         spawns: [['hound', -14, 0, 118], ['hound', 6, 0, 126], ['gull', 0, 14, 130]],
       },
       {
         kicker: 'ACT VIII · NW COASTAL AIRFIELD',
-        title: '海岸应急机场 · 跑道撤离',
-        sub: '全速北上西北机场，沿跑道穿过炮火冲进拱形机库完成撤离',
-        radio: '玛拉：「灯塔亮了，十七人失联名单已传回海事局！油门踩到底，冲进西北机场拱形机库撤离！」',
+        title: '海岸应急机场 · 终局撤离',
+        sub: '灯塔重燃、舰队入港！顶着跑道炮火全速冲进西北机场拱形机库完成撤离',
+        beats: [
+          { at: .2, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '已目视南角灯塔强光！先遣舰队正进港接管防务，西北机场救援运输机已启动引擎，全速前往机库汇合！' },
+          { at: 6.0, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '托马斯和十七个兄弟不会白白失联了……林恩，把油门踩到底，冲进 110 米跑道尽头的拱形机库！' },
+        ],
         spawns: [['hound', -154, 0, -174], ['gull', -168, 14, -182]],
       },
     ];
@@ -2554,12 +2921,10 @@
       actCard.querySelector('[data-t]').textContent = sc.title;
       actCard.querySelector('[data-s]').textContent = sc.sub;
       actCard.classList.add('show');
+      setLetterbox(true, 3600);
       if (actCardTimer) clearTimeout(actCardTimer);
-      actCardTimer = setTimeout(() => actCard.classList.remove('show'), 3800);
-      if (sc.radio) {
-        world.hud?.radio?.(sc.radio, 6.5);
-        world.berthSlice?.companion?.speak?.(sc.radio, sc.radio, false);
-      }
+      actCardTimer = setTimeout(() => actCard.classList.remove('show'), 4200);
+      if (sc.beats) playStorySequence(sc.beats);
     }
 
     function spawnStageDefenders(idx) {
@@ -2576,13 +2941,15 @@
     // =========================================================================
     // DUAL MODE: OPEN WORLD SIGHTSEEING (freeRoam) <-> 8-ACT CITY CAMPAIGN
     // =========================================================================
+    const owProgress = createOpenWorldCampaignProgress();
     const urlParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+    const isMultiplayer = () => Boolean(world.game?.conquest);
     let freeRoam = !!(window.SALTLINE_OPEN_WORLD_ROAM || urlParams?.get('mode') === 'openworld');
-    let cityCampaignActive = false; // Explicitly activated via [M] Map or Dev Menu; NEVER hijacks Berth 4 main story!
+    let cityCampaignActive = !freeRoam; // Default to 8-Act Battlefield Open-World Campaign in mission mode!
     let photoMode = false;
-    const isMainStoryActive = () => !cityCampaignActive && !freeRoam && Boolean(world.game?.campaign);
+    const isMainStoryActive = () => false;
     function syncOpenWorldMissionProps() {
-      const showProps = cityCampaignActive && !freeRoam;
+      const showProps = cityCampaignActive && !freeRoam && !isMultiplayer();
       jammerRoot.visible = showProps;
       for (const t of shootTargets) t.group.visible = showProps && t.alive;
       for (const rb of roadblockProps) rb.mesh.visible = showProps && rb.intact;
@@ -2722,15 +3089,68 @@
     mapModeBtn.addEventListener('click', () => setFreeRoam(!freeRoam, true));
     mapOverlay.querySelector('[data-sky-btn]').addEventListener('click', () => applySkyPreset(skyIdx + 1));
 
+    function isStandPosClear(x, y, z, radius = 0.45, height = 1.75) {
+      const boxes = physics?.boxes;
+      if (!Array.isArray(boxes)) return true;
+      for (let i = 0; i < boxes.length; i++) {
+        const b = boxes[i];
+        if (!b || b.bulletOnly) continue;
+        if (b.max.y <= y + 0.12 || b.min.y >= y + height) continue;
+        if (x + radius > b.min.x && x - radius < b.max.x && z + radius > b.min.z && z - radius < b.max.z) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function resolveSafeStandPos(pos) {
+      const baseX = pos.x, baseY = pos.y, baseZ = pos.z;
+      const sampleGround = (x, z) => {
+        const gh = typeof physics?.groundHeight === 'function' ? physics.groundHeight(x, z, baseY + 2.5) : baseY;
+        return Number.isFinite(gh) ? Math.max(baseY, gh) : baseY;
+      };
+      const g0 = sampleGround(baseX, baseZ);
+      if (isStandPosClear(baseX, g0, baseZ)) return new Vector3(baseX, g0 + 0.05, baseZ);
+      const rings = [1.8, 3.4, 5.2, 7.5];
+      for (const r of rings) {
+        for (let k = 0; k < 8; k++) {
+          const ang = (k / 8) * Math.PI * 2;
+          const cx = baseX + Math.cos(ang) * r;
+          const cz = baseZ + Math.sin(ang) * r;
+          const gy = sampleGround(cx, cz);
+          if (isStandPosClear(cx, gy, cz)) return new Vector3(cx, gy + 0.05, cz);
+        }
+      }
+      return new Vector3(baseX, g0 + 0.15, baseZ);
+    }
+
     function movePlayerAndVehicle(pos, bringTruckNear = false) {
+      const safePos = resolveSafeStandPos(pos);
       if (world.player?.pos) {
-        world.player.pos.copy(pos);
+        world.player.pos.copy(safePos);
         if (world.player.vel) world.player.vel.set(0, 0, 0);
+        world.player.enabled = true;
       }
       if (world.vehicle?.setPosition) {
-        if (world.vehicle.driving) world.vehicle.setPosition(pos);
-        else if (bringTruckNear) world.vehicle.setPosition(new Vector3(pos.x + 5.5, pos.y, pos.z + 3.5));
+        if (world.vehicle.driving) world.vehicle.setPosition(safePos);
+        else if (bringTruckNear) {
+          const truckPos = resolveSafeStandPos(new Vector3(safePos.x + 5.5, safePos.y, safePos.z + 3.5));
+          world.vehicle.setPosition(truckPos);
+        }
       }
+      return safePos;
+    }
+
+    function teleportToSafeStart() {
+      const safeStart = movePlayerAndVehicle(new Vector3(-26, 0.25, -36), true);
+      if (world.player) {
+        world.player.yaw = 0;
+        world.player.pitch = 0;
+        world.player.enabled = true;
+      }
+      if (world.game?.state === 'paused') world.game.resume?.();
+      world.input?.setGameplay?.(true);
+      return safeStart;
     }
 
     function teleportToDistrict(d) {
@@ -2746,7 +3166,7 @@
     }
 
     function renderMapEntries(playerPos) {
-      mapModeBtn.textContent = freeRoam ? '🌏 当前：自由漫游（点此启动全城 8 幕战役）' : (cityCampaignActive ? '🔥 当前：全城 8 幕战役（点此切自由漫游）' : '🎬 当前：四号泊位主线剧情（点此切自由漫游）');
+      mapModeBtn.textContent = freeRoam ? '🌏 当前：自由漫游（点此切回全城 8 幕战役）' : '🔥 当前：全城 8 幕战役（点此切自由漫游）';
       mapZonesG.innerHTML = '';
       mapListEl.innerHTML = '';
       for (const d of districts) {
@@ -2796,11 +3216,18 @@
     }
 
     function toggleMap(force) {
-      mapOpen = typeof force === 'boolean' ? force : !mapOpen;
+      const nextOpen = typeof force === 'boolean' ? force : !mapOpen;
+      mapOpen = nextOpen;
       mapOverlay.classList.toggle('open', mapOpen);
       if (mapOpen) {
+        world.input?.setGameplay?.(false);
         try { document.exitPointerLock?.(); } catch {}
         renderMapEntries(world.player?.pos);
+      } else {
+        if (world.game?.state === 'paused') world.game.resume?.();
+        if (world.player) world.player.enabled = true;
+        world.input?.setGameplay?.(true);
+        try { world.input?.requestLock?.(); } catch {}
       }
     }
     mapOverlay.querySelector('[data-close]').addEventListener('click', () => toggleMap(false));
@@ -2874,10 +3301,18 @@
     const onKeyDown = e => {
       if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
       if (e.code === 'KeyM') { e.preventDefault(); toggleMap(); }
+      else if (e.code === 'KeyU' && !e.repeat) {
+        e.preventDefault();
+        teleportToSafeStart();
+        world.tactical?.notify?.('🧭 已一键脱困，传送至沿海大道开阔路面', '🧭 Unstuck to Coastal Blvd', false, 2.8);
+      }
       else if (e.code === 'KeyT' && !e.repeat) { e.preventDefault(); applySkyPreset(skyIdx + 1); }
       else if (e.code === 'KeyV' && !e.repeat) { e.preventDefault(); setPhotoMode(); }
       else if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); jumpInspectView(inspectIdx + 1); }
       else if (e.code === 'KeyE' && !e.repeat && activeInteractable) { activeInteractable.use(); }
+      else if (e.code === 'KeyZ' && !e.repeat) { callSupport('supply'); }
+      else if (e.code === 'KeyX' && !e.repeat) { callSupport('artillery'); }
+      else if (e.code === 'KeyK' && !e.repeat) { callSupport('smoke'); }
       else if (e.code === 'Escape' && mapOpen) { e.preventDefault(); toggleMap(false); }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -2894,6 +3329,7 @@
     const rayOrigin = new Vector3(), rayDir = new Vector3(), toTgt = new Vector3(), up = new Vector3(0, 1, 0);
 
     function advanceToStage(nextStage) {
+      if (nextStage > stage) owProgress.completeStage(stage);
       stage = nextStage;
       if (nextStage < 8) {
         showActCard(nextStage);
@@ -2901,11 +3337,13 @@
       }
     }
 
-    function jumpToStage(targetStage) {
+    function jumpToStage(targetStage, { teleport = true, clearEnemies = true } = {}) {
       freeRoam = false;
       cityCampaignActive = true;
+      introActShown = true;
       window.SALTLINE_OPEN_WORLD_ROAM = false;
       if (world.developer?.flags) world.developer.flags.noEnemies = false;
+      if (clearEnemies) world.enemies?.clear?.();
       const idx = Math.max(0, Math.min(7, Number(targetStage) || 0));
       stage = idx;
       customGpsTarget = null;
@@ -2920,12 +3358,25 @@
         rb.intact = idx <= 1;
         rb.mesh.visible = rb.intact;
       }
+      syncOpenWorldMissionProps();
+      finaleCard.classList.remove('open');
       const st = stageStarts[idx];
-      if (st) movePlayerAndVehicle(st.pos, true);
-      if (idx === 5) world.disasters?.triggerTsunami?.();
+      if (teleport && st) movePlayerAndVehicle(st.pos, true);
+      if (idx === 5) {
+        world.disasters?.triggerTideGateDemolition?.();
+        world.disasters?.triggerTsunami?.();
+      }
       if (idx === 6) world.disasters?.triggerArtilleryBarrage?.();
       showActCard(idx);
       spawnStageDefenders(idx);
+    }
+
+    function startFromLanding() {
+      jumpToStage(0, { teleport: false, clearEnemies: true });
+    }
+
+    function restartCurrentStage() {
+      jumpToStage(Math.min(stage, 7), { teleport: true, clearEnemies: true });
     }
 
     function hitTarget(t) {
@@ -2959,32 +3410,137 @@
         else { advanceToStage(4); world.disasters?.triggerFuelChainBlast?.(); }
       } else if (stage === 4) {
         if (rem > 0) world.tactical?.notify?.(`🎯 ${t.labelZh}已击毁！还剩 ${rem} 个！`, `🎯 Cooling core down! ${rem} left!`, false, 3.8);
-        else { tsunamiSurviveClock = 12.0; advanceToStage(5); world.disasters?.triggerTsunami?.(); }
+        else {
+          tsunamiSurviveClock = 12.0;
+          world.disasters?.triggerTideGateDemolition?.();
+          world.disasters?.triggerTsunami?.();
+          advanceToStage(5);
+        }
       } else if (stage === 6) {
         if (rem > 0) world.tactical?.notify?.(`🚨 ${t.labelZh}已摧毁！还剩 ${rem} 座！`, `🚨 Lighthouse jammer down! ${rem} left!`, false, 3.8);
-        else advanceToStage(7);
+        else {
+          lighthouseOverdrive = true;
+          world.disasters?.triggerVictoryFlareBarrage?.(new Vector3(14, 18, 134));
+          world.tactical?.notify?.('🗼 22 米南角灯塔强光重燃！东海救援舰队已突破风暴线！', '🗼 22m Lighthouse relit! Rescue fleet inbound!', true, 5.2);
+          advanceToStage(7);
+        }
       }
     }
 
-    world.events?.on?.('weapon:fire', () => {
-      if (!world.camera || freeRoam || !cityCampaignActive) return;
-      world.camera.getWorldPosition(rayOrigin);
-      world.camera.getWorldDirection(rayDir);
-      let best = null, bestDist = 120;
+    function checkTargetShot(originVec, dirVec, maxDist = 160) {
+      if (freeRoam || !cityCampaignActive) return;
+      let best = null, bestDist = maxDist;
       for (const t of shootTargets) {
         if (!t.alive || t.stage !== stage) continue;
-        toTgt.subVectors(t.pos, rayOrigin);
-        const proj = toTgt.dot(rayDir);
+        toTgt.subVectors(t.pos, originVec);
+        const proj = toTgt.dot(dirVec);
         if (proj < .5 || proj > bestDist) continue;
         const perpSq = toTgt.lengthSq() - proj * proj;
         if (perpSq <= t.radius * t.radius) { best = t; bestDist = proj; }
       }
       if (best) hitTarget(best);
+    }
+    world.events?.on?.('weapon:fire', () => {
+      if (!world.camera || freeRoam || !cityCampaignActive) return;
+      world.camera.getWorldPosition(rayOrigin);
+      world.camera.getWorldDirection(rayDir);
+      checkTargetShot(rayOrigin, rayDir, 120);
+    });
+    world.events?.on?.('vehicle:fire', ev => {
+      if (!ev?.origin || !ev?.dir) return;
+      checkTargetShot(ev.origin, ev.dir, 185);
     });
 
-    // Real Drone Explosion Splash Damage (fixes drones exploding with zero damage!)
+    // =========================================================================
+    // BATTLEFIELD ELEMENTS IN CAMPAIGN: SUPPORT CALLS & DISTRICT OUTPOSTS
+    // =========================================================================
+    let supportPoints = 4;
+    const SUPPORT_MAX = 12;
+    const supportState = { supplyCd: 0, artilleryCd: 0, smokeCd: 0 };
+    const awardSupport = amt => { supportPoints = Math.min(SUPPORT_MAX, supportPoints + amt); };
+
+    const outposts = [
+      { id: 'outpost-city', nameZh: '沿海警务广场据点', pos: new Vector3(-26, .22, -56), progress: 0, captured: false },
+      { id: 'outpost-rail', nameZh: '西区编组站前哨', pos: new Vector3(-158, .22, 12), progress: 0, captured: false },
+      { id: 'outpost-south', nameZh: '南港防潮闸前哨', pos: new Vector3(-26, .22, 88), progress: 0, captured: false },
+    ].map(op => {
+      const ringMat = new MeshBasicMaterial({ color: 0xf0b94e, transparent: true, opacity: .45, side: THREE.DoubleSide, depthWrite: false });
+      const ring = new Mesh(new THREE.RingGeometry(5.2, 6.2, 32), ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(op.pos.x, op.pos.y + .06, op.pos.z);
+      root.add(ring);
+      return { ...op, ring, ringMat };
+    });
+
+    function callSupport(kind) {
+      if (freeRoam || !cityCampaignActive || isMultiplayer() || mapOpen) return;
+      if (world.game?.state !== 'playing') return;
+      const pPos = world.player?.pos;
+      if (!pPos) return;
+      if (kind === 'supply') {
+        if (supportState.supplyCd > 0) return;
+        if (supportPoints < 2) { world.tactical?.notify?.('⚠️ 支援点不足（需要 2 点）[Z] 战术空投补给', '⚠️ Need 2 Support Points', false, 2.0); return; }
+        supportPoints -= 2;
+        supportState.supplyCd = 10;
+        (world.weapon?.refill || world.weapon?.reset)?.call(world.weapon);
+        world.player?.heal?.(45);
+        fx?.smoke?.(pPos, { size: 3.0, life: 3.5, color: 0x3ec486, alpha: .55, rise: 1.2, count: 6 });
+        fx?.sparks?.(pPos, up, 22);
+        audio?.play?.('rail_touchdown', { pos: pPos, ref: 18, gain: .6, jitter: .05 });
+        world.tactical?.notify?.('📦 战术空投补给已抵达！弹药已满 +45 生命值', '📦 Supply Drop delivered! Ammo full +45 HP', false, 3.2);
+      } else if (kind === 'smoke') {
+        if (supportState.smokeCd > 0) return;
+        if (supportPoints < 3) { world.tactical?.notify?.('⚠️ 支援点不足（需要 3 点）[K] 烟雾掩护', '⚠️ Need 3 Support Points', false, 2.0); return; }
+        supportPoints -= 3;
+        supportState.smokeCd = 14;
+        world.player?.heal?.(20);
+        for (let s = 0; s < 6; s++) {
+          const ang = (s / 6) * Math.PI * 2;
+          const sp = new Vector3(pPos.x + Math.cos(ang) * 4.5, pPos.y + .4, pPos.z + Math.sin(ang) * 4.5);
+          fx?.smoke?.(sp, { size: 5.5, life: 8.5, color: 0xd0dce2, alpha: .75, rise: .45, count: 4 });
+        }
+        audio?.play?.('rail_touchdown', { pos: pPos, ref: 18, gain: .5, jitter: .08 });
+        world.tactical?.notify?.('💨 战术烟雾掩护已展开！(+20 生命值)', '💨 Tactical Smoke Screen deployed! (+20 HP)', false, 3.0);
+      } else if (kind === 'artillery') {
+        if (supportState.artilleryCd > 0) return;
+        if (supportPoints < 5) { world.tactical?.notify?.('⚠️ 支援点不足（需要 5 点）[X] 重炮支援', '⚠️ Need 5 Support Points', false, 2.0); return; }
+        supportPoints -= 5;
+        supportState.artilleryCd = 18;
+        let strikePos = null;
+        if (world.camera) {
+          world.camera.getWorldPosition(rayOrigin);
+          world.camera.getWorldDirection(rayDir);
+          const hit = physics?.raycast?.(rayOrigin, rayDir, 150);
+          strikePos = hit?.point ? hit.point.clone() : rayOrigin.clone().addScaledVector(rayDir, 45);
+        } else {
+          strikePos = pPos.clone().add(new Vector3(0, 0, -25));
+        }
+        world.tactical?.notify?.('💥 重炮支援已锁定目标区域！3 发齐射来袭！', '💥 Artillery Strike inbound!', true, 3.5);
+        for (let k = 0; k < 3; k++) {
+          setTimeout(() => {
+            const imp = new Vector3(strikePos.x + (k - 1) * 4.2, Math.max(.2, strikePos.y), strikePos.z + (k % 2 === 0 ? 2.5 : -2.5));
+            fx?.smoke?.(imp, { size: 5.2, life: 5.0, color: 0x26211d, alpha: .78, rise: 1.5, count: 10 });
+            fx?.sparks?.(imp, up, 42);
+            fx?.debris?.(imp, { count: 16 });
+            audio?.play?.('explosion', { pos: imp, ref: 36, gain: .95, jitter: .06 });
+            world.player?.addShake?.(.45);
+            for (const e of world.enemies?.list ?? []) {
+              if (e?.alive && e.pos && e.pos.distanceTo(imp) < 12) {
+                e.damage?.(135, imp, up, 'explosion');
+              }
+            }
+            for (const t of shootTargets) {
+              if (t.alive && t.stage === stage && t.pos.distanceTo(imp) < 11) hitTarget(t);
+            }
+          }, k * 420);
+        }
+      }
+    }
+
+    // Real Drone Explosion Splash Damage + Battlefield Support Point Award
     let droneBlastGuard = false;
     world.events?.on?.('enemy:killed', ev => {
+      if (cityCampaignActive && !freeRoam) awardSupport(1);
       if (droneBlastGuard) return;
       const enemy = ev?.enemy;
       const type = ev?.type || enemy?.type;
@@ -3020,7 +3576,7 @@
     // Start hidden until active gameplay (NEVER blocks the Main Title Menu!)
     const hud = document.createElement('div');
     hud.className = 'sl-world-hud sl-menu-hidden';
-    hud.innerHTML = `<div class="sl-world-zone" data-zone>当前区域：四号泊位核心港区</div><div data-perf>FPS --</div><div class="sl-stealth-pill" data-stealth>🟢 隐蔽潜行 · 东海净空</div><div class="sl-world-op" data-op></div><div class="sl-world-hint">[E] 交互 · [G] 召唤四驱车 · [M] 地图 · [T] 光影</div>`;
+    hud.innerHTML = `<div class="sl-world-zone" data-zone>当前区域：四号泊位核心港区</div><div data-perf>FPS --</div><div class="sl-stealth-pill" data-stealth>🟢 隐蔽潜行 · 东海净空</div><div class="sl-world-op" data-op></div><div class="sl-world-hint" data-support>[Z]空投(2) · [K]烟雾(3) · [X]炮击(5) · [G]四驱车 · [M]地图</div>`;
     document.body.appendChild(hud);
     const zoneEl = hud.querySelector('[data-zone]');
     const perfEl = hud.querySelector('[data-perf]');
@@ -3149,7 +3705,7 @@
     function update(dt, playerPos) {
       if (!(dt > 0)) return;
       const menuOpen = Boolean(document.querySelector('.menu.open') || document.querySelector('.developer-menu[open]'));
-      const inGame = !menuOpen && (!world.game || world.game.state === 'playing');
+      const inGame = !menuOpen && !isMultiplayer() && (!world.game || world.game.state === 'playing');
       if (world.backdrop?.skyline?.visible) world.backdrop.skyline.visible = false;
       if (world.backdrop?.lamps?.visible) world.backdrop.lamps.visible = false;
       hud.classList.toggle('sl-menu-hidden', !inGame);
@@ -3228,13 +3784,28 @@
       }
 
       if (cityCampaignActive && !freeRoam) {
+        supportState.supplyCd = Math.max(0, supportState.supplyCd - dt);
+        supportState.artilleryCd = Math.max(0, supportState.artilleryCd - dt);
+        supportState.smokeCd = Math.max(0, supportState.smokeCd - dt);
+        for (const op of outposts) {
+          op.ring.visible = true;
+          if (!op.captured && playerPos && playerPos.distanceTo(op.pos) < 13) {
+            op.progress = Math.min(100, op.progress + dt * 30);
+            if (op.progress >= 100) {
+              op.captured = true;
+              op.ringMat.color.setHex(0x42d982);
+              awardSupport(3);
+              (world.weapon?.refill || world.weapon?.reset)?.call(world.weapon);
+              world.player?.heal?.(40);
+              audio?.play?.('rail_touchdown', { pos: op.pos, ref: 24, gain: .65, jitter: .04 });
+              world.tactical?.notify?.(`🚩 已占领「${op.nameZh}」！+3 支援点 · 弹药已补满`, `🚩 Captured ${op.id}! +3 Support Pts`, false, 4.2);
+            }
+          }
+        }
         if (stage === 1 && playerPos && playerPos.distanceTo(new Vector3(-26, 0, -76)) < 7.5) {
           for (const rb of roadblockProps) { rb.intact = false; rb.mesh.visible = false; }
-          const hitPos = new Vector3(-26, 1.2, -76);
-          fx?.sparks?.(hitPos, up, 36);
-          fx?.debris?.(hitPos, { count: 18 });
-          audio?.play?.('rail_touchdown', { pos: hitPos, ref: 24, gain: .95, jitter: .05 });
-          world.player?.addShake?.(.58);
+          const hitPos = new Vector3(-26, 1.0, -76);
+          world.disasters?.triggerHighwayAmbush?.(hitPos);
           advanceToStage(2);
         }
         if (stage === 5) {
@@ -3251,19 +3822,31 @@
         if (stage === 7 && playerPos) {
           if (playerPos.z < -130 && playerPos.x < -110) {
             runwayArtilleryClock += dt;
-            if (runwayArtilleryClock >= 2.2) {
+            if (runwayArtilleryClock >= 1.85) {
               runwayArtilleryClock = 0;
               const blast = new Vector3(playerPos.x - 16, 1.0, -172 + (Math.random() - .5) * 24);
-              fx?.smoke?.(blast, { size: 4.5, life: 4.0, color: 0x2c2724, alpha: .65, rise: 1.2, count: 7 });
-              fx?.sparks?.(blast, up, 28);
-              audio?.play?.('rail_touchdown', { pos: blast, ref: 34, gain: .85, jitter: .08 });
-              world.player?.addShake?.(.38);
+              world.disasters?.spawnFireballExplosion?.(blast, 1.35);
+              fx?.smoke?.(blast, { size: 5.4, life: 4.8, color: 0x241f1c, alpha: .75, rise: 1.4, count: 9 });
+              fx?.sparks?.(blast, up, 36);
+              audio?.play?.('explosion', { pos: blast, ref: 38, gain: .92, jitter: .08 });
+              world.player?.addShake?.(.46);
             }
           }
           if (playerPos.distanceTo(new Vector3(-172, .2, -200)) < 12.5) {
+            owProgress.completeStage(7);
             stage = 8;
-            world.tactical?.notify?.('🏆 盐线市 8 幕《失联名单》全城战役通关！按 [M] 自由畅游全城！',
-              '🏆 Saltline City 8-Act Campaign Complete! Press [M] to roam!', false, 8.5);
+            finaleSpinActive = true;
+            setLetterbox(true, 0);
+            world.disasters?.stopAllEvents?.();
+            world.disasters?.triggerVictoryFlareBarrage?.(new Vector3(-168, 2.5, -184));
+            playStorySequence([
+              { at: .2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '我们做到了，林恩！运输机螺旋桨已经起转，十七个人的名字一个都不会被抹掉！' },
+              { at: 4.4, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '全港区已由救援舰队接管，里德与沃德的通缉令已下达。欢迎归队，SAR-04。' },
+            ]);
+            storyTimers.push(setTimeout(() => {
+              try { document.exitPointerLock?.(); } catch {}
+              finaleCard.classList.add('open');
+            }, 5200));
           }
         }
       }
@@ -3333,10 +3916,10 @@
           stealthEl.textContent = '🌏 开放世界和平漫游 · 东海净空';
         } else if (aliveEnemies > 0) {
           stealthEl.className = 'sl-stealth-pill alert';
-          stealthEl.textContent = `🔴 战术交火态 · 周边敌军 ${aliveEnemies}`;
+          stealthEl.textContent = `🔴 战术交火态 · 敌军 ${aliveEnemies} · ⚡支援点 ${supportPoints}/${SUPPORT_MAX}`;
         } else {
           stealthEl.className = 'sl-stealth-pill';
-          stealthEl.textContent = '🟢 隐蔽潜行态 · 区域安全';
+          stealthEl.textContent = `🟢 区域安全 · ⚡支援点 ${supportPoints}/${SUPPORT_MAX}`;
         }
         const distSuffix = beaconTarget && playerPos ? ` · ${Math.round(playerPos.distanceTo(beaconTarget))}m` : '';
         const objText = local(info.en, info.zh) + distSuffix;
@@ -3409,11 +3992,17 @@
       blindPane.dispose();
       root.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
       for (const geo of worldBoxCache.values()) geo.dispose();
+      clearStoryTimers();
+      if (cinemaTimer) clearTimeout(cinemaTimer);
       root.removeFromParent();
       hud.remove();
       minimap.remove();
       pinLayer.remove();
       actCard.remove();
+      cinemaTop.remove();
+      cinemaBot.remove();
+      storyBox.remove();
+      finaleCard.remove();
       photoPill.remove();
       if (legacySkyline) legacySkyline.visible = true;
       if (legacyLamps) legacyLamps.visible = true;
@@ -3426,14 +4015,19 @@
     }
 
     return {
-      update, dispose, toggleMap, jumpToStage, setFreeRoam, setPhotoMode,
+      update, dispose, toggleMap, jumpToStage, startFromLanding, restartCurrentStage, setFreeRoam, setPhotoMode,
+      teleportToSafeStart,
       cycleSky() { return applySkyPreset(skyIdx + 1); },
-      stageStarts, interactables,
+      stageStarts, interactables, progress: owProgress,
       rainShelters: blocks.filter(b => b.facility || b.enterable).map(b => ({
         min:new Vector3(b.x0+1.5,.16,b.z0+1.5),max:new Vector3(b.x1-1.5,b.enterable?3.8:7.8,b.z1-1.5)
       })),
+      get mapOpen() { return mapOpen; },
       get freeRoam() { return freeRoam; },
+      get activeCampaign() { return cityCampaignActive && !freeRoam && !isMultiplayer(); },
       get stage() { return stage; },
+      get currentObjective() { return currentObjectiveInfo(); },
+      get currentStageStart() { return stageStarts[Math.min(stage, 7)] ?? stageStarts[0]; },
       waypoints: districts.map(d => ({ label: d.nameEn, zh: d.nameZh, pos: d.pos.clone() })),
     };
   };
