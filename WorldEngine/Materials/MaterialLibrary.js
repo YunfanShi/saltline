@@ -107,7 +107,7 @@
         cache.set(key, mat);
         return mat;
       }
-      const size = Math.max(128, Math.min(512, Math.round(resolution * qualityResMul)));
+      const size = Math.max(128, Math.min(1024, Math.round(resolution * qualityResMul)));
       const makeCanvas = () => { const c = document.createElement('canvas'); c.width = c.height = size; return c; };
       const cCol = makeCanvas(), cRgh = makeCanvas(), cNrm = makeCanvas(), cAo = makeCanvas();
       const ctxC = cCol.getContext?.('2d'), ctxR = cRgh.getContext?.('2d'), ctxN = cNrm.getContext?.('2d'), ctxA = cAo.getContext?.('2d');
@@ -305,7 +305,7 @@
     function get(name, overrideOpts) {
       const key = overrideOpts ? `${name}:${JSON.stringify(overrideOpts)}` : name;
       if (cache.has(key)) return cache.get(key);
-      if (!overrideOpts && worldMats?.get) {
+      if (!overrideOpts && !presets[name] && worldMats?.get) {
         const nativeHit = worldMats.get(name);
         if (nativeHit) return nativeHit;
       }
@@ -313,10 +313,54 @@
       return bakePBRSet(key, spec);
     }
 
+    function scannedSurface(id) {
+      if (cache.has(id)) return cache.get(id);
+      const loader = new THREE.TextureLoader();
+      function load(file, color) {
+        const texture = loader.load('./assets/surfaces/' + id + '/' + file + '.jpg');
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.anisotropy = 4;
+        if (color) texture.colorSpace = THREE.SRGBColorSpace;
+        textures.push(texture);
+        return texture;
+      }
+      const arm = load('arm',false);
+      const mat = new THREE.MeshStandardMaterial({map:load('Diffuse',true),normalMap:load('nor_gl',false),
+        roughnessMap:arm,aoMap:arm,roughness:1,metalness:0});
+      materials.push(mat); cache.set(id,mat);
+      return mat;
+    }
+    const metricMaterials = new Map();
+    // A unit cube may represent a 90 mm mullion or a 20 m wall within the same draw.
+    function forInstancedBoxes(source) {
+      if (!source.map && !source.normalMap && !source.roughnessMap && !source.aoMap) return source;
+      if (metricMaterials.has(source)) return metricMaterials.get(source);
+      const m = source.clone();
+      m.onBeforeCompile = shader => {
+        const maps = [['USE_MAP','vMapUv'],['USE_NORMALMAP','vNormalMapUv'],
+          ['USE_ROUGHNESSMAP','vRoughnessMapUv'],['USE_AOMAP','vAoMapUv']];
+        const scaleUvs = maps.map(([flag, varying]) =>
+          '#ifdef ' + flag + '\n' + varying + ' *= meters / 3.0;\n#endif').join('\n');
+        shader.vertexShader = shader.vertexShader.replace('#include <uv_vertex>',
+          `#include <uv_vertex>
+          #ifdef USE_INSTANCING
+          vec3 dims = vec3(length(instanceMatrix[0].xyz),length(instanceMatrix[1].xyz),length(instanceMatrix[2].xyz));
+          vec2 meters = abs(normal.x) > .5 ? dims.zy : (abs(normal.y) > .5 ? dims.xz : dims.xy);
+          ${scaleUvs}
+          #endif`);
+      };
+      materials.push(m);
+      metricMaterials.set(source, m);
+      return m;
+    }
+
     function createDecalMaterial(text, subText, bgColor = 'rgba(22,30,36,0.78)', fgColor = '#e9d399') {
+      const key = JSON.stringify([text, subText, bgColor, fgColor]);
+      if (cache.has(key)) return cache.get(key);
       if (!canBake) {
         const m = new THREE.MeshStandardMaterial({ color: 0x263038, roughness: 0.8 });
         materials.push(m);
+        cache.set(key,m);
         return m;
       }
       const c = document.createElement('canvas'); c.width = 512; c.height = 192;
@@ -338,6 +382,7 @@
         map: tex, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       });
       materials.push(mat);
+      cache.set(key,mat);
       return mat;
     }
 
@@ -347,7 +392,7 @@
       cache.clear();
     }
 
-    return { get, applyWorldUV, createDecalMaterial, mulberry32, fbm2D, dispose };
+    return { get, scannedSurface, forInstancedBoxes, applyWorldUV, createDecalMaterial, mulberry32, fbm2D, dispose };
   }
 
   WE.createMaterialLibrary = createMaterialLibrary;

@@ -19,7 +19,7 @@
     }
 
     // Scene-aware PMREM cubemap: sky gradient + glowing sun/moon disc + East Sea reflection plane + skyline silhouette
-    function buildProceduralEnvMap(topHex, horizonHex, seaHex, sunHex = 0xfff2d6, sunElev = 0.55) {
+    function buildProceduralEnvMap(topHex, horizonHex, seaHex, sunHex = 0xfff2d6, sunElev = 0.55, direction) {
       if (!renderer || typeof THREE.PMREMGenerator !== 'function' || typeof THREE.Scene !== 'function') return;
       try {
         const pmrem = new THREE.PMREMGenerator(renderer);
@@ -45,7 +45,7 @@
         const sunGeo = new THREE.SphereGeometry(2.1, 10, 8);
         const sunMat = new THREE.MeshBasicMaterial({ color: sunHex });
         const sunMesh = new THREE.Mesh(sunGeo, sunMat);
-        sunMesh.position.set(16 * Math.cos(sunElev), 16 * Math.sin(sunElev), -9);
+        sunMesh.position.copy(direction).multiplyScalar(18);
         envScene.add(sunMesh);
 
         // Distant coastal city silhouette ring along western horizon of reflection probe
@@ -103,41 +103,77 @@
     let currentIdx = 0;
     let timeOfDay = presets[0].hour;
 
-    function applySunAngle(hour) {
-      if (!scene) return;
-      const elev = Math.max(0.14, Math.sin(((hour - 6) / 12) * Math.PI) * 1.15);
-      const azim = ((hour - 6) / 12) * Math.PI - Math.PI * 0.35;
-      scene.traverse?.(obj => {
-        if (obj.isDirectionalLight && obj.position?.set) {
-          obj.position.set(Math.cos(azim) * 95, Math.max(22, Math.sin(elev) * 110), Math.sin(azim) * 95);
-        }
-      });
-    }
-
-    function applyPreset(idx, silent = false) {
-      currentIdx = ((idx % presets.length) + presets.length) % presets.length;
-      const p = presets[currentIdx];
-      timeOfDay = p.hour;
-      if (scene) {
-        if (scene.fog) {
-          scene.fog.color?.setHex?.(p.fog);
-          if (typeof scene.fog.density === 'number') scene.fog.density = p.density;
-        }
-        scene.traverse?.(obj => {
-          if (obj.isDirectionalLight) { obj.color?.setHex?.(p.sun); obj.intensity = p.sunInt; }
-          else if (obj.isHemisphereLight) { obj.color?.setHex?.(p.hemiSky); obj.groundColor?.setHex?.(p.hemiGnd); obj.intensity = p.hemiInt; }
+    const dayKeys = [{ ...presets[3], hour: 4.3 }, ...presets];
+    const previousEnvironment = scene?.environment;
+    let lights, skyUniforms, reflectionSlot, elapsed = 0;
+    const mixed = new THREE.Color(), other = new THREE.Color();
+    const blendColor = (a,b,t) => mixed.setHex(a).lerp(other.setHex(b),t).getHex();
+    function setTimeOfDay(hour) {
+      timeOfDay = (hour % 24 + 24) % 24;
+      let end = dayKeys.findIndex(p => p.hour > timeOfDay);
+      if (end < 0) end = 0;
+      const a = dayKeys[(end+dayKeys.length-1)%dayKeys.length], b=dayKeys[end];
+      const t = ((timeOfDay-a.hour+24)%24)/((b.hour-a.hour+24)%24);
+      const p = {};
+      for (const key of ['sun','fog','hemiSky','hemiGnd','envTop','envHor','envSea'])
+        p[key] = blendColor(a[key],b[key],t);
+      for (const key of ['density','sunInt','hemiInt','exposure','sunElev'])
+        p[key] = a[key] + (b[key]-a[key])*t;
+      const rain=Math.max(0,Math.min(1,world.ground?.rainLevel ?? 0));
+      p.sunInt *= 1-.25*rain;
+      p.density += rain*.00016;
+      p.hemiInt *= 1-.08*rain;
+      if (!lights) {
+        lights=[]; skyUniforms=[];
+        scene?.traverse?.(node => {
+          if (node.isDirectionalLight || node.isHemisphereLight) lights.push(node);
+          const u=node.material?.uniforms;
+          if (u?.uZen && u.uHor) skyUniforms.push(u);
         });
       }
-      applySunAngle(timeOfDay);
-      if (renderer && 'toneMappingExposure' in renderer) renderer.toneMappingExposure = p.exposure;
-      buildProceduralEnvMap(p.envTop, p.envHor, p.envSea, p.sun, p.sunElev);
-      if (!silent) world.tactical?.notify?.(`🌤️ 氛围光影已切换：${p.zh}（按 T 键随时切换）`, `🌤️ Atmosphere: ${p.en}`, false, 2.8);
+      const az = (timeOfDay-6)*Math.PI/12-Math.PI*.35;
+      const dir = new THREE.Vector3(Math.cos(az)*Math.cos(p.sunElev),Math.sin(p.sunElev),Math.sin(az)*Math.cos(p.sunElev));
+      for (const light of lights) {
+        if (light.isDirectionalLight) {
+          light.position.copy(dir).multiplyScalar(110);
+          light.color.setHex(p.sun); light.intensity=p.sunInt;
+        } else {
+          light.color.setHex(p.hemiSky); light.groundColor.setHex(p.hemiGnd); light.intensity=p.hemiInt;
+        }
+      }
+      for (const u of skyUniforms) {
+        u.uZen.value.setHex(p.envTop); u.uHor.value.setHex(p.envHor);
+        u.uHorAway?.value.setHex(p.fog); u.uSunDir?.value.copy(dir); u.uSunCol?.value.setHex(p.sun);
+      }
+      if (scene?.fog) {
+        scene.fog.color.setHex(p.fog);
+        if ('density' in scene.fog) scene.fog.density=p.density;
+      }
+      if (renderer) renderer.toneMappingExposure=p.exposure;
+      const slot=Math.floor(timeOfDay*2);
+      if (reflectionSlot!==slot) {
+        buildProceduralEnvMap(p.envTop,p.envHor,p.envSea,p.sun,p.sunElev,dir);
+        reflectionSlot=slot;
+      }
+      return p;
+    }
+    function applyPreset(idx, silent=false) {
+      currentIdx=((idx%presets.length)+presets.length)%presets.length;
+      const p=presets[currentIdx];
+      setTimeOfDay(p.hour);
+      if (!silent) world.tactical?.notify?.(p.zh,p.en,false,2.8);
+      return p;
+    }
+    function advance(dt) {
+      elapsed+=dt;
+      if (elapsed<.5) return;
+      const p=setTimeOfDay(timeOfDay+elapsed/150);
+      elapsed=0;
       return p;
     }
 
-    buildProceduralEnvMap(presets[0].envTop, presets[0].envHor, presets[0].envSea, presets[0].sun, presets[0].sunElev);
-
     function dispose() {
+      if (scene?.environment === envRT?.texture && scene) scene.environment = previousEnvironment;
       if (envRT) { envRT.dispose?.(); envRT = null; }
     }
 
@@ -145,13 +181,7 @@
       presets,
       applyPreset,
       cycle: () => applyPreset(currentIdx + 1),
-      setTimeOfDay(hour) {
-        timeOfDay = ((Number(hour) || 0) % 24 + 24) % 24;
-        if (timeOfDay >= 20 || timeOfDay < 5.5) return applyPreset(3, true);
-        if (timeOfDay >= 16.5) return applyPreset(2, true);
-        if (timeOfDay >= 11 && timeOfDay < 16.5) return applyPreset(1, true);
-        return applyPreset(0, true);
-      },
+      setTimeOfDay, advance,
       get current() { return presets[currentIdx]; },
       get index() { return currentIdx; },
       get timeOfDay() { return timeOfDay; },

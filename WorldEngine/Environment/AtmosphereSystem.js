@@ -110,7 +110,13 @@
       g.removeFromParent?.();
     }
 
-    return { group: g, syncPreset, dispose };
+    function syncDaylight(p) {
+      if (!cloudMat || !p) return;
+      cloudMat.uniforms.uCloudColor.value.setHex(p.hemiSky);
+      cloudMat.uniforms.uShadowColor.value.setHex(p.fog);
+      cloudMat.uniforms.uOpacity.value = .32 + p.hemiInt*.16;
+    }
+    return { group: g, syncPreset, syncDaylight, dispose };
   }
 
   WE.createAtmosphereSystem = createAtmosphereSystem;

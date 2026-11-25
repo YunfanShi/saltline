@@ -20,8 +20,76 @@
       // Western highland escarpment rises smoothly west of x = -216
       const westSlope = Math.max(0, Math.min(1, (-216 - x) / 16));
       const smoothWest = westSlope * westSlope * (3 - 2 * westSlope);
-      const baseEscarp = z < -28 ? 14.2 : (z < 46 ? 12.6 : 10.8);
+      const baseEscarp = 12.5 - 1.7 * Math.tanh((z - 6) / 46);
       return 0.16 + smoothWest * (baseEscarp + fbm + ridge * 1.4 - erosion);
+    }
+
+    const regions = [
+      [-244,-226,25,-30.2], [-244,-30.2,-107.2,28.2], [-244,28.2,-6.2,148],
+      [-6.2,28.2,25,80.5], [-6.2,103.5,25,148]
+    ];
+    function floorAt(x,z) {
+      for (const [west,north,east,south] of regions)
+        if (x>=west && x<=east && z>=north && z<=south) return sampleHeight(x,z);
+      return undefined;
+    }
+
+    function intersectRay(origin,dir,maxDist) {
+      let hit=maxDist;
+      for (const [west,north,east,south] of regions) {
+        let lo=0,hi=hit;
+        for (const [pos,delta,min,max] of [[origin.x,dir.x,west,east],[origin.z,dir.z,north,south]]) {
+          if (Math.abs(delta)<1e-8) { if(pos<min || pos>max) hi=-1; continue; }
+          const a=(min-pos)/delta,b=(max-pos)/delta;
+          lo=Math.max(lo,Math.min(a,b)); hi=Math.min(hi,Math.max(a,b));
+        }
+        if (lo>hi) continue;
+        const flat=dir.y<0 ? (.16-origin.y)/dir.y : Infinity;
+        if (flat>=lo && flat<=hi && origin.x+dir.x*flat>=-216) hit=Math.min(hit,flat);
+        if (dir.x>0) hi=Math.min(hi,(-216-origin.x)/dir.x);
+        else if (dir.x<0) lo=Math.max(lo,(-216-origin.x)/dir.x);
+        else if (origin.x>=-216) continue;
+        if(lo>hi) continue;
+        const above=t=>origin.y+dir.y*t-sampleHeight(origin.x+dir.x*t,origin.z+dir.z*t);
+        const step=2/Math.max(.01,Math.hypot(dir.x,dir.z));
+        for(let start=lo;start<hi;) {
+          const end=Math.min(hi,start+step);
+          if(above(start)>=0 && above(end)<=0) {
+            let a=start,b=end;
+            for(let i=0;i<14;i++){const mid=(a+b)/2;if(above(mid)>0)a=mid;else b=mid;}
+            hit=Math.min(hit,b); break;
+          }
+          start=end;
+        }
+      }
+      return hit<maxDist ? hit : null;
+    }
+
+    function tileGeometry(x0,z0,x1,z1,spacing) {
+      const nx = Math.ceil((x1-x0)/spacing), nz = Math.ceil((z1-z0)/spacing);
+      const positions=[],colors=[],uv=[],indices=[];
+      for (let j=0;j<=nz;j++) for (let i=0;i<=nx;i++) {
+        const x = x0+(x1-x0)*i/nx, z = z0+(z1-z0)*j/nz;
+        const h = sampleHeight(x,z);
+        positions.push(x,h,z);
+        uv.push(x/3,z/3);
+        const grade = Math.min(1,Math.hypot(sampleHeight(x+.5,z)-sampleHeight(x-.5,z),
+          sampleHeight(x,z+.5)-sampleHeight(x,z-.5)));
+        const inland = Math.min(1,Math.max(0,(-x-210)/12));
+        const sod = inland*(1-grade)*(.81+.13*Math.sin(x*.53+z*.34));
+        colors.push(1-.66*sod-.28*grade,1-.44*sod-.25*grade,1-.75*sod-.26*grade);
+        if (i && j) {
+          const d = j*(nx+1)+i, c=d-1,b=d-nx-1,a=b-1;
+          indices.push(a,c,b,b,c,d);
+        }
+      }
+      const geo = new BufferGeometry();
+      geo.setAttribute('position',new Float32BufferAttribute(positions,3));
+      geo.setAttribute('color',new Float32BufferAttribute(colors,3));
+      geo.setAttribute('uv',new Float32BufferAttribute(uv,2));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
     }
 
     // Continuous multi-strata cliff escarpment with hydraulic-erosion gullies & slope-blended vertex colors
@@ -108,22 +176,45 @@
         return mat;
       };
 
-      const pineMat = makeWindMat(0x1f3624, 0.055);
-      const cypressMat = makeWindMat(0x28422b, 0.042);
-      const shrubMat = makeWindMat(0x36522e, 0.028);
-
-      const cypressGeo = typeof ConeGeometry === 'function' ? new ConeGeometry(1.15, 5.4, 8) : crownGeo;
-      if (cypressGeo !== crownGeo) { cypressGeo.translate(0, 3.6, 0); geos.push(cypressGeo); }
-      const shrubGeo = typeof DodecahedronGeometry === 'function' ? new DodecahedronGeometry(1.1, 0) : crownGeo;
-      if (shrubGeo !== crownGeo) { shrubGeo.scale(1.25, 0.68, 1.15); shrubGeo.translate(0, 0.65, 0); geos.push(shrubGeo); }
-
+      const pineMat = makeWindMat(0xffffff, .026);
+      const loader = new THREE.TextureLoader();
+      const foliageMaps = ['twig','alpha'].map(name => loader.load('./assets/surfaces/pine_tree_01/'+name+'.jpg'));
+      pineMat.map = foliageMaps[0]; pineMat.map.colorSpace = THREE.SRGBColorSpace;
+      pineMat.alphaMap = foliageMaps[1]; pineMat.alphaTest = .40;
+      pineMat.userData.ownedMaps = foliageMaps;
+      const vertices=[], uv=[];
+      // This atlas has a vertical needle spray at its upper-left corner.
+      for (let level=0;level<11;level++) {
+        const y=1.2+level*.37, reach=1.82-level*.135;
+        for (let j=0;j<10;j++) {
+          const azimuth=j*2.39996+level*1.72;
+          for (const split of [-.34,0,.34]) {
+            const a=azimuth+split, dx=Math.cos(a), dz=Math.sin(a);
+            const start=.15+Math.abs(split)*reach*.72, end=reach*(.91+.09*Math.cos(j*4.1));
+            const w=(end-start)*.24;
+            const tipY=y-.27+.13*Math.cos(level+j);
+            const x=Math.cos(azimuth)*start,z=Math.sin(azimuth)*start;
+            const tipX=x+dx*(end-start),tipZ=z+dz*(end-start);
+            const v=[[x-dz*w,y,z+dx*w],[x+dz*w,y,z-dx*w],
+              [tipX+dz*w,tipY,tipZ-dx*w],[tipX-dz*w,tipY,tipZ+dx*w]];
+            for(const i of [0,1,2,0,2,3]) {
+              vertices.push(...v[i]);
+              uv.push(i===0||i===3?.014:.232,i<2?.56:.99);
+            }
+          }
+        }
+      }
+      const foliage = new BufferGeometry();
+      foliage.setAttribute('position',new Float32BufferAttribute(vertices,3));
+      foliage.setAttribute('uv',new Float32BufferAttribute(uv,2));
+      foliage.computeVertexNormals(); geos.push(foliage);
       const pines = [], cypresses = [], shrubs = [];
       for (let i = 0; i < positions.length; i++) {
         const p = positions[i];
         if (i % 5 === 2) cypresses.push(p);
         else pines.push(p);
         // Ecological understory coastal shrub clustered near tree bases
-        if (i % 2 === 0) shrubs.push([p[0] + Math.sin(i * 2.1) * 1.9, p[1] - 0.1, p[2] + Math.cos(i * 1.7) * 1.9, 0.75 + (i % 3) * 0.22]);
+        if (i % 2 === 0) shrubs.push([p[0] + Math.sin(i * 2.1) * 1.9, sampleHeight(p[0] + Math.sin(i * 2.1) * 1.9, p[2] + Math.cos(i * 1.7) * 1.9), p[2] + Math.cos(i * 1.7) * 1.9, 0.75 + (i % 3) * 0.22]);
       }
 
       const dummy = new Object3D();
@@ -151,9 +242,9 @@
         return cInst;
       };
 
-      const pineInst = buildSpecies(pines, crownGeo, pineMat, true);
-      const cypressInst = buildSpecies(cypresses, cypressGeo, cypressMat, true);
-      const shrubInst = buildSpecies(shrubs, shrubGeo, shrubMat, false);
+      const pineInst = buildSpecies(pines, foliage, pineMat, true);
+      const cypressInst = buildSpecies(cypresses, foliage, pineMat, true);
+      const shrubInst = buildSpecies(shrubs.map(([x,y,z,size])=>[x,y,z,size*.28]), foliage, pineMat, false);
 
       if (Array.isArray(updaters)) {
         updaters.push(dt => { windUniform.value += dt; });
@@ -163,10 +254,10 @@
 
     function dispose() {
       for (const g of geos) g.dispose?.();
-      for (const m of mats) m.dispose?.();
+      for (const m of mats) { for (const map of m.userData.ownedMaps || []) map.dispose(); m.dispose(); }
     }
 
-    return { sampleHeight, buildStratifiedCliff, buildWindPineForest, dispose };
+    return { regions, floorAt, intersectRay, tileGeometry, sampleHeight, buildStratifiedCliff, buildWindPineForest, dispose };
   }
 
   WE.createTerrainGenerator = createTerrainGenerator;

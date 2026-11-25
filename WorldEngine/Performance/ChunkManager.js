@@ -38,7 +38,7 @@
           const next = (resourceRefs.get(node.geometry) || 0) + delta;
           if (next <= 0) {
             resourceRefs.delete(node.geometry);
-            if (node.userData?.streamDisposable) { node.geometry.dispose?.(); totalDisposals++; }
+            if (node.geometry.userData?.streamOwned) { node.geometry.dispose?.(); totalDisposals++; }
           } else resourceRefs.set(node.geometry, next);
         }
         if (node.material) {
@@ -47,7 +47,7 @@
             const next = (resourceRefs.get(m) || 0) + delta;
             if (next <= 0) {
               resourceRefs.delete(m);
-              if (node.userData?.streamDisposable) { m.dispose?.(); totalDisposals++; }
+              if (m.userData?.streamOwned) { m.dispose?.(); totalDisposals++; }
             } else resourceRefs.set(m, next);
           }
         }
@@ -67,7 +67,8 @@
     function activateChunk(chunk) {
       const { sec } = chunk;
       if (typeof sec.onBuild === 'function' && !sec._built) {
-        sec.onBuild();
+        sec._started = true;
+        if (sec.onBuild() === false) return false;
         sec._built = true;
       }
       if (!sec.loaded) {
@@ -75,6 +76,7 @@
         if (sec.shell) sec.shell.visible = true;
         syncColliders?.(sec, true);
         trackObjectResources(sec.shell, 1);
+        trackObjectResources(sec.detail, 1);
       }
       chunk.state = 'ACTIVE';
       chunk.dormantClock = 0;
@@ -85,17 +87,18 @@
       if (sec.detailed) {
         sec.detailed = false;
         if (sec.detail) sec.detail.visible = false;
-        trackObjectResources(sec.detail, -1);
       }
       if (sec.loaded) {
         sec.loaded = false;
         if (sec.shell) sec.shell.visible = false;
         syncColliders?.(sec, false);
         trackObjectResources(sec.shell, -1);
+        trackObjectResources(sec.detail, -1);
       }
-      if (typeof sec.onUnload === 'function' && sec._built) {
+      if (typeof sec.onUnload === 'function' && sec._started) {
         sec.onUnload();
         sec._built = false;
+        sec._started = false;
       }
       chunk.state = 'UNLOADED';
       chunk.lod = 2;
@@ -154,12 +157,10 @@
             if (!sec.detailed && dist <= detailInR) {
               sec.detailed = true;
               if (sec.detail) sec.detail.visible = true;
-              trackObjectResources(sec.detail, 1);
               ch.lod = 0;
             } else if (sec.detailed && dist > detailOutR) {
               sec.detailed = false;
               if (sec.detail) sec.detail.visible = false;
-              trackObjectResources(sec.detail, -1);
               ch.lod = 1;
             }
           }
@@ -171,14 +172,13 @@
             if (sec.detailed) {
               sec.detailed = false;
               if (sec.detail) sec.detail.visible = false;
-              trackObjectResources(sec.detail, -1);
             }
             ch.lod = 1;
           } else if (ch.state === 'DORMANT') {
             ch.dormantClock += dt;
             if (ch.dormantClock >= dormantTtlSec) unloadChunk(ch);
           } else if (ch.state === 'QUEUED') {
-            ch.state = 'UNLOADED';
+            unloadChunk(ch);
           }
         }
       }
@@ -188,11 +188,13 @@
         queue.sort((a, b) => a.priority - b.priority);
         const deadline = t0 + preset.budgetMs;
         for (let i = 0; i < queue.length; i++) {
-          activateChunk(queue[i]);
+          if (activateChunk(queue[i]) === false) {
+            if (nowMs() >= deadline) break;
+            continue;
+          }
           if (queue[i].lastDist <= (queue[i].sec.detailRadius || 195) * preset.detailMul) {
             queue[i].sec.detailed = true;
             if (queue[i].sec.detail) queue[i].sec.detail.visible = true;
-            trackObjectResources(queue[i].sec.detail, 1);
             queue[i].lod = 0;
           }
           if (nowMs() >= deadline && i >= 0) break;

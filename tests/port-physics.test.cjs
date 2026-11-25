@@ -70,3 +70,13 @@ test('a rail gate added after build blocks movement and navigation until removed
   assert.ok(opened.position.z > 24);
   assert.equal(physics.nav.isWalkable(25, 23.05), true);
 });
+
+test('height queries and the moving capsule use the same open-world terrain surface',()=>{
+  const physics=create({});
+  physics.terrainHeight=(x,z)=>x<-80 && z>10 ? 3+(z-11)*.05 : undefined;
+  const position=vector(-87,3,11);
+  physics.moveCapsule(position,vector(0,-1,2),.25);
+  assert.equal(position.y,physics.groundHeight(position.x,position.z));
+  delete physics.terrainHeight;
+  assert.ok(physics.groundHeight(position.x,position.z)<3);
+});

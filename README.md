@@ -4,7 +4,7 @@ A small browser first-person shooter set in a rainy industrial port. Recover evi
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.14.0
+## Saltline fork 0.15.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
 - **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure four sectors in order, beginning at West Dispatch. The LAN staging room is available when launched with the local server.

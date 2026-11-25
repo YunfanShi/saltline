@@ -74,7 +74,7 @@
       const flush = () => {
         if (typeof InstancedMesh === 'function') {
           for (const [material, matrices] of batches) {
-            const batch = new InstancedMesh(unitBox, material, matrices.length);
+            const batch = new InstancedMesh(unitBox, matLib.forInstancedBoxes(material), matrices.length);
             for (let i = 0; i < matrices.length; i++) batch.setMatrixAt(i, matrices[i]);
             batch.receiveShadow = true;
             g.add(batch);
@@ -548,11 +548,116 @@
       return g;
     }
 
+    function buildDistantBuilding(parent, { cx,cz,width:w,depth:d,height:h,style }) {
+      const group = new Group();
+      const {push,flush} = createBatcher(group);
+      const mass = (dx,dz,width,depth,base,height,material) =>
+        push(material,width,height,depth,cx+dx,.16+base+height/2,cz+dz);
+      const wall=sharedMats.brickWeathered, trim=sharedMats.concreteDirty;
+      if (style==='modern_office') {
+        mass(0,0,w,d,0,h*.25,trim); mass(0,0,w*.77,d*.79,h*.25,h*.65,sharedMats.smokedPane);
+        mass(0,0,w*.52,d*.52,h*.9,h*.12,sharedMats.steelDark);
+      } else if (style==='harbor_apartment') {
+        mass(0,-d*.21,w,d*.58,0,h,wall);
+        for (const side of [-1,1]) mass(w*.33*side,d*.29,w*.34,d*.42,0,h,wall);
+      } else {
+        mass(0,0,w,d,0,h*.80,style==='industrial_hall' ? sharedMats.steelClad : trim);
+        if (style==='industrial_hall' || style==='coastal_residence') {
+          const count=style==='industrial_hall'?4:2;
+          for(let i=0;i<count;i++) push(sharedMats.corrugated,w+.4,.18,d/count*1.05,cx,h*.85,cz-d/2+(i+.5)*d/count,.22);
+        } else mass(0,0,w*.77,d*.71,h*.80,h*.18,wall);
+      }
+      flush(); parent.add(group); return group;
+    }
+
+    function buildFreightExchange(parent, lot, external, collide) {
+      const m=sharedMats, g=new Group();
+      g.name='customs-transit-shed';
+      const {push,flush}=createBatcher(g);
+      const west=lot.x0+1.5,east=lot.x1-1.5,north=lot.z0+2.5,south=lot.z1-2.5;
+      const width=east-west, depth=south-north, x=(west+east)/2, z=(north+south)/2;
+      const placements=[];
+      const ground=.16, eave=6.4, bay=depth/9;
+      const brick=matLib.scannedSurface('brick_wall_001');
+      // Leave a three-bay entrance for receiving cargo from Coastal Boulevard.
+      for(let i=0;i<9;i++) {
+        const at=north+i*bay;
+        if(i>=3 && i<6) continue;
+        for(let floor=0;floor<2;floor++) {
+          for(const part of ['wall_window_centered_double_01','window_centered_double_01'])
+            placements.push([part,east,ground+floor*3.12,at,Math.PI/2,bay/3,1.04]);
+        }
+        placements.push(['wall_pier_standard_01',east,ground,at,Math.PI/2,1,2.08]);
+        collide(east-.20,ground,at,east+.04,eave,at+bay);
+      }
+      external.placeFacadeModules(g,placements);
+      for(const end of [north,south]) {
+        push(brick,width,eave,.38,x,eave/2+ground,end);
+        collide(west,ground,end-.19,east,eave,end+.19);
+      }
+      push(brick,.42,eave,depth,west,eave/2+ground,z);
+      collide(west-.21,ground,north,west+.21,eave,south);
+      const span=width/3, rise=2.15;
+      for(let i=0;i<3;i++) {
+        const center=west+(i+.5)*span;
+        push(m.corrugated,Math.hypot(span,rise),.18,depth+.6,center,eave+rise/2,z,0,0,Math.atan2(rise,span));
+        push(m.smokedPane,.12,rise,depth,center+span/2,eave+rise/2,z);
+        for(let j=0;j<=6;j++) push(m.steelGalv,.19,rise,.12,center+span/2,eave+rise/2,north+j*depth/6);
+      }
+      // The canopy girders sit directly over the masonry jambs.
+      push(m.steelDark,3.4,.22,bay*3+.6,east+1.5,4.35,z);
+      push(m.steelDark,.32,.55,bay*3+.7,east,5.94,z);
+      for(const side of [-1,1]) {
+        const jamb=z+side*(bay*1.5+.05);
+        push(m.steelDark,.36,eave,.38,east+.03,eave/2+ground,jamb);
+        push(m.steelGalv,3.42,.12,.12,east+1.5,4.95,jamb,0,0,-.34);
+      }
+      flush(); parent.add(g);
+    }
+
+    function buildDispatchWing(parent, { bx0, bx1, bz0, bz1, entZ, externalAssets }) {
+      const g = new Group();
+      g.name = 'dispatch-radio-room';
+      const { push, flush } = createBatcher(g);
+      const m = sharedMats, masonry = matLib.scannedSurface('brick_wall_001');
+      const stone = matLib.get('granite'), pane = m.smokedPane;
+      const front = bx0 + 2.6, back = bx1 - 1.4, z0 = bz0 + .8, z1 = bz1 - 3.6;
+      const mid = (front + back)/2;
+      push(stone, back-front+.7,.24,z1-z0+.7,mid,4.16,(z1+z0)/2);
+      push(masonry,.42,4.18,z1-z0,back,6.28,(z1+z0)/2);
+      for (const z of [z0,z1]) push(masonry,back-front,4.18,.42,mid,6.28,z);
+      const placements=[];
+      const bays = 9, pitch = (z1-z0)/bays;
+      for (let i=0;i<bays;i++) {
+        const end = z0 + (i+1)*pitch;
+        const module = (part,y) => placements.push([part,front,y,end,-Math.PI/2,pitch/3,4.18/3]);
+        module('wall_window_centered_double_01',4.19);
+        module('window_centered_double_01',4.19);
+        module('cornice01_standard_standard_01',8.20);
+        if (i%3===0) module('wall_pier_standard_01',4.19);
+      }
+      externalAssets.placeFacadeModules(g,placements);
+      push(m.steelDark,back-front+1.2,.25,z1-z0+1.2,mid,8.42,(z1+z0)/2);
+      // Offset radio watch room and its projecting roof read above the brick wing.
+      const towerX = back-3.8, towerZ = z0+3.7;
+      push(masonry,7.4,2.25,7.2,towerX,9.65,towerZ);
+      push(pane,7.1,1.48,7,towerX,11.5,towerZ);
+      for (const dx of [-3.45,0,3.45]) for (const dz of [-3.43,3.43])
+        push(m.steelDark,.14,1.5,.14,towerX+dx,11.51,towerZ+dz);
+      push(m.steelDark,8.2,.24,8,towerX,12.38,towerZ);
+      // Deep brick pilasters at street level tie the ribbon windows to the stone plinth.
+      for (const z of [bz0+.52,entZ-7.7,entZ-2.4,entZ+2.4,entZ+7.7,bz1-.52])
+        push(masonry,.80,3.68,.74,bx0-.17,2.01,z);
+      flush();
+      parent.add(g);
+      return g;
+    }
+
     function dispose() {
       for (const geo of createdGeos) geo.dispose?.();
     }
 
-    return { buildCoastalBuilding, dispose };
+    return { buildCoastalBuilding, buildFreightExchange, buildDistantBuilding, buildDispatchWing, dispose };
   }
 
   WE.createBuildingGenerator = createBuildingGenerator;

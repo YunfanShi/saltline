@@ -159,62 +159,10 @@
     const customGeos = [];
 
     // High-res procedural weathered coastal building facade (crisp recessed windows, mullions, sills & rain streaks — slashes DC!)
+    const lobbyGlass = new MeshStandardMaterial({color:0x9caeb0, transparent:true, opacity:.27, roughness:.19, metalness:.3, depthWrite:false});
     const smokedPane = new MeshStandardMaterial({ color: 0x38494d, metalness: .4, roughness: .24 });
     const blindPane = new MeshStandardMaterial({ color: 0x686356, metalness: .17, roughness: .52 });
-    // Group identical components per building so rows of window reveals cost one draw per finish.
-    function buildStreetBlock(blk, cx, cz, width, depth) {
-      const batches = new Map();
-      const transform = new THREE.Object3D();
-      const floorCount = Math.max(2, Math.round((blk.h - 3.1) / 3.15));
-      const storey = (blk.h - 3.1) / floorCount;
-      for (let face = 0; face < 4; face++) {
-        const theta = face * Math.PI / 2;
-        const sin = Math.sin(theta), cos = Math.cos(theta);
-        const span = face % 2 ? depth : width;
-        const offset = (face % 2 ? width : depth) / 2;
-        const bays = Math.max(2, Math.round(span / (blk.h > 13 ? 4.0 : 5.0)));
-        const pitch = span / bays;
-        function panel(material, w, h, d, u, y, inset) {
-          transform.position.set(cx + cos*u + sin*(offset-inset), y, cz - sin*u + cos*(offset-inset));
-          transform.rotation.y = theta;
-          transform.scale.set(w,h,d);
-          transform.updateMatrix();
-          if (!batches.has(material)) batches.set(material, []);
-          batches.get(material).push(transform.matrix.clone());
-        }
-        for (let row = 0; row < floorCount; row++) {
-          const base = 3.1 + row * storey;
-          const sill = blk.h > 13 ? 1.12 : .93;
-          const glassHeight = storey - sill - .32;
-          panel(blk.mat, span, sill, .36, 0, base + sill/2, .18);
-          panel(blk.mat, span, .32, .36, 0, base + storey - .16, .18);
-          for (let bay = 0; bay < bays; bay++) {
-            const u = (bay + .5) * pitch - span/2;
-            const opening = pitch * (blk.h > 13 ? .75 : .54);
-            const jamb = (pitch-opening)/2;
-            const y = base + sill + glassHeight/2;
-            for (const sign of [-1,1]) panel(blk.mat, jamb, glassHeight, .36, u + sign*(pitch-jamb)/2, y, .18);
-            panel((row*7+bay*3+face)%9 === 1 ? blindPane : smokedPane, opening, glassHeight, .045, u, y, .29);
-            panel(M.steelDark, .055, glassHeight, .08, u + opening*.12, y, .24);
-            panel(M.concreteDirty, opening+.15, .09, .47, u, base+sill, .15);
-          }
-        }
-        panel(M.concreteDirty, span, .54, .42, 0, .43, .21);
-        panel(blk.mat, span, .5, .38, 0, 2.85, .19);
-        for (let bay=0; bay<bays; bay++) {
-          const u=(bay+.5)*pitch-span/2;
-          panel(M.steelDark, pitch, 1.9, .12, u, 1.65, .33);
-          panel(smokedPane, pitch-.45, 1.72, .06, u, 1.66, .24);
-          panel(blk.mat, .33, 2.0, .42, u-pitch/2+.165, 1.67, .21);
-        }
-      }
-      for (const [material, matrices] of batches) {
-        const batch = new THREE.InstancedMesh(boxGeo, material, matrices.length);
-        matrices.forEach((matrix,index) => batch.setMatrixAt(index,matrix));
-        batch.receiveShadow = true;
-        horizonRoot.add(batch);
-      }
-    }
+
 
     const hangarArchMat = M.corrugated.clone ? M.corrugated.clone() : new MeshStandardMaterial({ color: 0x3b464c, roughness: .68, metalness: .45 });
     hangarArchMat.side = THREE.DoubleSide;
@@ -225,6 +173,7 @@
     const sphGeo = new SphereGeometry(1, 14, 10);
 
     const sectors = [];
+    const parcels = [];
     const updaters = [];
     const shootTargets = [];
     const roadblockProps = [];
@@ -265,6 +214,17 @@
       };
       sectors.push(sec);
       return sec;
+    }
+
+    function makeParcel(id, x, z, streamRadius, detailRadius) {
+      const shell = new Group(), detail = new Group();
+      shell.name = id;
+      shell.visible = detail.visible = false;
+      root.add(shell, detail);
+      const parcel = { id, center: new Vector3(x, 0, z), streamRadius, detailRadius,
+        shell, detail, colliderSpecs: [], activeColliders: [], loaded: false, detailed: false };
+      parcels.push(parcel);
+      return parcel;
     }
 
     // World-meter UV BoxGeometry cache so large roads/walls NEVER stretch textures (matches Claude's Berth 4 density!)
@@ -330,10 +290,40 @@
 
     // Reuse Area 1 (Berth 4) native high-precision procedural asset library (world.props.build) with rotated AABB colliders!
     let propSeed = 4200;
-    function placePortProp(sec, parent, name, x, y, z, yaw = 0, opts = {}, collide = true) {
+    const propCells = new Map();
+    function placePortProp(sec,parent,name,x,y,z,yaw=0,opts={},collide=true) {
+      const seed = propSeed++;
+      if (!sec || (parent !== sec.shell && parent !== sec.detail))
+        return buildPortProp(sec,parent,name,x,y,z,yaw,{seed,...opts},collide);
+      const gx = Math.floor(x / 24), gz = Math.floor(z / 24);
+      const key = sec.id+'-'+gx+'-'+gz;
+      let cell = propCells.get(key);
+      if (!cell) {
+        cell = makeParcel(key,(gx+.5)*24,(gz+.5)*24,120,78);
+        cell.recipes=[];
+        let next = 0;
+        cell.onBuild = () => {
+          cell.recipes[next++]();
+          return next === cell.recipes.length;
+        };
+        cell.onUnload = () => {
+          cell.shell.clear(); cell.detail.clear(); cell.colliderSpecs.length=0; next=0;
+        };
+        propCells.set(key,cell);
+      }
+      cell.recipes.push(() => {
+        const obj = buildPortProp(cell,cell.shell,
+          name,x,y,z,yaw,{seed,...opts},collide);
+        // Native grouped geometry is generated per prop. Materials belong to the port library.
+        obj?.traverse(node => {
+          if (node.geometry) node.geometry.userData.streamOwned = true;
+        });
+      });
+    }
+    function buildPortProp(sec,parent,name,x,y,z,yaw,opts,collide) {
       if (!world.props?.build) return null;
       let obj = null;
-      try { obj = world.props.build(name, { seed: propSeed++, ...opts }); } catch { return null; }
+      try { obj = world.props.build(name, opts); } catch { return null; }
       if (!obj) return null;
       obj.position.set(x, y, z);
       obj.rotation.y = yaw;
@@ -1309,11 +1299,36 @@
     // TIER 0 (ALWAYS VISIBLE): ZERO-OVERLAP GROUND TILES (y=0.16) + ELEVATED ROADS (y=0.205) + REAL RECESSED DRYDOCK
     // STRICTLY x <= +26! ZERO COPLANAR OVERLAPS = ZERO Z-FIGHTING / ZERO FLICKER!
     // =========================================================================
-    solidHorizon(M.concreteDirty, -226, -.50, -226, 25, .16, -30.2, 'concrete', true);
-    solidHorizon(M.concreteDirty, -226, -.50, -30.15, -107.2, .16, 28.15, 'concrete', true);
-    solidHorizon(M.concreteDirty, -226, -.50, 28.2, -6.2, .16, 148, 'concrete', true);
-    solidHorizon(M.concreteDirty, -6.15, -.50, 28.2, 25, .16, 80.5, 'concrete', true);
-    solidHorizon(M.concreteDirty, -6.15, -.50, 103.5, 25, .16, 148, 'concrete', true);
+    const terrainSurface = M.concreteDirty.clone();
+    terrainSurface.vertexColors = true;
+    const hillsideSurface = matLib.scannedSurface('forest_floor').clone();
+    hillsideSurface.vertexColors = true;
+    const coarseTiles = [];
+    physics.terrainHeight = terrainGen.floorAt;
+    physics.terrainRay = terrainGen.intersectRay;
+    for (const [west,north,east,south] of terrainGen.regions) {
+      for (let x=west;x<east;x+=48) for (let z=north;z<south;z+=48) {
+        const x1=Math.min(x+48,east), z1=Math.min(z+48,south);
+        const tile=(spacing) => {
+          const mesh = new Mesh(terrainGen.tileGeometry(x,z,x1,z1,spacing),x < -216 ? hillsideSurface : terrainSurface);
+          mesh.receiveShadow = true;
+          return mesh;
+        };
+        const coarse = tile(8);
+        coarseTiles.push(coarse);
+        root.add(coarse);
+        // Inside the graded port all LODs are coplanar. Only the escarpment needs subdivision.
+        if (x >= -216) continue;
+        const parcel = makeParcel('terrain-'+x+'-'+z,(x+x1)/2,(z+z1)/2,116,82);
+        parcel.onBuild = () => {
+          const near = tile(2);
+          near.geometry.userData.streamOwned = true;
+          parcel.shell.add(near);
+          coarse.visible = false;
+        };
+        parcel.onUnload = () => { parcel.shell.clear(); coarse.visible = true; };
+      }
+    }
     solidHorizon(M.concrete, 23.6, -2.5, -145, 25.4, 1.05, -30.2, 'concrete', true);
     solidHorizon(M.concrete, 23.6, -2.5, 28.2, 25.4, 1.05, 80.5, 'concrete', true);
     solidHorizon(M.concrete, 23.6, -2.5, 103.5, 25.4, 1.05, 148, 'concrete', true);
@@ -1337,16 +1352,11 @@
 
     // CONTINUOUS WESTERN FORESTED CLIFF ESCARPMENT (WorldEngine Stratified Vertex-Color Cliff + Wind-Swaying Instanced Pine Forest)
     {
-      const zMin = -128, zMax = 144;
-      if (terrainGen) {
-        terrainGen.buildStratifiedCliff(horizonRoot, { crestX: -224.0, zMin, zMax, zSteps: 56, layers: 6 });
-      }
-      addBox(horizonRoot, M.coastalGrass, 16.0, .4, zMax - zMin + 4, -232.0, 12.6, (zMin + zMax) / 2);
       const pinePositions = [];
-      for (let pz = -124; pz <= 140; pz += 8.5) {
-        const py = (pz < -28 ? 14.0 : (pz < 46 ? 12.4 : 10.6)) + Math.sin(pz * .09) * .8;
-        pinePositions.push([-225.5 + (Math.sin(pz * 1.3) * 1.6), py, pz, 1.15 + Math.abs(Math.sin(pz * .7)) * .45]);
-        pinePositions.push([-231.5 + (Math.cos(pz * .9) * 2.0), py + .4, pz + 4.2, 1.3 + Math.abs(Math.cos(pz * .5)) * .35]);
+      for (let pz=-124;pz<=140;pz+=8.5) {
+        const x=-225.5+Math.sin(pz*1.3)*1.6, x2=-231.5+Math.cos(pz*.9)*2;
+        pinePositions.push([x,terrainGen.sampleHeight(x,pz),pz,1.15+Math.abs(Math.sin(pz*.7))*.45]);
+        pinePositions.push([x2,terrainGen.sampleHeight(x2,pz+4.2),pz+4.2,1.3+Math.abs(Math.cos(pz*.5))*.35]);
       }
       if (terrainGen) {
         terrainGen.buildWindPineForest(horizonRoot, crown, cylGeo, M.wood, pinePositions, updaters);
@@ -1449,9 +1459,11 @@
     // SECTOR 1 (NORTH): COASTAL CITY DOWNTOWN & EAST SEAFRONT PROMENADE (x: -107..+24, z: -145..-30)
     // =========================================================================
     const city = makeSector('city', '沿海城区与滨海长廊', 'Coastal City & Seafront', [-42, 0, -86], 155);
-    // Cross-street asphalt cleanly clipped outside V1 Coastal Blvd (ZERO overlap!)
-    addBox(city.shell, M.asphalt, 71.8, .05, 14, -69, .185, -84);
-    addBox(city.shell, M.asphalt, 38.8, .05, 14, .5, .185, -84);
+    const quarter = WE.planCoastalQuarter(M);
+    for (const [west,east,z,width] of quarter.crossStreets)
+      addBox(city.shell,M.asphalt,east-west,.05,width,(west+east)/2,.185,z);
+    for (const [x0,z0,x1,z1] of quarter.sidewalks)
+      solid(city,city.shell,M.concrete,x0,.15,z0,x1,.30,z1,'concrete',true);
     for (let z = -34; z >= -140; z -= 6.5) addBox(city.detail, M.yellowPaint, .18, .015, 3.2, -26, .24, z);
     for (let x = -100; x <= 18; x += 6.5) {
       if (Math.abs(x + 26) < 9) continue;
@@ -1482,36 +1494,29 @@
       roadblockProps.push({ mesh: b, intact: true });
     }
     // Showcase Coastal City District featuring ALL 6 distinct architectural archetypes (ZERO copy-pasted boxes!)
-    const blocks = [
-      { x0: -98, z0: -72, x1: -66, z1: -38, mat: M.brickWeathered, h: 11.5, style: 'commercial_arcade', seed: 101, labelZh: '海事货运商业骑楼', labelEn: 'MARITIME COMMERCIAL ARCADE' },
-      { x0: -62, z0: -72, x1: -37, z1: -38, mat: M.concrete, h: 8.2, facility: true },
-      { x0: -15, z0: -72, x1: 16, z1: -38, mat: M.plasterGrey, h: 9.2, enterable: true },
-      { x0: -98, z0: -115, x1: -68, z1: -93, mat: M.concreteDirty, h: 18.2, style: 'modern_office', seed: 202, labelZh: '盐线港务大厦', labelEn: 'SALTLINE PORT TOWER' },
-      { x0: -64, z0: -115, x1: -37, z1: -93, mat: M.brickWeathered, h: 13.0, style: 'harbor_apartment', seed: 303, labelZh: '滨海船员公寓', labelEn: 'SEAFARER COURTYARD APTS' },
-      { x0: -15, z0: -115, x1: 16, z1: -93, mat: M.concrete, h: 15.2, style: 'civic_customs', seed: 404, labelZh: '东海海关清关署', labelEn: 'EAST SEA CUSTOMS HALL' },
-      { x0: -96, z0: -143, x1: -40, z1: -134, mat: M.brickWeathered, h: 9.4, style: 'industrial_hall', seed: 505, labelZh: '北港锯齿机电工坊', labelEn: 'NORTH PORT SAWTOOTH WORKS' },
-      { x0: -15, z0: -143, x1: 16, z1: -134, mat: M.concreteDirty, h: 8.8, style: 'coastal_residence', seed: 606, labelZh: '东海海岸排屋民居', labelEn: 'COASTAL TERRACE RESIDENCE' },
-    ];
+    const blocks = quarter.lots;
     for (const blk of blocks) {
       solid(city, city.shell, M.concreteDirty, blk.x0 - 2.0, -.04, blk.z0 - 2.0, blk.x1 + 2.0, .16, blk.z1 + 2.0, 'concrete', true);
       if (blk.facility) {
-        addIndustrialFacility(city, city.shell, {
-          x0: blk.x0 + 1.5, z0: blk.z0 + 2.5, x1: blk.x1 - 1.5, z1: blk.z1 - 2.5,
-          h: 8.0, wallMat: M.steelClad, roofMat: M.corrugated,
-          title: 'COASTAL CUSTOMS FREIGHT HALL', doorSide: 'east', signBg: '#1c3240', interiorKind: 'warehouse',
-        });
+        buildingGen.buildFreightExchange(city.shell,blk,externalAssets,(x0,y0,z0,x1,y1,z1) =>
+          city.colliderSpecs.push({min:new Vector3(x0,y0,z0),max:new Vector3(x1,y1,z1),surface:'concrete'}));
+        for (const z of [blk.cz-8,blk.cz+8]) {
+          placePortProp(city,city.detail,'shelf_rack',blk.x0+4,.16,z,Math.PI/2);
+          placePortProp(city,city.detail,'pallet_stack',blk.cx,.16,z,.13);
+        }
+        placePortProp(city,city.detail,'forklift',blk.cx+2,.16,blk.cz-3,-.4);
         placePortProp(city, city.detail, 'guard_booth', blk.x1 + .6, .16, blk.z1 - 4.2, -Math.PI / 2);
         placePortProp(city, city.detail, 'jersey_barrier', blk.x1 + 1.4, .16, blk.z0 + 5.5, Math.PI / 2);
         placePortProp(city, city.detail, 'dumpster', blk.x0 - 1.8, .16, blk.z0 + 6.5, 0);
       } else if (blk.enterable) {
         const bx0 = blk.x0 + 1.5, bx1 = blk.x1 - 1.5, bz0 = blk.z0 + 1.5, bz1 = blk.z1 - 1.5;
-        solid(city, city.shell, blk.mat, bx0, .16, bz0, bx1, blk.h, bz0 + .5, 'concrete', true);
-        solid(city, city.shell, blk.mat, bx1 - .5, .16, bz0, bx1, blk.h, bz1, 'concrete', true);
-        solid(city, city.shell, blk.mat, bx0, .16, bz1 - .5, bx1, blk.h, bz1, 'concrete', true);
+        solid(city, city.shell, blk.mat, bx0, .16, bz0, bx1, 3.8, bz0 + .5, 'concrete', true);
+        solid(city, city.shell, blk.mat, bx1 - .5, .16, bz0, bx1, 3.8, bz1, 'concrete', true);
+        solid(city, city.shell, blk.mat, bx0, .16, bz1 - .5, bx1, 3.8, bz1, 'concrete', true);
         const entZ = (bz0 + bz1) / 2;
         const windowBays = [bz0 + 5.2, bz0 + 10.2, bz1 - 10.2, bz1 - 5.2];
         for (const [low, high, glazed] of [[.16, 1.18, false], [1.18, 3.02, true],
-          [3.02, 3.6, false], [3.6, 4.98, false], [4.98, 6.82, true], [6.82, blk.h, false]]) {
+          [3.02, 3.8, false]]) {
           const gaps = glazed ? windowBays.map(z => [z - 1.4, z + 1.4]) : [];
           if (low < 3.6) gaps.push([entZ - 2, entZ + 2]);
           let start = bz0;
@@ -1521,45 +1526,68 @@
           }
         }
         solid(city, city.shell, M.concrete, bx0, 3.8, bz0, bx1, 4.1, bz1, 'concrete', true);
-        solid(city, city.shell, M.steelDark, bx0 - .45, blk.h, bz0 - .45, bx1 + .45, blk.h + .44, bz1 + .45, 'metal', true);
-        for (const px of [bx0 - .05, bx1 + .05]) {
-          for (const pz of [bz0 - .05, bz1 + .05]) addBox(city.detail, M.concreteDirty, .68, blk.h + .6, .68, px, blk.h / 2 + .2, pz);
-        }
-        addBox(city.detail, M.concreteDirty, (bx1 - bx0) + .6, .28, (bz1 - bz0) + .6, (bx0 + bx1) / 2, 3.92, (bz0 + bz1) / 2);
-        for (const rz of [bz0 - .15, bz1 + .15]) addBox(city.detail, blk.mat, (bx1 - bx0) + .4, .85, .32, (bx0 + bx1) / 2, blk.h + .82, rz);
-        for (const rx of [bx0 - .15, bx1 + .15]) addBox(city.detail, blk.mat, .32, .85, (bz1 - bz0) + .4, rx, blk.h + .82, (bz0 + bz1) / 2);
-        addBox(city.detail, M.steelGalv, 3.6, 1.45, 2.4, bx1 - 5.5, blk.h + 1.15, bz0 + 6.5);
-        addCyl(city.detail, M.steelGalv, .12, 5.4, bx0 + 4.5, blk.h + 3.1, bz1 - 5.5);
-        addBox(city.detail, M.redCore, .30, .34, .30, bx0 + 4.5, blk.h + 5.9, bz1 - 5.5);
-        const precinctSign = addBox(city.detail, makeSignMat('COASTAL PRECINCT 04', 'HARBOR DISPATCH HQ', '#182f42'), 4.8, .92, .12, bx0 - 2.65, 4.42, entZ);
-        precinctSign.rotation.y = Math.PI / 2; precinctSign.updateMatrix();
+        buildingGen.buildDispatchWing(city.shell, { bx0, bx1, bz0, bz1, entZ, externalAssets });
+        const precinctSign = new Mesh(boxGeo,makeSignMat('COASTAL PRECINCT 04','HARBOR DISPATCH HQ','#182f42'));
+        precinctSign.scale.set(5.0,.92,.12); precinctSign.position.set(bx0-2.65,4.42,entZ);
+        city.detail.add(precinctSign);
+        precinctSign.rotation.y = -Math.PI / 2; precinctSign.updateMatrix();
         addBox(city.shell, M.concrete, 2.4, .22, 6.2, bx0 - 1.2, .11, entZ);
         addBox(city.shell, M.steelDark, 2.8, .22, 6.2, bx0 - 1.4, 3.85, entZ);
         for (const sz of [entZ - 2.4, entZ + 2.4]) {
           addBox(city.detail, M.steelGalv, .14, 3.8, .14, bx0 - 2.6, 1.9, sz);
           addBox(city.detail, M.concreteDirty, .42, 3.6, .42, bx0 + .05, 1.96, sz);
         }
-        for (const wy of [2.1, 5.9]) {
+        for (const wy of [2.1]) {
           for (const wz of windowBays) {
             for (const side of [-1, 1]) addBox(city.detail, M.steelDark, .20, 1.84, .08, bx0 + .26, wy, wz + side * 1.36);
-            solid(city, city.detail, M.glass, bx0 + .28, wy - .92, wz - 1.36, bx0 + .31, wy + .92, wz + 1.36, 'glass', true);
+            solid(city, city.detail, lobbyGlass, bx0 + .28, wy - .92, wz - 1.36, bx0 + .31, wy + .92, wz + 1.36, 'glass', true);
             addBox(city.detail, M.steelDark, .10, 1.84, .055, bx0 + .23, wy, wz);
             addBox(city.detail, M.concrete, .48, .18, 3.05, bx0 - .14, wy - 1.02, wz);
             addBox(city.detail, M.steelWorn, .44, .12, 3.00, bx0 - .12, wy + 1.00, wz);
           }
         }
-        for (const czPipe of [bz0 + .4, bz1 - .4]) addCyl(city.detail, M.steelGalv, .09, blk.h - .4, bx0 - .16, blk.h / 2, czPipe);
-        for (const czCol of [bz0 + 6.5, bz1 - 6.5]) addBox(city.detail, M.concreteDirty, .65, 3.8, .65, bx0 + 5.2, 2.0, czCol);
-        addBox(city.detail, M.steelWorn, 2.0, 1.1, 5.5, bx0 + 6.5, .75, entZ);
-        addBox(city.detail, M.glassCyan, .35, .5, 2.4, bx0 + 6.5, 1.52, entZ);
-        placePortProp(city, city.detail, 'shelf_rack', bx1 - 3.2, .16, bz0 + 4.5, Math.PI / 2);
-        placePortProp(city, city.detail, 'shelf_rack', bx1 - 3.2, .16, bz1 - 4.5, Math.PI / 2);
-        placePortProp(city, city.detail, 'crate_wood', bx0 + 9.5, .16, bz0 + 4.2, .15);
-        placePortProp(city, city.detail, 'toolbox_cart', bx0 + 8.5, .16, bz1 - 4.8, -.2);
-        placePortProp(city, city.detail, 'floodlight_stand', bx0 + 3.6, .16, bz0 + 3.6, .6);
-        placePortProp(city, city.detail, 'guard_booth', bx0 - 2.6, .16, bz1 - 3.2, Math.PI / 2);
-        placePortProp(city, city.detail, 'jersey_barrier', bx0 - 2.2, .16, bz0 + 3.5, Math.PI / 2);
-        placePortProp(city, city.detail, 'sign_post', bx0 - 2.5, .16, entZ + 4.2, -Math.PI / 2, { sign: 'berth4' });
+        // Short returns split public waiting, interview and radio operator spaces.
+        for (const side of [-1, 1]) {
+          const edge = entZ + side * 8;
+          solid(city, city.shell, M.plasterGrey, bx0+5,.16,edge,bx1-.5,3.8,edge+.22,'concrete',true);
+          solid(city, city.shell, M.plasterGrey, bx0+12,.16,Math.min(edge,entZ+side*3),bx0+12.25,3.8,Math.max(edge,entZ+side*3),'concrete',true);
+        }
+        const floor = matLib.get('granite');
+        solid(city,city.shell,floor,bx0+.5,.16,bz0+.5,bx1-.5,.205,bz1-.5,'concrete',true);
+        for (const z of [entZ-3.7,entZ+3.4]) {
+          solid(city,city.shell,M.plasterGrey,bx0+3.2,.205,z,bx0+8.8,3.80,z+.18,'concrete',true);
+          addBox(city.detail,M.wood,5.62,.13,.20,bx0+6,.30,z+.09);
+        }
+        const stationX = bx0+5.4;
+        const stationZ = entZ-1.15;
+        placeExternal(city.detail,'metal_office_desk',stationX,.205,stationZ,-Math.PI/2);
+        placeExternal(city.detail,'vintage_radio_transceiver',stationX,.993,stationZ-.48,-Math.PI/2);
+        placeExternal(city.detail,'desk_lamp_arm_01',stationX+.15,.993,stationZ+.69,-.9);
+        externalAssets.place(city.detail,'office_notepads',stationX-.13,.994,stationZ+.14,-1.25,1,'office_notepads_a4_stack');
+        placeExternal(city.detail,'painted_wooden_chair_02',stationX+.91,.205,stationZ+.16,1.35,.83);
+        city.colliderSpecs.push({min:new Vector3(stationX-.46,.16,stationZ-1),max:new Vector3(stationX+.46,.978,stationZ+1),surface:'metal'});
+        for (const dz of [-3.5,-2.68,3.4]) placeExternal(city.detail,'painted_wooden_chair_02',bx0+1.55,.205,entZ+dz,-1.56,.83);
+        for (const dz of [-2.4,2.4]) placeExternal(city.detail,'industrial_wall_lamp',bx0-.55,2.75,entZ+dz,-Math.PI/2);
+        // A second operator works at right angles to receiving, facing the street windows.
+        const secondX=stationX+3.6, secondZ=entZ+2.12;
+        placeExternal(city.detail,'metal_office_desk',secondX,.205,secondZ,Math.PI);
+        placeExternal(city.detail,'painted_wooden_chair_02',secondX+.18,.205,secondZ-.82,-.14,.83);
+        placeExternal(city.detail,'desk_lamp_arm_01',secondX+.68,.993,secondZ+.08,2.64);
+        externalAssets.place(city.detail,'office_notepads',secondX-.38,.993,secondZ+.05,.17,1,'office_notepads_yellow_pad');
+        city.colliderSpecs.push({min:new Vector3(secondX-1,.205,secondZ-.46),max:new Vector3(secondX+1,.993,secondZ+.46),surface:'metal'});
+        const workLight=new THREE.PointLight(0xffdcad,9,9,2);
+        workLight.position.set(stationX+.19,2.05,stationZ+.56);
+        city.detail.add(workLight);
+        const board = new Mesh(boxGeo, makeSignMat('HARBOR DISPATCH', 'WATCH 04    /    COASTAL RADIO', '#243d3d'));
+        board.position.set(bx0+12.05,2.25,entZ);
+        board.scale.set(4.5,.86,.06);
+        board.rotation.y=-Math.PI/2;
+        city.detail.add(board);
+        addBox(city.detail,M.wood,.24,2.5,5.5,bx0+12.25,1.65,entZ);
+        for (const dz of [-5,0,5]) {
+          addBox(city.detail,M.steelDark,3,.12,.42,bx0+5.5,3.68,entZ+dz);
+          addBox(city.detail,M.glassWarm,2.86,.04,.34,bx0+5.5,3.595,entZ+dz);
+        }
         addInteractiveDoor(city.shell, { id: 'city-precinct-door', labelZh: '沿海警务调度楼防爆门', x: bx0 + .2, y: .16, z: (bz0 + bz1) / 2, width: 3.9, height: 3.4, axis: 'z', initiallyOpen: false });
         addInteractiveTerminal(city.shell, {
           id: 'city-garage-call', promptZh: '按 [E] 城区警务车库召唤 SAR 四驱车', x: -16.5, y: .16, z: -56, colorMat: M.glassWarm,
@@ -1570,22 +1598,29 @@
           },
         });
       } else {
-        const bw = (blk.x1 - blk.x0) - 3.6, bd = (blk.z1 - blk.z0) - 3.6;
-        const cx = (blk.x0 + blk.x1) / 2, cz = (blk.z0 + blk.z1) / 2;
-        if (buildingGen) {
-          buildingGen.buildCoastalBuilding(horizonRoot, {
-            cx, cz, width: bw, depth: bd, height: blk.h,
-            seed: blk.seed || 101, styleName: blk.style, labelZh: blk.labelZh, labelEn: blk.labelEn,
-          });
-        } else {
-          buildStreetBlock(blk, cx, cz, bw, bd);
-          addBox(horizonRoot, M.steelDark, bw + .8, .55, bd + .8, cx, blk.h + .26, cz);
-        }
-        city.colliderSpecs.push({
-          min: new Vector3(blk.x0 + 1.8, .16, blk.z0 + 1.8),
-          max: new Vector3(blk.x1 - 1.8, blk.h + .5, blk.z1 - 1.8),
-          surface: 'concrete',
+        const lot = makeParcel(blk.style, blk.cx, blk.cz, 172, 95);
+        const skyline = buildingGen.buildDistantBuilding(root,blk);
+        let architecture;
+        lot.onBuild = () => {
+          architecture = WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane });
+          architecture.buildCoastalBuilding(lot.shell, blk);
+          skyline.visible = false;
+        };
+        lot.onUnload = () => {
+          lot.shell.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
+          lot.shell.clear();
+          architecture.dispose();
+          skyline.visible = true;
+        };
+        const bounds = (cx, cz, w, d) => lot.colliderSpecs.push({
+          min: new Vector3(cx - w/2, .16, cz - d/2),
+          max: new Vector3(cx + w/2, blk.h, cz + d/2), surface: 'concrete'
         });
+        if (blk.style === 'harbor_apartment') {
+          bounds(blk.cx, blk.cz - blk.depth * .21, blk.width, blk.depth * .58);
+          for (const side of [-1, 1]) bounds(blk.cx + side * blk.width * .33, blk.cz + blk.depth * .29, blk.width * .34, blk.depth * .42);
+          lot.colliderSpecs.push({min:new Vector3(blk.cx-blk.width/2,.16,blk.cz-blk.depth/2),max:new Vector3(blk.cx+blk.width/2,.81,blk.cz+blk.depth/2),surface:'concrete'});
+        } else bounds(blk.cx, blk.cz, blk.width, blk.depth);
       }
     }
     // Seafront Promenade Streetlamps & Pines along x = +21 facing the open East Sea!
@@ -1615,7 +1650,8 @@
       addBox(horizonRoot, M.concrete, 1.6, 6.2, 3.8, sx, 3.1, -104);
       addBox(city.detail, M.steelGalv, 2.2, .16, 4.2, sx, 6.2, -104);
     }
-    addBox(city.detail, M.steelDark, 1.8, 2.6, 5.6, -15.2, 1.46, -44); // Coastal Blvd transit shelter
+    addBox(city.detail, M.steelDark, 1.8, .12, 5.6, -15.2, 2.82, -44);
+    for (const z of [-46.5,-41.5]) addBox(city.detail,M.steelGalv,.09,2.58,.09,-14.45,1.57,z);
     addBox(city.detail, smokedPane, .10, 2.2, 5.2, -14.4, 1.56, -44);
     addBox(city.detail, M.wood, .55, .48, 3.8, -15.0, .50, -44);
     addParkedSedan(city.detail, 17.5, .18, -110, Math.PI, M.sedanDark);
@@ -1902,6 +1938,14 @@
     shadow.rotation.set(-Math.PI/2,0,.35);
     shadow.position.set(-172,.074,-184);
     airfield.detail.add(shadow);
+    for (const [x,z,w,d] of [[-8.1,-56.15,1.45,2.6],[-7.19,-55.99,.95,.95],
+      [-11.95,-58.5,.86,.86],[-11.95,-57.68,.86,.86],[-11.95,-51.6,.86,.86]]) {
+      const contact=new Mesh(shadow.geometry,shadow.material);
+      contact.rotation.x=-Math.PI/2;
+      contact.scale.set(w/12,d/17,1);
+      contact.position.set(x,.209,z);
+      city.detail.add(contact);
+    }
     plane.updateMatrixWorld(true);
     plane.traverse(node=>{
       if (node.name!=='aircraft-landing-gear') return;
@@ -2761,27 +2805,71 @@
     }
     mapOverlay.querySelector('[data-close]').addEventListener('click', () => toggleMap(false));
 
-    // 6-Viewpoint Acceptance Inspection Tour ([B] key) with live FPS / Frame Time / Draw Calls / Triangles / GPU Memory report
+    // 6-Viewpoint Acceptance Inspection Tour ([B] key or automated CDP capture script)
     const inspectViews = [
-      { name: '1/6 白天城市街道', pos: new Vector3(-26, 2.2, -58), sky: 1 },
-      { name: '2/6 建筑近距离细节', pos: new Vector3(-34, 3.2, -96), sky: 1 },
-      { name: '3/6 城市天际线', pos: new Vector3(20, 14.0, -34), sky: 1 },
-      { name: '4/6 工业区域', pos: new Vector3(-164, 5.5, 74), sky: 1 },
-      { name: '5/6 自然地形与森林', pos: new Vector3(-174, 15.2, -78), sky: 1 },
-      { name: '6/6 夜间环境', pos: new Vector3(-26, 3.5, -72), sky: 3 },
+      { id: 'view-1-day-street',       name: '1/6 白天城市街道',   pos: new Vector3(-26, 2.8, -42),  look: new Vector3(-26, 4.8, -108),  sky: 1 },
+      { id: 'view-2-building-closeup', name: '2/6 建筑近距离细节', pos: new Vector3(-56, 4.4, -82),  look: new Vector3(-82, 7.6, -104),  sky: 1 },
+      { id: 'view-3-skyline',          name: '3/6 城市天际线',     pos: new Vector3(19, 15.5, -34),  look: new Vector3(-58, 7.5, -98),   sky: 1 },
+      { id: 'view-4-industrial',       name: '4/6 工业区域',       pos: new Vector3(-156, 8.2, 52),  look: new Vector3(-192, 6.5, 92),   sky: 1 },
+      { id: 'view-5-terrain-forest',   name: '5/6 自然地形与森林', pos: new Vector3(-168, 17.5, -62), look: new Vector3(-218, 12.5, -88), sky: 1 },
+      { id: 'view-6-night',            name: '6/6 夜间环境',       pos: new Vector3(-26, 3.6, -48),  look: new Vector3(-26, 5.2, -110),  sky: 3 },
     ];
     let inspectIdx = -1;
-    function jumpInspectView(idx) {
+    let inspectLock = null;
+    function jumpInspectView(idx, { photoClean = false } = {}) {
       inspectIdx = ((idx % inspectViews.length) + inspectViews.length) % inspectViews.length;
       const v = inspectViews[inspectIdx];
+      if (!freeRoam) setFreeRoam(true, false);
       applySkyPreset(v.sky, true);
       movePlayerAndVehicle(v.pos, false);
-      const st = chunkMgr?.getStats?.();
-      const statsStr = st ? ` | ${st.fps} FPS (${st.frameTimeMs}ms) · DC ${st.drawCalls} · Tri ${st.triangles} · Geo ${st.gpuGeometries} · Tex ${st.gpuTextures}` : '';
-      world.tactical?.notify?.(`📸 验收视角 ${v.name}${statsStr}`, `Inspect ${v.name}${statsStr}`, false, 5.5);
-      return { view: v.name, stats: st };
+      const dx = v.look.x - v.pos.x, dy = v.look.y - v.pos.y, dz = v.look.z - v.pos.z;
+      const horiz = Math.max(0.001, Math.hypot(dx, dz));
+      const yaw = Math.atan2(-dx, -dz);
+      const pitch = Math.atan2(dy, horiz);
+      if (world.player) {
+        world.player.yaw = yaw;
+        world.player.pitch = pitch;
+      }
+      if (photoClean) {
+        inspectLock = { pos: v.pos.clone(), look: v.look.clone(), yaw, pitch };
+        world.weapon?.setVisible?.(false);
+        setPhotoMode(true);
+        const menuEl = document.querySelector?.('.menu');
+        if (menuEl) menuEl.classList.remove('open');
+        if (world.game) world.game.state = 'playing';
+      } else {
+        inspectLock = null;
+      }
+      if (world.camera) {
+        world.camera.position.copy(v.pos);
+        world.camera.lookAt(v.look);
+      }
+      const st = chunkMgr?.getStats?.() || null;
+      if (!photoClean) {
+        const statsStr = st ? ` | ${st.fps} FPS (${st.frameTimeMs}ms) · DC ${st.drawCalls} · Tri ${st.triangles} · Geo ${st.gpuGeometries} · Tex ${st.gpuTextures}` : '';
+        world.tactical?.notify?.(`📸 验收视角 ${v.name}${statsStr}`, `Inspect ${v.name}${statsStr}`, false, 5.5);
+      }
+      return { id: v.id, view: v.name, stats: st };
     }
-    if (typeof window !== 'undefined') window.SALTLINE_INSPECT_VIEW = jumpInspectView;
+    if (typeof window !== 'undefined') {
+      window.SALTLINE_INSPECT_VIEW = jumpInspectView;
+      window.SALTLINE_INSPECT_VIEWS = inspectViews.map(v => ({ id: v.id, name: v.name }));
+      window.SALTLINE_GET_STATS = () => chunkMgr?.getStats?.() || null;
+    }
+
+    updaters.push(() => {
+      if (!inspectLock) return;
+      if (world.player?.pos) {
+        world.player.pos.copy(inspectLock.pos);
+        world.player.vel?.set?.(0, 0, 0);
+        world.player.yaw = inspectLock.yaw;
+        world.player.pitch = inspectLock.pitch;
+      }
+      if (world.camera) {
+        world.camera.position.copy(inspectLock.pos);
+        world.camera.lookAt(inspectLock.look);
+      }
+    });
 
     const onKeyDown = e => {
       if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
@@ -3008,7 +3096,7 @@
         for (const b of sec.activeColliders.splice(0)) physics.removeBox(b);
       }
     }
-    const chunkMgr = WE?.createChunkManager ? WE.createChunkManager({ renderer: world.renderer, sectors, syncColliders, targetFps: 55 }) : null;
+    const chunkMgr = WE?.createChunkManager ? WE.createChunkManager({ renderer: world.renderer, sectors: [...sectors, ...parcels], quality: world.params?.q || 'high', syncColliders, targetFps: 55 }) : null;
 
     function detectZoneObj(pos) {
       if (!pos) return districts[0];
@@ -3075,6 +3163,7 @@
         objPinEl.style.display = 'none';
         return;
       }
+      atmosphereSys?.syncDaylight(lightingSys?.advance(dt));
       aliveClock += dt;
       fpsSmooth = fpsSmooth * .92 + (1 / Math.max(.004, dt)) * .08;
       for (const fn of updaters) fn(dt);
@@ -3308,12 +3397,18 @@
       atmosphereSys?.dispose?.();
       chunkMgr?.dispose?.();
       buildingGen?.dispose?.();
+      if (physics.terrainHeight === terrainGen.floorAt) { delete physics.terrainHeight; delete physics.terrainRay; }
+      for (const mesh of coarseTiles) mesh.geometry.dispose();
+      terrainSurface.dispose();
+      hillsideSurface.dispose();
       terrainGen?.dispose?.();
       lightingSys?.dispose?.();
       matLib?.dispose?.();
+      lobbyGlass.dispose();
       smokedPane.dispose();
       blindPane.dispose();
-      horizonRoot.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
+      root.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
+      for (const geo of worldBoxCache.values()) geo.dispose();
       root.removeFromParent();
       hud.remove();
       minimap.remove();
@@ -3334,6 +3429,9 @@
       update, dispose, toggleMap, jumpToStage, setFreeRoam, setPhotoMode,
       cycleSky() { return applySkyPreset(skyIdx + 1); },
       stageStarts, interactables,
+      rainShelters: blocks.filter(b => b.facility || b.enterable).map(b => ({
+        min:new Vector3(b.x0+1.5,.16,b.z0+1.5),max:new Vector3(b.x1-1.5,b.enterable?3.8:7.8,b.z1-1.5)
+      })),
       get freeRoam() { return freeRoam; },
       get stage() { return stage; },
       waypoints: districts.map(d => ({ label: d.nameEn, zh: d.nameZh, pos: d.pos.clone() })),

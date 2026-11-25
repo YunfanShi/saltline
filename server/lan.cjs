@@ -24,7 +24,7 @@ const ASSETS = new Set([
   'port-operations.js', 'port-operations.css',
   'port-tactical-sandbox.js', 'port-chapter-architecture.js', 'port-cinematic-sequencer.js',
   'port-companion-ai.js', 'port-berth-vertical-slice.js',
-  'WorldEngine/Materials/MaterialLibrary.js', 'WorldEngine/Assets/BuildingGenerator.js',
+  'WorldEngine/Materials/MaterialLibrary.js', 'WorldEngine/Assets/BuildingGenerator.js', 'WorldEngine/Assets/UrbanPlanningSystem.js',
   'WorldEngine/Assets/IndustrialGenerator.js', 'WorldEngine/Environment/AtmosphereSystem.js',
   'WorldEngine/Performance/ChunkManager.js',
   'WorldEngine/Terrain/TerrainGenerator.js', 'WorldEngine/Rendering/LightingSystem.js',
@@ -40,6 +40,9 @@ const CONTENT_TYPES = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gltf': 'model/gltf+json',
+  '.bin': 'application/octet-stream',
 };
 
 class RequestError extends Error {
@@ -229,7 +232,7 @@ function createLanServer({ clock = Date.now } = {}) {
         return;
       }
       const filename = pathname === '/' ? 'index.html' : pathname.slice(1);
-      if (!ASSETS.has(filename)) throw new RequestError(404, 'not_found');
+      if (!ASSETS.has(filename) && !/^assets\/(?:models\/[a-z0-9_]+\/(?:scene\.gltf|[a-z0-9_]+\.bin|textures\/[a-z0-9_]+\.(?:jpg|png))|surfaces\/[a-z0-9_]+\/[A-Za-z0-9_]+\.jpg)$/.test(filename)) throw new RequestError(404, 'not_found');
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         response.setHeader('Allow', 'GET, HEAD');
         throw new RequestError(405, 'method_not_allowed');

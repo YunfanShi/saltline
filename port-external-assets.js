@@ -15,6 +15,9 @@
     overhead_crane: 'https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/overhead_crane/overhead_crane_1k.gltf',
   };
 
+  const localModels = ["desk_lamp_arm_01", "industrial_wall_lamp", "metal_office_desk", "modular_factory_facade", "office_notepads", "painted_wooden_chair_02", "vintage_radio_transceiver"];
+  for (const id of localModels) POLYHAVEN_CATALOG[id] = './assets/models/' + id + '/scene.gltf';
+
   const TYPE_SIZES = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
   const COMP_ARRAYS = {
     5120: Int8Array,
@@ -85,7 +88,7 @@
     return { array, itemSize, normalized: !!acc.normalized };
   }
 
-  async function fetchGltfTemplate(THREE, url) {
+  async function fetchGltfTemplate(THREE, url, id) {
     if (typeof fetch !== 'function' || typeof window === 'undefined') return null;
     const res = await fetch(url, { mode: 'cors' });
     if (!res.ok) return null;
@@ -119,6 +122,12 @@
       }
       if (m.normalTexture && textures[m.normalTexture.index]) {
         opts.normalMap = loadImageTexture(THREE, textures[m.normalTexture.index], false);
+      }
+      if (m.occlusionTexture?.index === pbr.metallicRoughnessTexture?.index && opts.roughnessMap) opts.aoMap = opts.roughnessMap;
+      if (m.alphaMode === 'BLEND') {
+        opts.transparent = true;
+        opts.depthWrite = false;
+        opts.opacity = pbr.baseColorFactor?.[3] ?? .56;
       }
       return new THREE.MeshStandardMaterial(opts);
     });
@@ -170,6 +179,8 @@
     const root = new THREE.Group();
     const sceneDef = gltf.scenes?.[gltf.scene || 0] || gltf.scenes?.[0];
     for (const rootIdx of sceneDef?.nodes || []) {
+      const name = gltf.nodes[rootIdx]?.name || '';
+      if (id === 'modular_factory_facade' && !['wall_window_centered_double_01','window_centered_double_01','cornice01_standard_standard_01','wall_pier_standard_01'].includes(name)) continue;
       const nodeObj = buildNode(rootIdx);
       if (nodeObj) root.add(nodeObj);
     }
@@ -192,32 +203,76 @@
       const url = POLYHAVEN_CATALOG[id];
       if (!url) return Promise.resolve(null);
       if (!cache.has(id)) {
-        cache.set(id, fetchGltfTemplate(THREE, url).catch(() => null));
+        cache.set(id, fetchGltfTemplate(THREE, url, id).catch(() => null));
       }
       return cache.get(id);
     }
 
-    function place(parent, id, x, y, z, yaw = 0, scale = 1.0) {
+    function place(parent, id, x, y, z, yaw = 0, scale = 1.0, part = null) {
       if (!parent || !POLYHAVEN_CATALOG[id] || typeof fetch !== 'function') return null;
       const anchor = new THREE.Group();
       anchor.name = 'polyhaven-' + id;
       anchor.position.set(x, y, z);
       anchor.rotation.y = yaw;
-      if (scale !== 1.0) anchor.scale.setScalar(scale);
+      if (Array.isArray(scale)) anchor.scale.set(...scale);
+      else anchor.scale.setScalar(scale);
       parent.add(anchor);
       load(id).then(tpl => {
         if (!tpl || disposed || !anchor.parent) return;
-        const inst = tpl.clone(true);
+        const src = part ? tpl.getObjectByName(part) : tpl;
+        if (!src) return;
+        const inst = src.clone(true);
+        if (part) inst.position.set(0,0,0);
         anchor.add(inst);
       });
       return anchor;
     }
 
+    function placeFacadeModules(parent, placements) {
+      const group = new THREE.Group();
+      group.name = 'polyhaven-modular_factory_facade';
+      parent.add(group);
+      load('modular_factory_facade').then(template => {
+        if (!template || disposed || !group.parent) return;
+        const transform = new THREE.Object3D();
+        const batches = new Map();
+        for (const [part,x,y,z,yaw,sx,sy] of placements) {
+          const node = template.getObjectByName(part);
+          if (!node) continue;
+          transform.position.set(x,y,z); transform.rotation.y=yaw; transform.scale.set(sx,sy,1);
+          transform.updateMatrix();
+          for (const primitive of node.children) {
+            let instances=batches.get(primitive);
+            if (!instances) batches.set(primitive,instances=[]);
+            instances.push(transform.matrix.clone());
+          }
+        }
+        for (const [primitive,matrices] of batches) {
+          const mesh=new THREE.InstancedMesh(primitive.geometry,primitive.material,matrices.length);
+          for(let i=0;i<matrices.length;i++) mesh.setMatrixAt(i,matrices[i]);
+          mesh.receiveShadow=true;
+          group.add(mesh);
+        }
+      });
+    }
+
     function dispose() {
       disposed = true;
+      for (const pending of cache.values()) pending.then(template => {
+        const resources = new Set();
+        template?.traverse(node => {
+          if (!node.isMesh) return;
+          resources.add(node.geometry);
+          for (const material of [].concat(node.material)) {
+            resources.add(material);
+            for (const value of Object.values(material)) if (value?.isTexture) resources.add(value);
+          }
+        });
+        for (const resource of resources) resource.dispose();
+      });
       cache.clear();
     }
 
-    return { catalog: POLYHAVEN_CATALOG, load, place, dispose };
+    return { catalog: POLYHAVEN_CATALOG, load, place, placeFacadeModules, dispose };
   };
 })();
