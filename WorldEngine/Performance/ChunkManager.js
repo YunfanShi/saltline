@@ -63,6 +63,14 @@
       lastDist: 999,
       priority: 0,
     }));
+    // Sectors can already be loaded when the manager takes ownership.
+    // Register their resources before any of them are unloaded.
+    for (const { sec } of chunks) {
+      if (sec.loaded) {
+        trackObjectResources(sec.shell, 1);
+        trackObjectResources(sec.detail, 1);
+      }
+    }
 
     function activateChunk(chunk) {
       const { sec } = chunk;

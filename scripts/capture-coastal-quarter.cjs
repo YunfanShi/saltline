@@ -141,6 +141,47 @@ async function evalJs(cdp, expression) {
   return res.result?.value;
 }
 
+async function dispatchKey(cdp, type, code, key, windowsVirtualKeyCode) {
+  await cdp.send('Input.dispatchKeyEvent', { type, code, key, windowsVirtualKeyCode });
+}
+
+async function checkPlayerControls(cdp) {
+  const readState = () => evalJs(cdp, `({
+    state: __G.game.state, mapOpen: __G.openWorld.mapOpen,
+    pos: __G.player.pos.toArray(), chunks: SALTLINE_GET_STATS().loadedCount,
+    errors: window.__errors
+  })`);
+  const press = async (code, key, virtualKey) => {
+    await dispatchKey(cdp, 'keyDown', code, key, virtualKey);
+    await dispatchKey(cdp, 'keyUp', code, key, virtualKey);
+  };
+  const walk = async () => {
+    await dispatchKey(cdp, 'keyDown', 'KeyW', 'w', 87);
+    try {
+      await evalJs(cdp, `new Promise(resolve => {
+        let frames = 0;
+        function tick() { if (++frames >= 30) resolve(true); else requestAnimationFrame(tick); }
+        requestAnimationFrame(tick);
+      })`);
+    } finally {
+      await dispatchKey(cdp, 'keyUp', 'KeyW', 'w', 87);
+    }
+  };
+  const distance = (a, b) => Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2]);
+  await press('KeyM', 'm', 77);
+  const before = await readState();
+  await walk();
+  const mapped = await readState();
+  await press('Escape', 'Escape', 27);
+  await walk();
+  const after = await readState();
+  if (!before.mapOpen || !mapped.mapOpen || distance(before, mapped) > 0.05 ||
+      after.mapOpen || after.state !== 'playing' || distance(mapped, after) < 0.3 ||
+      !after.chunks || after.errors.length) {
+    throw new Error('开放世界移动或地图回归: ' + JSON.stringify({ before, mapped, after }));
+  }
+}
+
 async function main() {
   const chromePath = findChromeBinary();
   if (!chromePath) {
@@ -181,23 +222,29 @@ async function main() {
     await cdp.send('Page.navigate', { url: targetUrl });
 
     let ready = false;
-    for (let i = 0; i < 220; i++) {
+    for (let i = 0; i < 60; i++) {
       await sleep(500);
       const state = await evalJs(cdp, `(() => {
         const boot = document.getElementById('boot');
         const bootDone = !boot || boot.classList.contains('done') || getComputedStyle(boot).display === 'none';
-        return { bootDone, hasApi: typeof window.SALTLINE_INSPECT_VIEW === 'function' };
+        return { bootDone, ready: window.__ready, fatal: window.__fatal,
+          hasApi: typeof window.SALTLINE_INSPECT_VIEW === 'function' };
       })()`);
-      if (state?.bootDone && state?.hasApi) { ready = true; break; }
+      if (state?.fatal) throw new Error(state.fatal);
+      if (state?.bootDone && state?.ready && state?.hasApi) { ready = true; break; }
     }
     if (!ready) throw new Error('等待 Saltline 开放世界初始化超时（30秒）');
 
     const mapLoadTimeMs = Date.now() - loadStart;
     console.log(`✅ 地图加载完成，耗时 ${mapLoadTimeMs} ms`);
+    await checkPlayerControls(cdp);
+    console.log('✅ 地图打开时暂停步行，按 Esc 关闭后恢复移动和分块加载');
 
     const views = [
       ['street',[-26,2.8,-42],[-26,4.8,-108],1],
       ['facade',[-24,2.4,-49],[-13,2.7,-56],1],
+      ['alley',[-66,2.3,-42],[-66,5.2,-96],1],
+      ['rooftop',[-44,19.5,-72],[-62,10.5,-118],1],
       ['interior',[-11.3,1.8,-55],[-.8,1.55,-57],1],
       ['skyline',[19,15.5,-34],[-58,7.5,-98],1],
       ['terrain',[-210,7,60],[-231,11,91],1],
@@ -253,15 +300,19 @@ async function main() {
       }
       const closed=crossDoor(); door.use(); const opened=crossDoor(); door.use();
       if(closed>-13.3 || opened < -13) throw Error('Door collider '+JSON.stringify({closed,opened}));
-      return {imports,cycles,geoDrift,texDrift,door:{closed,opened}};
+      const buildTimings = Array.isArray(window.SALTLINE_BUILD_TIMINGS) ? window.SALTLINE_BUILD_TIMINGS : [];
+      const maxPhaseMs = buildTimings.length ? Math.max(...buildTimings.map(b => b.maxPhaseMs || 0)) : null;
+      return {imports,cycles,geoDrift,texDrift,door:{closed,opened},buildTimingCount:buildTimings.length,maxPhaseMs,buildTimings};
     })()`);
     fs.writeFileSync(path.join(OUT_DIR,'streaming.json'),JSON.stringify(lifecycle,null,2));
     for (const r of results) {
       const sz = fs.statSync(path.join(OUT_DIR, r.file)).size;
       if (sz < 25000) throw Error(`Rendered screenshot too small / blank: ${r.file} (${sz} bytes)`);
     }
-    if (cdp.consoleErrors.length) {
-      throw Error('Browser console errors during render audit: ' + cdp.consoleErrors.join(' | '));
+    const gameErrors = await evalJs(cdp, 'window.__errors');
+    const errors = [...new Set([...cdp.consoleErrors, ...gameErrors])];
+    if (errors.length) {
+      throw Error('Browser console errors during render audit: ' + errors.join(' | '));
     }
     const avg = (arr) => (arr.length ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2)) : null);
     const validFps = results.map((r) => r.fps).filter((v) => typeof v === 'number' && v > 0);

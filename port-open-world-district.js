@@ -210,6 +210,11 @@
       .sl-finale-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
       .sl-finale-btn{background:rgba(102,217,240,.18);color:#dff8ff;border:1px solid rgba(102,217,240,.55);border-radius:6px;padding:9px 20px;font:700 13px/1 system-ui,sans-serif;cursor:pointer}
       .sl-finale-btn.primary{background:rgba(240,185,78,.24);color:#fff2cc;border-color:rgba(240,185,78,.72)}
+      .sl-cod-typewriter{position:fixed;left:24px;bottom:28px;z-index:34;pointer-events:none;font:700 12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;color:#d8f8e8;text-shadow:0 1px 10px rgba(0,0,0,.92),0 0 12px rgba(102,217,240,.35);border-left:2.5px solid #66d9f0;padding:4px 0 4px 12px;letter-spacing:.09em;white-space:pre-line;opacity:0;transition:opacity .45s ease}
+      .sl-cod-typewriter.show{opacity:1}
+      .sl-cod-hitmarker{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.82);z-index:35;width:28px;height:28px;pointer-events:none;opacity:0;color:#ffffff;filter:drop-shadow(0 0 5px rgba(0,0,0,.85));transition:opacity .08s ease-out,transform .08s ease-out}
+      .sl-cod-hitmarker.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+      .sl-cod-hitmarker.kill{color:#ff7b42;filter:drop-shadow(0 0 8px rgba(255,123,66,.85));transform:translate(-50%,-50%) scale(1.22)}
       .sl-photo-pill{position:fixed;right:18px;bottom:16px;z-index:25;background:rgba(8,14,19,.72);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:5px 12px;color:#d6eef2;font:600 11px/1 system-ui,sans-serif;pointer-events:none;display:none}
       .sl-photo-pill.on{display:block}
       .sl-minimap{position:fixed;left:18px;bottom:92px;z-index:18;width:194px;background:rgba(8,14,20,.86);border:1.5px solid rgba(102,217,240,.42);border-radius:9px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);backdrop-filter:blur(6px);transition:opacity .25s;pointer-events:auto;cursor:pointer}
@@ -1681,11 +1686,50 @@
         addBox(city.detail, curbStoneMat, swW, .20, .28, (x0 + x1) / 2, .24, roadEdgeZ);
       }
     }
-    // Street trees in granite-bordered planters + cast-iron pedestrian bollards along Coastal Blvd
-    for (const [px, pz] of [[-35.2, -41.5], [-35.2, -68.5], [-16.6, -40.5], [-16.6, -69.5]]) {
-      addBox(city.detail, curbStoneMat, 1.95, .28, 1.95, px, .38, pz);
-      addBox(city.detail, M.coastalGrass, 1.55, .14, 1.55, px, .46, pz);
-      addPineTree(city.detail, px, .48, pz, .62);
+    // Multi-tier Urban Spatial Elements from UrbanPlanningSystem: Alleys, Civic Plazas & Green Planters
+    const coastalGrassMat = matLib ? matLib.get('grass_coastal') : M.coastalGrass;
+    const coastalSoilMat = matLib ? matLib.get('coastal_soil') : M.wood;
+    for (const alley of (quarter.alleys || [])) {
+      const aw = alley.x1 - alley.x0, ad = alley.z1 - alley.z0;
+      const acx = (alley.x0 + alley.x1) / 2, acz = (alley.z0 + alley.z1) / 2;
+      addBox(city.shell, paverMat, aw, .06, ad, acx, .19, acz);
+      addBox(city.detail, M.steelDark, .36, .025, ad - 1.2, acx, .225, acz); // Center cobblestone drainage channel
+      for (let dz = alley.z0 + 4; dz < alley.z1 - 3; dz += 9) addBox(city.detail, M.steelWorn, .38, .03, .62, acx, .23, dz);
+      if (alley.hasArch) {
+        const az = alley.z1 - 2.2;
+        for (const sx of [alley.x0 + .32, alley.x1 - .32]) addBox(city.detail, M.steelDark, .26, 4.6, .26, sx, 2.46, az);
+        addBox(city.detail, M.steelDark, aw - .4, .34, .28, acx, 4.72, az);
+        addBox(city.detail, M.glassWarm, .48, .22, .22, acx, 4.46, az);
+        const laneSign = new Mesh(boxGeo, makeSignMat(alley.label || 'HARBOR LANE', 'PEDESTRIAN PASSAGE', '#1c2c34'));
+        laneSign.scale.set(Math.min(3.6, aw - 1.4), .56, .08);
+        laneSign.position.set(acx, 4.98, az + .14);
+        laneSign.matrixAutoUpdate = false; laneSign.updateMatrix();
+        city.detail.add(laneSign);
+      }
+    }
+    for (const plaza of (quarter.plazas || [])) {
+      const pw = plaza.x1 - plaza.x0, pd = plaza.z1 - plaza.z0;
+      const pcx = (plaza.x0 + plaza.x1) / 2, pcz = (plaza.z0 + plaza.z1) / 2;
+      solid(city, city.shell, paverMat, plaza.x0, .15, plaza.z0, plaza.x1, .28, plaza.z1, 'concrete', true);
+      addBox(city.detail, curbStoneMat, pw + .3, .16, .28, pcx, .26, plaza.z1);
+      addBox(city.detail, curbStoneMat, pw + .3, .16, .28, pcx, .26, plaza.z0);
+      if (plaza.kind === 'civic_forecourt') {
+        for (const bx of [pcx - 5.5, pcx + 5.5]) {
+          addBox(city.detail, curbStoneMat, 3.2, .44, .75, bx, .50, pcz + .4);
+          addBox(city.detail, M.wood, 3.0, .08, .58, bx, .76, pcz + .4);
+        }
+      } else if (plaza.kind === 'promenade_square') {
+        for (const bz of [pcz - 7.5, pcz + 7.5]) {
+          addBox(city.detail, curbStoneMat, .72, .44, 3.0, pcx - .6, .50, bz);
+          addBox(city.detail, M.wood, .56, .08, 2.8, pcx - .6, .76, bz);
+        }
+      }
+    }
+    for (const gs of (quarter.greenSpaces || [])) {
+      addBox(city.detail, curbStoneMat, gs.w, .30, gs.d, gs.x, .40, gs.z);
+      addBox(city.detail, coastalSoilMat, gs.w - .38, .10, gs.d - .38, gs.x, .50, gs.z);
+      addBox(city.detail, coastalGrassMat, gs.w - .54, .08, gs.d - .54, gs.x, .54, gs.z);
+      addPineTree(city.detail, gs.x, .54, gs.z, gs.treeScale || .64);
     }
     for (const bz of [-45.5, -49.5, -60.5, -64.5]) {
       addCyl(city.detail, M.steelDark, .09, .86, -18.55, .74, bz);
@@ -1859,7 +1903,8 @@
         lot.onBuild = () => {
           if (!architecture) {
             architecture = WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane });
-            buildTask = architecture.createCoastalBuildingTask(lot.shell, blk);
+            lot.colliderSpecs.length = 0;
+            buildTask = architecture.createCoastalBuildingTask(lot.shell, blk, { colliderTarget: lot.colliderSpecs });
           }
           const done = buildTask.step();
           if (done) skyline.visible = false;
@@ -1868,20 +1913,12 @@
         lot.onUnload = () => {
           lot.shell.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
           lot.shell.clear();
+          lot.colliderSpecs.length = 0;
           architecture?.dispose?.();
           architecture = null;
           buildTask = null;
           skyline.visible = true;
         };
-        const bounds = (cx, cz, w, d) => lot.colliderSpecs.push({
-          min: new Vector3(cx - w / 2, .16, cz - d / 2),
-          max: new Vector3(cx + w / 2, blk.h, cz + d / 2), surface: 'concrete'
-        });
-        if (blk.style === 'harbor_apartment') {
-          bounds(blk.cx, blk.cz - blk.depth * .21, blk.width, blk.depth * .58);
-          for (const side of [-1, 1]) bounds(blk.cx + side * blk.width * .33, blk.cz + blk.depth * .29, blk.width * .34, blk.depth * .42);
-          lot.colliderSpecs.push({ min: new Vector3(blk.cx - blk.width / 2, .16, blk.cz - blk.depth / 2), max: new Vector3(blk.cx + blk.width / 2, .81, blk.cz + blk.depth / 2), surface: 'concrete' });
-        } else bounds(blk.cx, blk.cz, blk.width, blk.depth);
       }
     }
     // Seafront Promenade Streetlamps, Warm Night Streetlight Pools & Pines along Coastal Blvd + x = +21!
@@ -2198,6 +2235,9 @@
     const gearBounds = new THREE.Box3().setFromObject(plane, true);
     plane.position.set(-172, .05 - gearBounds.min.y, -184);
     plane.rotation.y = .35;
+    const planeBasePos = plane.position.clone();
+    const planeBaseYaw = plane.rotation.y;
+    const planeProps = [], planeBlades = [], planeDiscs = [];
     airfield.detail.add(plane);
     const rubber = new MeshStandardMaterial({color:0x262726,roughness:.94});
     const contactShade = document.createElement('canvas');
@@ -2225,12 +2265,49 @@
     }
     plane.updateMatrixWorld(true);
     plane.traverse(node=>{
+      if (node.name==='aircraft-propeller') planeProps.push(node);
+      else if (node.name==='aircraft-propeller-blades') planeBlades.push(node);
+      else if (node.name==='aircraft-propeller-disc') planeDiscs.push(node);
       if (node.name!=='aircraft-landing-gear') return;
       const wheel=node.getWorldPosition(new Vector3());
       for(const side of [-1,1]) {
         const chock=addBox(airfield.detail,rubber,.64,.18,.21,wheel.x,.14,wheel.z+side*.38);
         chock.rotation.x=side*.24;
         chock.updateMatrix();
+      }
+    });
+    let finaleClock = 0;
+    function resetParkedAircraft() {
+      finaleSpinActive = false;
+      finaleClock = 0;
+      plane.position.copy(planeBasePos);
+      plane.rotation.set(0, planeBaseYaw, 0);
+      shadow.position.set(-172, .074, -184);
+      shadow.material.opacity = 1;
+      for (const b of planeBlades) b.visible = true;
+      for (const d of planeDiscs) d.visible = false;
+    }
+    updaters.push(dt => {
+      if (!finaleSpinActive) return;
+      finaleClock += dt;
+      const rpm = Math.min(30, 5 + finaleClock * 10);
+      for (const p of planeProps) p.rotation.z += dt * rpm;
+      const blurred = finaleClock > 1.2;
+      for (const b of planeBlades) b.visible = !blurred;
+      for (const d of planeDiscs) d.visible = blurred;
+      if (finaleClock > 2.0) {
+        const tRoll = finaleClock - 2.0;
+        const fwd = Math.min(26, tRoll * 11);
+        plane.position.x -= Math.sin(planeBaseYaw) * fwd * dt;
+        plane.position.z -= Math.cos(planeBaseYaw) * fwd * dt;
+        shadow.position.x = plane.position.x;
+        shadow.position.z = plane.position.z;
+        if (tRoll > 1.35) {
+          const climb = tRoll - 1.35;
+          plane.position.y += Math.min(14, climb * 5.2) * dt;
+          plane.rotation.x = Math.min(.22, climb * .09);
+          shadow.material.opacity = Math.max(0, 1 - climb * .45);
+        }
       }
     });
     for (const [hIdx, ahx] of [[0, hx], [1, hx - 31]]) {
@@ -2783,10 +2860,47 @@
           <button class="sl-finale-btn" data-finale-replay>🔄 从第一幕重玩</button>
         </div>
       </div>`;
-    document.body.append(actCard, cinemaTop, cinemaBot, storyBox, finaleCard);
+    const codTypewriter = document.createElement('div');
+    codTypewriter.className = 'sl-cod-typewriter';
+    const codHitmarker = document.createElement('div');
+    codHitmarker.className = 'sl-cod-hitmarker';
+    codHitmarker.innerHTML = `<svg viewBox="0 0 28 28" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="4" y1="4" x2="10" y2="10"/><line x1="24" y1="4" x2="18" y2="10"/><line x1="4" y1="24" x2="10" y2="18"/><line x1="24" y1="24" x2="18" y2="18"/></svg>`;
+    document.body.append(actCard, cinemaTop, cinemaBot, storyBox, finaleCard, codTypewriter, codHitmarker);
     let actCardTimer = null, cinemaTimer = null, storyHideTimer = null;
+    let typewriterInterval = null, typewriterHideTimer = null, hitmarkerTimer = null;
     const storyTimers = [];
     let finaleSpinActive = false;
+
+    function playCodTypewriter(idx) {
+      const sc = actScripts[idx];
+      if (!sc || freeRoam || isMultiplayer()) return;
+      if (typewriterInterval) { clearInterval(typewriterInterval); typewriterInterval = null; }
+      if (typewriterHideTimer) { clearTimeout(typewriterHideTimer); typewriterHideTimer = null; }
+      const full = `${sc.codTime || 'DAY 01 · 05:34:00'}
+${sc.codLoc || 'SALTLINE COASTAL PORT'}
+SAR-04 · LIN / MARA CHEN`;
+      let pos = 0;
+      codTypewriter.textContent = '';
+      codTypewriter.classList.add('show');
+      typewriterInterval = setInterval(() => {
+        pos += 2;
+        codTypewriter.textContent = full.slice(0, pos) + (pos < full.length ? '▌' : '');
+        if (pos >= full.length) {
+          clearInterval(typewriterInterval); typewriterInterval = null;
+          typewriterHideTimer = setTimeout(() => codTypewriter.classList.remove('show'), 4600);
+        }
+      }, 36);
+    }
+
+    function flashHitmarker(isKill = false) {
+      if (freeRoam || isMultiplayer()) return;
+      codHitmarker.classList.remove('show', 'kill');
+      void codHitmarker.offsetWidth;
+      codHitmarker.classList.add('show');
+      if (isKill) codHitmarker.classList.add('kill');
+      if (hitmarkerTimer) clearTimeout(hitmarkerTimer);
+      hitmarkerTimer = setTimeout(() => codHitmarker.classList.remove('show', 'kill'), isKill ? 220 : 140);
+    }
 
     function setLetterbox(on, autoOffMs = 0) {
       cinemaTop.classList.toggle('on', !!on);
@@ -2832,6 +2946,7 @@
 
     const actScripts = [
       {
+        codTime: 'DAY 01 · 05:34:12', codLoc: 'BERTH 4 HARBOR · SALTLINE',
         kicker: 'ACT I · 05:34 · BERTH 4 HARBOR',
         title: '四号泊位 · 失联名单',
         sub: '摧毁 2 座铁砧防空干扰塔，揭开老霍克 05:31 / 05:34 伪造撤离记录',
@@ -2843,6 +2958,7 @@
         spawns: [['hound', -10, 0, -12], ['hound', 10, 0, 6]],
       },
       {
+        codTime: 'DAY 01 · 05:51:04', codLoc: 'COASTAL BLVD · DOWNTOWN SECTOR',
         kicker: 'ACT II · COASTAL CITY BOULEVARD',
         title: '沿海城区 · 高速撞卡',
         sub: '驾驶武装 SAR 四驱车高速撞碎铁砧封城路障，杀出沿海主干道',
@@ -2853,6 +2969,7 @@
         spawns: [['hound', -22, 0, -68], ['hound', -30, 0, -82], ['gull', -26, 12, -74]],
       },
       {
+        codTime: 'DAY 01 · 06:14:28', codLoc: 'SW CRYO DEPOT & TRIAGE CLINIC',
         kicker: 'ACT III · SW COLD-STORAGE & CLINIC',
         title: '西南冷雾库 · 第十七人',
         sub: '攻入西南冷雾库与战地分诊中心，击毁 2 台冷库锁控箱抢出托马斯的原始档案',
@@ -2863,6 +2980,7 @@
         spawns: [['hound', -146, 0, 70], ['hound', -144, 0, 96], ['gull', -154, 12, 78]],
       },
       {
+        codTime: 'DAY 01 · 06:39:50', codLoc: 'WEST RAIL MARSHALLING YARD',
         kicker: 'ACT IV · WEST RAIL FREIGHT YARD',
         title: '西区铁路货场 · 截停专列',
         sub: '雷暴中北上西区编组站，炸毁 2 处铁路信号主控闸迫停铁砧证物专列',
@@ -2873,6 +2991,7 @@
         spawns: [['hound', -142, 0, -6], ['hound', -184, 0, 12], ['gull', -164, 13, 0]],
       },
       {
+        codTime: 'DAY 01 · 07:08:15', codLoc: 'WEST RIDGE COMMS · ELEV +14M',
         kicker: 'ACT V · WEST MOUNTAIN RIDGE +14M',
         title: '西岸山地卫星站 · 登顶劫持',
         sub: '沿盘山高架公路爬升 +14m 登顶，狙击 3 个卫星散热芯向全城公开《失联名单》',
@@ -2883,6 +3002,7 @@
         spawns: [['hound', -180, 14, -84], ['hound', -182, 14, -70], ['gull', -190, 26, -78]],
       },
       {
+        codTime: 'DAY 01 · 07:19:42', codLoc: 'SLUICE ZERO · 12M STORM SURGE',
         kicker: 'ACT VI · SLUICE ZERO · 12M TSUNAMI',
         title: '零号泄洪 · 12 米东海海啸',
         sub: '沃德炸毁南防潮闸企图毁尸灭迹！死守 +14m 山顶俯瞰 12 米巨浪吞没港区',
@@ -2893,6 +3013,7 @@
         spawns: [],
       },
       {
+        codTime: 'DAY 01 · 07:42:09', codLoc: 'SOUTH DRYDOCK & 22M LIGHTHOUSE',
         kicker: 'ACT VII · SOUTH DRYDOCK & HEADLAND',
         title: '南港船坞 · 风暴点灯',
         sub: '顶着海上重炮覆盖冲向南港海角，摧毁 2 座电源干扰器重启 22 米灯塔指引舰队',
@@ -2903,6 +3024,7 @@
         spawns: [['hound', -14, 0, 118], ['hound', 6, 0, 126], ['gull', 0, 14, 130]],
       },
       {
+        codTime: 'DAY 01 · 08:05:33', codLoc: 'NW COASTAL AIRFIELD · RUNWAY 07',
         kicker: 'ACT VIII · NW COASTAL AIRFIELD',
         title: '海岸应急机场 · 终局撤离',
         sub: '灯塔重燃、舰队入港！顶着跑道炮火全速冲进西北机场拱形机库完成撤离',
@@ -2924,6 +3046,7 @@
       setLetterbox(true, 3600);
       if (actCardTimer) clearTimeout(actCardTimer);
       actCardTimer = setTimeout(() => actCard.classList.remove('show'), 4200);
+      playCodTypewriter(idx);
       if (sc.beats) playStorySequence(sc.beats);
     }
 
@@ -2942,9 +3065,8 @@
     // DUAL MODE: OPEN WORLD SIGHTSEEING (freeRoam) <-> 8-ACT CITY CAMPAIGN
     // =========================================================================
     const owProgress = createOpenWorldCampaignProgress();
-    const urlParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
     const isMultiplayer = () => Boolean(world.game?.conquest);
-    let freeRoam = !!(window.SALTLINE_OPEN_WORLD_ROAM || urlParams?.get('mode') === 'openworld');
+    let freeRoam = !!(window.SALTLINE_OPEN_WORLD_ROAM || world.params?.mode === 'openworld');
     let cityCampaignActive = !freeRoam; // Default to 8-Act Battlefield Open-World Campaign in mission mode!
     let photoMode = false;
     const isMainStoryActive = () => false;
@@ -3142,13 +3264,14 @@
     }
 
     function teleportToSafeStart() {
+      inspectLock = null;
+      if (mapOpen) toggleMap(false);
       const safeStart = movePlayerAndVehicle(new Vector3(-26, 0.25, -36), true);
       if (world.player) {
         world.player.yaw = 0;
         world.player.pitch = 0;
         world.player.enabled = true;
       }
-      if (world.game?.state === 'paused') world.game.resume?.();
       world.input?.setGameplay?.(true);
       return safeStart;
     }
@@ -3215,17 +3338,16 @@
       } else mapGpsC.style.display = 'none';
     }
 
-    function toggleMap(force) {
+    function toggleMap(force, { restoreInput = true } = {}) {
       const nextOpen = typeof force === 'boolean' ? force : !mapOpen;
+      if (nextOpen === mapOpen || (nextOpen && isMultiplayer())) return;
       mapOpen = nextOpen;
       mapOverlay.classList.toggle('open', mapOpen);
       if (mapOpen) {
         world.input?.setGameplay?.(false);
         try { document.exitPointerLock?.(); } catch {}
         renderMapEntries(world.player?.pos);
-      } else {
-        if (world.game?.state === 'paused') world.game.resume?.();
-        if (world.player) world.player.enabled = true;
+      } else if (restoreInput && (!world.game || world.game.state === 'playing')) {
         world.input?.setGameplay?.(true);
         try { world.input?.requestLock?.(); } catch {}
       }
@@ -3243,6 +3365,12 @@
     ];
     let inspectIdx = -1;
     let inspectLock = null;
+    function resetView() {
+      inspectLock = null;
+      toggleMap(false, { restoreInput: false });
+      setPhotoMode(false);
+    }
+
     function jumpInspectView(idx, { photoClean = false } = {}) {
       inspectIdx = ((idx % inspectViews.length) + inspectViews.length) % inspectViews.length;
       const v = inspectViews[inspectIdx];
@@ -3299,8 +3427,14 @@
     });
 
     const onKeyDown = e => {
+      if (world.game?.state !== 'playing' || isMultiplayer() ||
+          world.game.cinematic?.active || world.game.arrival || world.developer?.open) return;
       if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-      if (e.code === 'KeyM') { e.preventDefault(); toggleMap(); }
+      if (e.code === 'Escape' && mapOpen) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        toggleMap(false);
+      } else if (e.code === 'KeyM' && !e.repeat) { e.preventDefault(); toggleMap(); }
       else if (e.code === 'KeyU' && !e.repeat) {
         e.preventDefault();
         teleportToSafeStart();
@@ -3313,9 +3447,8 @@
       else if (e.code === 'KeyZ' && !e.repeat) { callSupport('supply'); }
       else if (e.code === 'KeyX' && !e.repeat) { callSupport('artillery'); }
       else if (e.code === 'KeyK' && !e.repeat) { callSupport('smoke'); }
-      else if (e.code === 'Escape' && mapOpen) { e.preventDefault(); toggleMap(false); }
     };
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
 
     // =========================================================================
     // 8-ACT CONNECTED COASTAL CITY CAMPAIGN ("盐线市·失联名单")
@@ -3326,6 +3459,7 @@
 
     let stage = 0;
     let tsunamiSurviveClock = 0, runwayArtilleryClock = 0, bridgeBarrageTriggered = false, introActShown = false;
+    let act2ChaseTriggered = false, act8RunwayPassTriggered = false;
     const rayOrigin = new Vector3(), rayDir = new Vector3(), toTgt = new Vector3(), up = new Vector3(0, 1, 0);
 
     function advanceToStage(nextStage) {
@@ -3348,6 +3482,9 @@
       stage = idx;
       customGpsTarget = null;
       bridgeBarrageTriggered = false;
+      act2ChaseTriggered = false;
+      act8RunwayPassTriggered = false;
+      resetParkedAircraft();
       tsunamiSurviveClock = idx === 5 ? 12.0 : 0;
       for (const t of shootTargets) {
         t.alive = t.stage >= idx;
@@ -3382,6 +3519,7 @@
     function hitTarget(t) {
       if (!t.alive || freeRoam || !cityCampaignActive) return;
       t.hp--;
+      flashHitmarker(t.hp <= 0);
       fx?.sparks?.(t.pos, up, 20);
       audio?.play?.('rail_touchdown', { pos: t.pos, ref: 20, gain: .55, jitter: .1 });
       world.player?.addShake?.(.14);
@@ -3540,7 +3678,7 @@
     // Real Drone Explosion Splash Damage + Battlefield Support Point Award
     let droneBlastGuard = false;
     world.events?.on?.('enemy:killed', ev => {
-      if (cityCampaignActive && !freeRoam) awardSupport(1);
+      if (cityCampaignActive && !freeRoam) { awardSupport(1); flashHitmarker(true); }
       if (droneBlastGuard) return;
       const enemy = ev?.enemy;
       const type = ev?.type || enemy?.type;
@@ -3802,6 +3940,20 @@
             }
           }
         }
+        if (stage === 1 && !act2ChaseTriggered && playerPos && playerPos.z < -48) {
+          act2ChaseTriggered = true;
+          world.disasters?.triggerSkyBattlePass?.({
+            from: new Vector3(-26, 26, 8), to: new Vector3(-26, 20, -148),
+            strafeTarget: new Vector3(-26, .6, -76), count: 2,
+          });
+          if (!world.developer?.flags?.noEnemies && typeof world.enemies?.spawn === 'function') {
+            try {
+              world.enemies.spawn('gull', new Vector3(-36, 13, -58), { state: 'alert', target: playerPos });
+              world.enemies.spawn('gull', new Vector3(-16, 14, -62), { state: 'alert', target: playerPos });
+            } catch {}
+          }
+          world.tactical?.notify?.('✈️ 敌方拦截机低空掠过沿海大道！追击无人机已锁定四驱车！', '✈️ Hostile jets overhead! Pursuit drones inbound!', true, 4.5);
+        }
         if (stage === 1 && playerPos && playerPos.distanceTo(new Vector3(-26, 0, -76)) < 7.5) {
           for (const rb of roadblockProps) { rb.intact = false; rb.mesh.visible = false; }
           const hitPos = new Vector3(-26, 1.0, -76);
@@ -3818,9 +3970,27 @@
         if (stage === 6 && !bridgeBarrageTriggered && playerPos && playerPos.z > 62) {
           bridgeBarrageTriggered = true;
           world.disasters?.triggerArtilleryBarrage?.();
+          world.disasters?.triggerSkyBattlePass?.({
+            from: new Vector3(44, 30, 60), to: new Vector3(-68, 22, 142),
+            strafeTarget: new Vector3(-12, 1, 118), count: 2,
+          });
         }
         if (stage === 7 && playerPos) {
           if (playerPos.z < -130 && playerPos.x < -110) {
+            if (!act8RunwayPassTriggered) {
+              act8RunwayPassTriggered = true;
+              world.disasters?.triggerSkyBattlePass?.({
+                from: new Vector3(-92, 24, -172), to: new Vector3(-232, 18, -172),
+                strafeTarget: new Vector3(-168, .8, -172), count: 2,
+              });
+              if (!world.developer?.flags?.noEnemies && typeof world.enemies?.spawn === 'function') {
+                try {
+                  world.enemies.spawn('gull', new Vector3(-136, 14, -162), { state: 'alert', target: playerPos });
+                  world.enemies.spawn('gull', new Vector3(-148, 15, -182), { state: 'alert', target: playerPos });
+                } catch {}
+              }
+              world.tactical?.notify?.('✈️ 敌机正沿 110 米跑道低空扫射！立刻冲进前方拱形机库！', '✈️ Jets strafing runway! Push into the hangar NOW!', true, 4.5);
+            }
             runwayArtilleryClock += dt;
             if (runwayArtilleryClock >= 1.85) {
               runwayArtilleryClock = 0;
@@ -3960,7 +4130,12 @@
     }
 
     function dispose() {
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
+      if (window.SALTLINE_INSPECT_VIEW === jumpInspectView) {
+        delete window.SALTLINE_INSPECT_VIEW;
+        delete window.SALTLINE_INSPECT_VIEWS;
+        delete window.SALTLINE_GET_STATS;
+      }
       if (actCardTimer) clearTimeout(actCardTimer);
       for (const it of interactables) it.cleanup?.();
       for (const sec of sectors) syncColliders(sec, false);
@@ -3994,6 +4169,9 @@
       for (const geo of worldBoxCache.values()) geo.dispose();
       clearStoryTimers();
       if (cinemaTimer) clearTimeout(cinemaTimer);
+      if (typewriterInterval) clearInterval(typewriterInterval);
+      if (typewriterHideTimer) clearTimeout(typewriterHideTimer);
+      if (hitmarkerTimer) clearTimeout(hitmarkerTimer);
       root.removeFromParent();
       hud.remove();
       minimap.remove();
@@ -4003,6 +4181,8 @@
       cinemaBot.remove();
       storyBox.remove();
       finaleCard.remove();
+      codTypewriter.remove();
+      codHitmarker.remove();
       photoPill.remove();
       if (legacySkyline) legacySkyline.visible = true;
       if (legacyLamps) legacyLamps.visible = true;
@@ -4016,7 +4196,7 @@
 
     return {
       update, dispose, toggleMap, jumpToStage, startFromLanding, restartCurrentStage, setFreeRoam, setPhotoMode,
-      teleportToSafeStart,
+      teleportToSafeStart, resetView,
       cycleSky() { return applySkyPreset(skyIdx + 1); },
       stageStarts, interactables, progress: owProgress,
       rainShelters: blocks.filter(b => b.facility || b.enterable).map(b => ({

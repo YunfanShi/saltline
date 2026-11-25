@@ -21,7 +21,7 @@ const ASSETS = new Set([
   'port-campaign-continuation-layout.js', 'port-campaign-continuation.js',
   'port-prologue.js', 'port-prologue-layout.js', 'port-prologue-flight.js',
   'port-campaign-berth.js', 'port-campaign-rail.js',
-  'port-lan.js', 'port-mp-squad.js', 'port-mp-gadgets.js', 'port-mp-sync.js',
+  'port-lan.js', 'port-mp-squad.js', 'port-mp-gadgets.js', 'port-mp-sync.js', 'port-mp-vehicles.js',
   'port-loadout.js', 'port-loadout.css', 'port-sidearm.js',
   'port-operations.js', 'port-operations.css',
   'port-tactical-sandbox.js', 'port-chapter-architecture.js', 'port-cinematic-sequencer.js',
@@ -125,6 +125,24 @@ function assignTeam(room, isHost) {
     return blue > red ? 'red' : 'blue';
   }
   return 'blue';
+}
+
+function normalizeConquest(state) {
+  if (!state || !['conquest', 'breakthrough'].includes(state.mode) ||
+    !Number.isFinite(state.elapsed) || state.elapsed < 0 || state.elapsed > 360 ||
+    ![null, 'blue', 'red', 'draw'].includes(state.winner) ||
+    !Array.isArray(state.points) || state.points.length < 1 || state.points.length > 32 ||
+    !Number.isInteger(state.sector) || state.sector < 0 || state.sector > state.points.length ||
+    !state.tickets || !['blue', 'red'].every(team => Number.isFinite(state.tickets[team]) && state.tickets[team] >= 0 && state.tickets[team] <= 1000) ||
+    !state.points.every(point => point && [null, 'blue', 'red'].includes(point.owner) &&
+      Number.isFinite(point.control) && point.control >= -100 && point.control <= 100 &&
+      ['contested', 'locked', 'secured'].every(key => typeof point[key] === 'boolean'))) return null;
+  return {
+    mode: state.mode, elapsed: state.elapsed, winner: state.winner, sector: state.sector,
+    tickets: { blue: state.tickets.blue, red: state.tickets.red },
+    points: state.points.map(({ owner, control, contested, locked, secured }) =>
+      ({ owner, control, contested, locked, secured })),
+  };
 }
 
 function addPlayer(room, name, now, role = 'medic') {
@@ -272,6 +290,60 @@ function createWsParser(onMessage, onClose) {
   };
 }
 
+const AI_PATROL_WAYPOINTS = [
+  [-66, 0, 5], [-42, 0, -10], [-20, 0, -14], [4, 0, -8], [14, 0, 12], [-18, 0, 16],
+];
+
+function createRoomEnemies(difficulty = 'normal') {
+  const count = difficulty === 'hard' ? 10 : difficulty === 'easy' ? 4 : 7;
+  const list = [];
+  for (let i = 0; i < count; i++) {
+    const wp = AI_PATROL_WAYPOINTS[i % AI_PATROL_WAYPOINTS.length];
+    const isGull = i % 2 === 0;
+    list.push({
+      id: 'srv-ai-' + (i + 1),
+      type: isGull ? 'gull' : 'hound',
+      pos: [wp[0] + (i % 3) * 2.5, isGull ? 6.5 : 0, wp[2] - (i % 2) * 2.5],
+      yaw: 0,
+      hp: isGull ? 60 : 110,
+      maxHp: isGull ? 60 : 110,
+      alive: true,
+      respawnAt: 0,
+      wpIndex: (i + 1) % AI_PATROL_WAYPOINTS.length,
+    });
+  }
+  return list;
+}
+
+function tickRoomAI(room, dt, now) {
+  if (room.phase !== 'started' || room.settings?.aiEnabled === false) return;
+  if (!room.enemies) room.enemies = createRoomEnemies(room.settings?.difficulty);
+  for (const e of room.enemies) {
+    if (!e.alive) {
+      if (now >= e.respawnAt) {
+        const wp = AI_PATROL_WAYPOINTS[e.wpIndex % AI_PATROL_WAYPOINTS.length];
+        e.pos = [wp[0], e.type === 'gull' ? 6.5 : 0, wp[2]];
+        e.hp = e.maxHp;
+        e.alive = true;
+      }
+      continue;
+    }
+    const target = AI_PATROL_WAYPOINTS[e.wpIndex % AI_PATROL_WAYPOINTS.length];
+    const dx = target[0] - e.pos[0];
+    const dz = target[2] - e.pos[2];
+    const dist = Math.hypot(dx, dz);
+    if (dist < 2.2) {
+      e.wpIndex = (e.wpIndex + 1) % AI_PATROL_WAYPOINTS.length;
+    } else {
+      const speed = e.type === 'gull' ? 6.5 : 4.2;
+      const step = Math.min(dist, speed * dt);
+      e.pos[0] += (dx / dist) * step;
+      e.pos[2] += (dz / dist) * step;
+      e.yaw = Math.atan2(dx, dz);
+    }
+  }
+}
+
 function createLanServer({ clock = Date.now, enableTick = true } = {}) {
   const rooms = new Map();
 
@@ -324,6 +396,8 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
         settings: room.settings,
         players: playersList,
         conquest: room.conquest,
+        enemies: room.enemies ?? null,
+        vehicles: room.vehicles ?? null,
         events,
       });
     }
@@ -360,17 +434,40 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
     }
 
     if (msg.type === 'conquest' && player.id === room.hostId && msg.conquest && typeof msg.conquest === 'object') {
-      room.conquest = msg.conquest;
+      const state = normalizeConquest(msg.conquest);
+      if (state) room.conquest = state;
+      return;
+    }
+
+    if (msg.type === 'vehicles' && Array.isArray(msg.vehicles)) {
+      if (player.id === room.hostId || !room.vehicles) {
+        room.vehicles = msg.vehicles.slice(0, 24);
+      }
       return;
     }
 
     if (msg.type === 'event' && typeof msg.kind === 'string') {
+      const payload = msg.payload && typeof msg.payload === 'object' ? msg.payload : {};
+      if (msg.kind === 'enemyHit' && room.enemies && typeof payload.enemyId === 'string') {
+        const target = room.enemies.find(e => e.id === payload.enemyId && e.alive);
+        const dmg = Number(payload.damage) || 0;
+        if (target && dmg > 0) {
+          target.hp = Math.max(0, target.hp - dmg);
+          if (target.hp <= 0) {
+            target.alive = false;
+            target.respawnAt = now + 12_000;
+            player.state.kills = (player.state.kills || 0) + 1;
+            room.pendingEvents.push({ kind: 'enemyKilled', from: player.id, fromName: player.name, team: player.team, payload: { enemyId: target.id, type: target.type }, at: now });
+          }
+        }
+        return;
+      }
       const ev = {
         kind: msg.kind.slice(0, 24),
         from: player.id,
         fromName: player.name,
         team: player.team,
-        payload: msg.payload && typeof msg.payload === 'object' ? msg.payload : {},
+        payload,
         at: now,
       };
       room.pendingEvents.push(ev);
@@ -586,6 +683,7 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
       const now = clock();
       sweep(now);
       for (const room of rooms.values()) {
+        tickRoomAI(room, 0.05, now);
         if (room.sockets.size > 0) broadcastRoom(room, now);
       }
     }, 50);
@@ -622,4 +720,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { createLanServer, encodeWsFrame, createWsParser, normalizeSettings };
+module.exports = { createLanServer, encodeWsFrame, createWsParser, normalizeSettings, createRoomEnemies, tickRoomAI, normalizeConquest };

@@ -46,6 +46,33 @@ test('roof whip is vertical, mounted on the cab, and blocked driver exit uses th
   truck.dispose();
 });
 
+test('vehicle deactivation and disposal release driving and input ownership', () => {
+  const registered = new Map();
+  scope.window.addEventListener = (type, handler) => registered.set(type, handler);
+  scope.window.removeEventListener = (type, handler) => {
+    if (registered.get(type) === handler) registered.delete(type);
+  };
+  const player = { alive:true, pos:new THREE.Vector3(), vel:new THREE.Vector3() };
+  let visible = true;
+  const world = { THREE, physics:{ boxes:[], groundHeight:() => 0 }, player,
+    scene:new THREE.Scene(), game:{state:'playing'}, weapon:{setVisible: value => { visible = value; }} };
+  const truck = createPortDrivableVehicle(world, { startPos:new THREE.Vector3() });
+  registered.get('keydown')({code:'KeyF'});
+  assert.equal(truck.driving, true);
+  assert.equal(visible, false);
+  truck.setActive(false);
+  assert.equal(truck.driving, false);
+  assert.equal(truck.mesh.visible, false);
+  assert.equal(visible, true);
+  registered.get('keydown')({code:'KeyF'});
+  assert.equal(truck.driving, false);
+  truck.setActive(true);
+  registered.get('keydown')({code:'KeyF', saltlineVehicleHandled:true});
+  assert.equal(truck.driving, false);
+  truck.dispose();
+  assert.equal(registered.size, 0);
+});
+
 test('parked aircraft has stationary blades and independently disposable finishes', () => {
   const plane = createParkedTransport(THREE);
   const discs = [], blades = [];

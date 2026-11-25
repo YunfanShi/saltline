@@ -130,13 +130,12 @@ test('a missed heartbeat reserves a seat and reconnect keeps identity and readin
   lan.advance(6000);
   const { body: { room: active } } = await lan.room(code, guest);
   assert.equal(active.hostId, hostId);
-  assert.deepEqual(active.players[0], { id: hostId, name: 'Host', connected: false, ready: true });
+  assert.deepEqual(active.players[0], { id: hostId, name: 'Host', connected: false, ready: true, team: 'blue', role: 'medic' });
   lan.advance(5000);
   assert.deepEqual(await lan.action(code, 'start', guest), { status: 403, body: { error: 'host_only' } });
   const { body: { room: resumed } } = await lan.room(code, host);
   assert.equal(resumed.yourId, hostId);
-  assert.equal(resumed.players[0].ready, true);
-  assert.equal(resumed.players[0].connected, true);
+  assert.deepEqual(resumed.players[0], { ...active.players[0], connected: true });
   lan.advance(36_000);
   assert.equal((await lan.room(code, guest)).status, 404);
 });

@@ -5,9 +5,17 @@
     { key: '7', type: 'supply', en: 'Supply', zh: '补给' },
     { key: '8', type: 'smoke', en: 'Smoke', zh: '烟幕' },
     { key: '9', type: 'artillery', en: 'Artillery', zh: '重炮' },
-    { key: '0', type: 'vehicle', en: 'SAR 4x4', zh: '载具空投' },
+    { key: '0', type: 'vehicle', en: 'SAR 4x4', zh: '四驱空投' },
   ];
-  const REQUISITIONS = [...SUPPORT];
+  const HEAVY_DROPS = [
+    { type: 'motorcycle', en: 'M2 Bike', zh: 'M2 摩托' },
+    { type: 'ifv', en: 'V12 IFV', zh: 'V12 步战车' },
+    { type: 'aa', en: 'A40 AA', zh: 'A40 防空车' },
+    { type: 'tank', en: 'T90 Tank', zh: 'T90 坦克' },
+    { type: 'helicopter', en: 'H8 Heli', zh: 'H8 直升机' },
+    { type: 'jet', en: 'J20 Jet', zh: 'J20 战斗机' },
+  ];
+  const REQUISITIONS = [...SUPPORT, ...HEAVY_DROPS];
   const t = (english, chinese) => window.SaltlineLocale?.t(english, chinese) ?? english;
 
   window.createPortOperations = ({ world, onSupport, onOpen, onClose }) => {

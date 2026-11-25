@@ -5,8 +5,14 @@
   const DURATION = 240;
   const START_TICKETS = 40;
   const SUPPORT_CAP = 12;
-  const SUPPORTS = Object.freeze({ mark: 2, reinforce: 4, supply: 3, smoke: 4, artillery: 7, vehicle: 6 });
-  const SUPPORT_DURATION = { mark: 15, reinforce: 18, supply: 3, smoke: 22, artillery: 35, vehicle: 45 };
+  const SUPPORTS = Object.freeze({
+    mark: 2, reinforce: 4, supply: 3, smoke: 4, artillery: 7,
+    vehicle: 6, motorcycle: 2, ifv: 6, aa: 6, tank: 8, helicopter: 8, jet: 9,
+  });
+  const SUPPORT_DURATION = {
+    mark: 15, reinforce: 18, supply: 3, smoke: 22, artillery: 35,
+    vehicle: 45, motorcycle: 20, ifv: 50, aa: 45, tank: 65, helicopter: 60, jet: 70,
+  };
   const SMOKE_RADIUS = 6;
   const FIRST_EVENT = 35;
   const EVENT_COOLDOWN = 28;
@@ -33,11 +39,13 @@
     const tickets = { blue: startingTickets, red: breakthrough ? points.length : startingTickets };
     const support = {
       markUntil: 0, reinforceUntil: 0, supplyUntil: 0, reinforcePosition: null,
-      smokeUntil: 0, smokePosition: null, artilleryUntil: 0, artillery: null, vehicleUntil: 0,
+      smokeUntil: 0, smokePosition: null, artilleryUntil: 0, artillery: null,
+      vehicleUntil: 0, motorcycleUntil: 0, ifvUntil: 0, aaUntil: 0, tankUntil: 0, helicopterUntil: 0, jetUntil: 0,
     };
     let sector = 0;
     let supportPoints = 3;
     let elapsed = 0;
+    let localTime = 0;
     let winner = null;
     let respawnAt = null;
     let deaths = 0;
@@ -142,10 +150,48 @@
         return winner ? signals.filter(signal => signal.action === 'end') : signals;
       },
       near(position) { return points.find(point => nearby(position, point.pos)); },
-      useSupport(kind, position, targetId) {
+      exportSharedState() {
+        return {
+          mode: breakthrough ? 'breakthrough' : 'conquest', elapsed, winner, sector,
+          tickets: { ...tickets },
+          points: points.map(({ owner, control, contested, locked, secured }) =>
+            ({ owner, control, contested, locked, secured })),
+        };
+      },
+      applySharedState(state) {
+        if (!state || state.mode !== (breakthrough ? 'breakthrough' : 'conquest') ||
+          !Number.isFinite(state.elapsed) || state.elapsed < 0 || state.elapsed > duration ||
+          ![null, 'blue', 'red', 'draw'].includes(state.winner) ||
+          !Number.isInteger(state.sector) || state.sector < 0 || state.sector > points.length ||
+          !state.tickets || !['blue', 'red'].every(team => Number.isFinite(state.tickets[team]) && state.tickets[team] >= 0) ||
+          !Array.isArray(state.points) || state.points.length !== points.length ||
+          !state.points.every(point => point && [null, 'blue', 'red'].includes(point.owner) &&
+            Number.isFinite(point.control) && point.control >= -100 && point.control <= 100 &&
+            ['contested', 'locked', 'secured'].every(key => typeof point[key] === 'boolean'))) return false;
+        elapsed = state.elapsed;
+        winner = state.winner;
+        sector = state.sector;
+        tickets.blue = state.tickets.blue;
+        tickets.red = state.tickets.red;
+        points.forEach((point, index) => {
+          const shared = state.points[index];
+          for (const key of ['owner', 'control', 'contested', 'locked', 'secured']) point[key] = shared[key];
+        });
+        return true;
+      },
+      updateGuest(dt) {
+        if (winner || !Number.isFinite(dt) || dt <= 0) return { captures: [], respawn: false };
+        elapsed = Math.min(duration, elapsed + dt);
+        localTime += dt;
+        const respawn = respawnAt !== null && localTime >= respawnAt;
+        if (respawn) respawnAt = null;
+        return { captures: [], respawn };
+      },
+      useSupport(kind, position, targetId, deployVehicle) {
         if (winner || respawnAt !== null || !Object.hasOwn(SUPPORTS, kind)) return false;
         const durationKey = kind + 'Until';
         if (supportPoints < SUPPORTS[kind] || support[durationKey] > elapsed) return false;
+        if (deployVehicle && !deployVehicle()) return false;
         if (kind === 'reinforce') {
           const point = position && points.find(point => !point.locked && !point.secured && nearby(position, point.pos));
           if (!point) return false;
@@ -183,25 +229,30 @@
         }
         return impacts;
       },
-      casualty() {
+      casualty({ affectsTickets = true, team = 'blue' } = {}) {
         if (winner || respawnAt !== null) return;
         deaths++;
-        tickets.blue = Math.max(0, tickets.blue - 4);
-        respawnAt = elapsed + 3;
-        finish();
+        if (affectsTickets && (team === 'blue' || !breakthrough)) {
+          tickets[team] = Math.max(0, tickets[team] - 4);
+          finish();
+        }
+        respawnAt = localTime + 3;
       },
-      killedMachine() {
+      killedMachine({ affectsTickets = true } = {}) {
         if (winner) return;
         kills++;
         awardSupport(1);
-        if (!breakthrough) tickets.red = Math.max(0, tickets.red - 1);
-        finish();
+        if (affectsTickets) {
+          if (!breakthrough) tickets.red = Math.max(0, tickets.red - 1);
+          finish();
+        }
       },
       update(dt, player, machines, allies = []) {
         if (winner || !Number.isFinite(dt) || dt <= 0) return { captures: [], respawn: false };
         const previousElapsed = elapsed;
         dt = Math.min(dt, duration - previousElapsed);
         elapsed += dt;
+        localTime += dt;
         const capturedPoints = [];
         for (const point of breakthrough ? [points[sector]] : points) {
           const fullPresence = (player.alive && player.pos && nearby(player.pos, point.pos)) ||
@@ -237,7 +288,7 @@
         }
         finish();
         advanceMajorEvent();
-        const respawn = !winner && respawnAt !== null && elapsed >= respawnAt;
+        const respawn = !winner && respawnAt !== null && localTime >= respawnAt;
         if (respawn) respawnAt = null;
         return { captures: capturedPoints, respawn };
       }

@@ -85,14 +85,13 @@
       throwCooldown = 0;
       vehicleDropCooldown = 0;
       resetInventory();
-      // Spawn a drivable SAR 4x4 at Blue HQ for multiplayer combat (if available)
+      // Spawn a drivable SAR 4x4 at Blue HQ for multiplayer combat without disturbing campaign vehicle
       if (!mpVehicle && window.createPortDrivableVehicle && startPos) {
         const vehPos = new Vector3(startPos.x + 4.5, startPos.y ?? 0, startPos.z - 4.0);
         if (typeof physics?.groundHeight === 'function') {
           vehPos.y = physics.groundHeight(vehPos.x, vehPos.z, 1.5);
         }
-        mpVehicle = window.createPortDrivableVehicle(world, { startPos: vehPos, startYaw: 0, bevelBox });
-        world.vehicle = mpVehicle;
+        mpVehicle = window.createPortDrivableVehicle(world, { startPos: vehPos, startYaw: 0, bevelBox, multiplayer: true });
       }
     }
 
@@ -107,7 +106,6 @@
       ammoBoxes.length = 0;
       if (mpVehicle) {
         mpVehicle.dispose?.();
-        if (world.vehicle === mpVehicle) world.vehicle = null;
         mpVehicle = null;
       }
     }
@@ -168,10 +166,9 @@
     function airdropVehicle(player) {
       if (!active || !player?.pos || vehicleDropCooldown > 0) return false;
       if (!mpVehicle && window.createPortDrivableVehicle) {
-        mpVehicle = window.createPortDrivableVehicle(world, { startPos: player.pos.clone(), startYaw: player.yaw ?? 0 });
-        world.vehicle = mpVehicle;
+        mpVehicle = window.createPortDrivableVehicle(world, { startPos: player.pos.clone(), startYaw: player.yaw ?? 0, multiplayer: true });
       }
-      mpVehicle?.summonNear?.(player);
+      if (!mpVehicle?.summonNear?.(player)) return false;
       if (mpVehicle?.pos) {
         fx?.smoke?.(mpVehicle.pos, { size: 4.5, life: 2.5, rise: 0.35, count: 4, alpha: 0.65 });
       }
@@ -258,6 +255,7 @@
       }
 
       deployCallback = onChoose;
+      deployDialog._fallbackSpawn = baseSpawn;
       deployDialog.querySelector('[data-deploy-title]').textContent = t('Tactical Deploy', '选择部署位置');
       deployDialog.querySelector('[data-deploy-sub]').textContent = t(
         'Choose HQ, a captured sector, or a safe squadmate to redeploy.',
@@ -276,13 +274,24 @@
         });
         return btn;
       }));
+      if (!deployDialog._cancelWired) {
+        deployDialog._cancelWired = true;
+        deployDialog.addEventListener('cancel', event => {
+          event.preventDefault();
+          const cb = deployCallback;
+          const fb = deployDialog._fallbackSpawn;
+          deployCallback = null;
+          deployDialog.close();
+          cb?.(fb);
+        });
+      }
       if (!deployDialog.open) deployDialog.showModal();
     }
 
     const onKeyDown = e => {
       if (!active || e.repeat || e.ctrlKey || e.altKey || e.metaKey ||
         /^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName)) return;
-      if (world.game?.state !== 'playing' || !world.player?.alive || world.vehicle?.driving) return;
+      if (world.game?.state !== 'playing' || !world.player?.alive || world.vehicle?.driving || mpVehicle?.driving || world.mpVehicles?.driving) return;
       if (document.querySelector('.developer-menu[open]')) return;
       if (e.code === 'KeyG' || e.code === 'Digit4') {
         e.preventDefault();
@@ -394,6 +403,7 @@
       smokeBlocks,
       openDeploySelector,
       get active() { return active; },
+      get driving() { return Boolean(mpVehicle?.driving); },
       get fragCount() { return fragCount; },
       get smokeCount() { return smokeCount; },
       get ammoBoxes() { return ammoBoxes; },

@@ -1,15 +1,38 @@
 /* WorldEngine/Assets/BuildingGenerator.js
- * Next-Generation Parametric Coastal Architecture Engine (6 Distinct Archetypes).
- * Replaces plain rectangular boxes with true architectural silhouettes using
- * ExtrudeGeometry, Shape, Bevel, TubeGeometry, LatheGeometry, and InstancedMesh:
- *   1. coastal_residence  — L-shaped traditional house, ExtrudeGeometry pitched tile roof, dormers, brick chimney, shuttered windows, covered timber porch.
- *   2. harbor_apartment   — U-shaped recessed-courtyard brick/plaster apartment, mansard roof, corner loggia balconies, exterior fire escape, wooden water tower.
- *   3. modern_office      — Chamfered-corner podium + stepped glass curtain-wall tower, vertical solar fins, V-column recessed lobby, glazed skylight atrium crown.
- *   4. commercial_arcade  — Recessed ground-floor colonnade arcade, 45-deg chamfered corner entry, projecting bay windows, sloped awnings & marquee signage.
- *   5. civic_customs      — Symmetrical neoclassical/maritime civic hall, granite steps, fluted-pilaster portico, beveled pediment, central skylight cupola lantern.
- *   6. industrial_hall    — Multi-bay ExtrudeGeometry sawtooth north-light factory roof, exposed steel portal H-frames, loading dock apron & cyclone exhaust stack. */
+ * Next-Generation Parametric Coastal Architecture Engine (9 Distinct Structural Archetypes)
+ * with Genuine 8-Stage Time-Sliced Phased Generation & Per-Phase Timing Telemetry.
+ *
+ * 8 Independent Phased Build Stages (createCoastalBuildingTask):
+ *   1. structure   — Foundation plinths, stepped/L/U/chamfered massing, structural columns & slabs
+ *   2. facade      — Tripartite base/shaft/attic composition, corner piers/quoins, spandrels & belt courses
+ *   3. openings    — Deeply recessed windows, varied bay rhythms, mullions, sills, lintels & glazed portals
+ *   4. roof        — ExtrudeGeometry gable/mansard/sawtooth/stepped roofs, parapets, coping, cupolas & dormers
+ *   5. attachments — Awnings, bay windows, recessed loggias, fire escapes, chimneys, hoist beams & signage
+ *   6. interior    — Visible ground-floor lobby floors, columns, reception counters & warm ceiling soffits
+ *   7. colliders   — Multi-volume AABB collider specs matching true L/U/stepped/rowhouse geometry
+ *   8. activate    — GPU InstancedMesh flush, streamOwned tagging, scene mount & timing telemetry commit
+ *
+ * 9 Independent Architectural Archetypes:
+ *   1. coastal_residence     — L-shaped stone & plaster house, pitched tile roof, dormer, chimney, timber porch
+ *   2. harbor_apartment      — U-shaped recessed courtyard masonry apartment, slate mansard, loggias, water tower
+ *   3. modern_office         — Chamfered 8-sided podium + stepped glass tower, V-columns, solar fins, atrium crown
+ *   4. commercial_arcade     — Recessed granite colonnade arcade, chamfered corner entry, bay windows, awnings
+ *   5. civic_customs         — Stepped granite stylobate, fluted portico, triangular pediment, glazed cupola
+ *   6. industrial_hall       — Multi-bay ExtrudeGeometry sawtooth north-light factory, portal H-frames, cyclone stack
+ *   7. stepped_mixed_use     — 1930s Maritime Art-Deco corner block with stepped setbacks & chamfered watch turret
+ *   8. bonded_warehouse      — 19th-c. brick & granite bonded warehouse, recessed hoist gable, cathead beam & tie-rods
+ *   9. waterfront_rowhouses  — 3-part staggered coastal terrace rowhouses with varied heights, roofs, stoops & materials */
 (() => {
   const WE = (window.WorldEngine = window.WorldEngine || {});
+
+  const nowMs = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now());
+
+  function recordBuildTiming(entry) {
+    if (typeof window === 'undefined') return;
+    if (!Array.isArray(window.SALTLINE_BUILD_TIMINGS)) window.SALTLINE_BUILD_TIMINGS = [];
+    window.SALTLINE_BUILD_TIMINGS.push(entry);
+    if (window.SALTLINE_BUILD_TIMINGS.length > 64) window.SALTLINE_BUILD_TIMINGS.shift();
+  }
 
   function createBuildingGenerator(THREE, matLib, sharedMats) {
     const { Group, Mesh, BoxGeometry, CylinderGeometry, InstancedMesh, Object3D, Vector2, Vector3 } = THREE;
@@ -35,6 +58,7 @@
       if (rotY) geo.rotateY(rotY);
       geo.computeVertexNormals();
       if (matLib?.applyWorldUV) matLib.applyWorldUV(geo, 3.0);
+      geo.userData.streamOwned = true;
       createdGeos.push(geo);
       return geo;
     }
@@ -43,6 +67,7 @@
       if (typeof THREE.TubeGeometry === 'function' && typeof THREE.CatmullRomCurve3 === 'function') {
         const curve = new THREE.CatmullRomCurve3(pts.map(p => new Vector3(p[0], p[1], p[2])));
         const geo = new THREE.TubeGeometry(curve, Math.max(10, pts.length * 4), radius, 7, false);
+        geo.userData.streamOwned = true;
         createdGeos.push(geo);
         const m = new Mesh(geo, mat);
         m.matrixAutoUpdate = false; m.updateMatrix();
@@ -57,10 +82,10 @@
       return m;
     }
 
-    // Shared instanced batch collector so high geometric detail stays low draw-call!
     function createBatcher(g) {
       const batches = new Map();
       const dummy = new Object3D();
+      let opCount = 0;
       const push = (mat, w, h, d, px, py, pz, rx = 0, ry = 0, rz = 0) => {
         if (!mat) return;
         dummy.position.set(px, py, pz);
@@ -70,6 +95,7 @@
         let arr = batches.get(mat);
         if (!arr) { arr = []; batches.set(mat, arr); }
         arr.push(dummy.matrix.clone());
+        opCount++;
       };
       const flush = () => {
         if (typeof InstancedMesh === 'function') {
@@ -81,491 +107,827 @@
           }
         }
       };
-      return { push, flush };
+      return { push, flush, get ops() { return opCount; } };
     }
 
-    // Reusable facade window-bay generator with archetype-specific proportions, shutters, fins or balconies
-    function populateFacade(push, {
-      cx, cz, width, depth, baseY, yStart, floors, storeyH, bayTarget,
-      wallMat, trimMat, steelDark, steelGalv, officeGlass, litGlass, blindGlass,
-      rng, shutterMat = null, balconyChance = 0, verticalFins = false, finMat = null,
-      bayWindows = false, faces = [0, 1, 2, 3],
-    }) {
+    // Architectural facade planner separated cleanly into masonry/pilaster articulation vs window openings vs attachments!
+    function computeFacadeLayout({ cx, cz, width, depth, baseY, yStart, floors, storeyH, bayTarget, faces = [0, 1, 2, 3], cornerPier = 0.85 }) {
+      const facePlans = [];
       for (const face of faces) {
         const theta = face * Math.PI / 2;
         const sin = Math.sin(theta), cos = Math.cos(theta);
         const span = face % 2 ? depth : width;
         const offset = (face % 2 ? width : depth) / 2;
-        const bays = Math.max(2, Math.round(span / bayTarget));
-        const pitch = span / bays;
+        const innerSpan = Math.max(2.4, span - cornerPier * 2);
+        const bays = Math.max(2, Math.round(innerSpan / bayTarget));
+        const pitch = innerSpan / bays;
+        facePlans.push({ face, theta, sin, cos, span, innerSpan, offset, bays, pitch, cornerPier, cx, cz, baseY, yStart, floors, storeyH });
+      }
+      return facePlans;
+    }
+
+    function emitFacadeWallShell(push, facePlans, { wallMat, trimMat, verticalFins = false, finMat = null, quoins = false, pilasterStep = 0 }) {
+      for (const fp of facePlans) {
         const place = (mat, w, h, d, u, y, inset, rx = 0) => {
-          push(mat, w, h, d, cx + cos * u + sin * (offset - inset), baseY + y, cz - sin * u + cos * (offset - inset), rx, theta, 0);
+          push(mat, w, h, d, fp.cx + fp.cos * u + fp.sin * (fp.offset - inset), fp.baseY + y, fp.cz - fp.sin * u + fp.cos * (fp.offset - inset), rx, fp.theta, 0);
         };
-
-        for (let row = 0; row < floors; row++) {
-          const fy = yStart + row * storeyH;
-          const sillH = verticalFins ? 0.62 : 0.94;
-          const winH = storeyH - sillH - 0.34;
-          place(wallMat, span, sillH, 0.38, 0, fy + sillH / 2, 0.18);
-          place(wallMat, span, 0.34, 0.38, 0, fy + storeyH - 0.17, 0.18);
-          if (row > 0 && row % 2 === 0) place(trimMat, span + 0.24, 0.15, 0.46, 0, fy, 0.12);
-
-          for (let b = 0; b < bays; b++) {
-            const u = (b + 0.5) * pitch - span / 2;
-            const winW = pitch * (verticalFins ? 0.78 : 0.60);
-            const jambW = (pitch - winW) / 2;
-            const wy = fy + sillH + winH / 2;
-            for (const sgn of [-1, 1]) {
-              place(wallMat, jambW, winH, 0.38, u + sgn * (pitch - jambW) / 2, wy, 0.18);
-              place(steelDark, 0.08, winH + 0.04, 0.22, u + sgn * (winW / 2 - 0.04), wy, 0.28);
+        const totalH = fp.floors * fp.storeyH;
+        // Solid corner piers prevent windows from colliding awkwardly at building edges
+        for (const sgn of [-1, 1]) {
+          const cornerU = sgn * (fp.span / 2 - fp.cornerPier / 2);
+          place(wallMat, fp.cornerPier, totalH, 0.44, cornerU, fp.yStart + totalH / 2, 0.20);
+          if (quoins) {
+            for (let qy = fp.yStart + 0.35; qy < fp.yStart + totalH - 0.3; qy += 0.92) {
+              const qW = ((Math.round(qy * 2) % 2) === 0) ? fp.cornerPier * 0.96 : fp.cornerPier * 0.68;
+              place(trimMat, qW, 0.42, 0.50, cornerU, qy, 0.14);
             }
-            const rv = rng();
-            const pane = rv < 0.22 ? litGlass : (rv < 0.36 ? blindGlass : officeGlass);
-            place(pane, winW, winH, 0.05, u, wy, 0.34);
-            place(steelDark, 0.07, winH, 0.11, u, wy, 0.27);
-            place(steelDark, winW, 0.07, 0.11, u, wy + winH * 0.20, 0.27);
-            place(trimMat, winW + 0.22, 0.13, 0.52, u, fy + sillH - 0.02, 0.10);
-            place(trimMat, winW + 0.18, 0.13, 0.46, u, fy + sillH + winH + 0.06, 0.14);
-
-            // Archetype-specific meso details
-            if (shutterMat) {
-              for (const sgn of [-1, 1]) {
-                place(shutterMat, 0.34, winH * 0.96, 0.06, u + sgn * (winW / 2 + 0.19), wy, -0.04);
-              }
-            } else if (verticalFins && finMat) {
-              place(finMat, 0.10, storeyH, 0.44, u - pitch / 2, fy + storeyH / 2, -0.16);
-            } else if (bayWindows && row >= 0 && b % 2 === 1 && winW > 1.8) {
-              // Projecting rectangular/chamfered bay window box
-              place(wallMat, winW + 0.36, 0.24, 0.72, u, fy + sillH - 0.10, -0.34);
-              place(trimMat, winW + 0.42, 0.22, 0.78, u, fy + sillH + winH + 0.12, -0.36);
-              place(pane, winW * 0.86, winH, 0.08, u, wy, -0.66);
-              for (const sgn of [-1, 1]) place(steelDark, 0.10, winH, 0.68, u + sgn * (winW * 0.45), wy, -0.34);
-            } else if (balconyChance > 0 && row >= 1 && b % 2 === (face % 2) && rng() < balconyChance) {
-              place(trimMat, winW + 0.58, 0.17, 1.28, u, fy + 0.10, -0.56);
-              place(steelDark, winW + 0.58, 0.08, 0.08, u, fy + 1.08, -1.14);
-              place(steelDark, winW + 0.58, 0.05, 0.05, u, fy + 0.62, -1.14);
-              for (const sgn of [-1, 1]) place(steelDark, 0.08, 0.08, 1.20, u + sgn * (winW + 0.54) / 2, fy + 1.08, -0.56);
-              for (let p = -3; p <= 3; p++) place(steelGalv, 0.045, 0.94, 0.045, u + (p / 3) * (winW * 0.48), fy + 0.58, -1.14);
+          }
+        }
+        // Horizontal spandrels, belt courses & vertical pilasters
+        for (let row = 0; row < fp.floors; row++) {
+          const fy = fp.yStart + row * fp.storeyH;
+          const sillH = verticalFins ? 0.58 : (row === 0 ? 0.86 : 0.96);
+          const lintelH = 0.36;
+          place(wallMat, fp.innerSpan, sillH, 0.40, 0, fy + sillH / 2, 0.19);
+          place(wallMat, fp.innerSpan, lintelH, 0.40, 0, fy + fp.storeyH - lintelH / 2, 0.19);
+          if (row === 0 || row === fp.floors - 1 || row % 2 === 0) {
+            place(trimMat, fp.span + 0.22, 0.16, 0.48, 0, fy, 0.11);
+          }
+          for (let b = 0; b <= fp.bays; b++) {
+            const pierU = -fp.innerSpan / 2 + b * fp.pitch;
+            if (verticalFins && finMat) {
+              place(finMat, 0.11, fp.storeyH, 0.46, pierU, fy + fp.storeyH / 2, -0.17);
+            } else if (pilasterStep > 0 && b % pilasterStep === 0 && b > 0 && b < fp.bays) {
+              place(trimMat, 0.38, fp.storeyH, 0.52, pierU, fy + fp.storeyH / 2, 0.10);
             }
           }
         }
       }
     }
 
-    function buildCoastalBuilding(parent, {
-      cx, cz, width, depth, height, seed = 1, styleName, labelZh, labelEn,
+    function emitFacadeOpenings(push, facePlans, {
+      wallMat, trimMat, steelDark, officeGlass, litGlass, blindGlass, rng,
+      verticalFins = false, rhythm = 'uniform', corbelLintels = false,
     }) {
+      for (const fp of facePlans) {
+        const place = (mat, w, h, d, u, y, inset, rx = 0) => {
+          push(mat, w, h, d, fp.cx + fp.cos * u + fp.sin * (fp.offset - inset), fp.baseY + y, fp.cz - fp.sin * u + fp.cos * (fp.offset - inset), rx, fp.theta, 0);
+        };
+        for (let row = 0; row < fp.floors; row++) {
+          const fy = fp.yStart + row * fp.storeyH;
+          const sillH = verticalFins ? 0.58 : (row === 0 ? 0.86 : 0.96);
+          const winH = fp.storeyH - sillH - 0.36;
+          const wy = fy + sillH + winH / 2;
+          const isTopAttic = row === fp.floors - 1 && fp.floors >= 3;
+
+          for (let b = 0; b < fp.bays; b++) {
+            const u = -fp.innerSpan / 2 + (b + 0.5) * fp.pitch;
+            // Varied architectural bay widths (breaks mechanical grid repetition!)
+            const isCenter = Math.abs(b - (fp.bays - 1) / 2) < 0.6;
+            let widthRatio = verticalFins ? 0.78 : 0.58;
+            if (rhythm === 'center_accent' && isCenter) widthRatio = 0.72;
+            else if (rhythm === 'paired' && (b % 2 === 0)) widthRatio = 0.64;
+            else if (isTopAttic) widthRatio *= 0.84;
+
+            const winW = fp.pitch * widthRatio;
+            const jambW = (fp.pitch - winW) / 2;
+            for (const sgn of [-1, 1]) {
+              place(wallMat, jambW, winH, 0.40, u + sgn * (fp.pitch - jambW) / 2, wy, 0.19);
+              place(steelDark, 0.08, winH + 0.04, 0.24, u + sgn * (winW / 2 - 0.04), wy, 0.30);
+            }
+            // Deeply recessed window glazing with varied occupancy (lit / blind / reflective)
+            const rv = rng();
+            const pane = rv < 0.24 ? litGlass : (rv < 0.38 ? blindGlass : officeGlass);
+            place(pane, winW, winH, 0.05, u, wy, 0.37);
+            // Mullion & transom bars
+            place(steelDark, 0.065, winH, 0.11, u, wy, 0.29);
+            place(steelDark, winW, 0.065, 0.11, u, wy + winH * 0.22, 0.29);
+            // Projecting stone sill + lintel
+            place(trimMat, winW + 0.24, 0.14, 0.54, u, fy + sillH - 0.02, 0.09);
+            place(trimMat, winW + (corbelLintels ? 0.34 : 0.18), corbelLintels ? 0.22 : 0.13, 0.48, u, fy + sillH + winH + 0.07, 0.13);
+            if (corbelLintels) {
+              place(trimMat, 0.20, 0.28, 0.52, u, fy + sillH + winH + 0.10, 0.11); // Keystone accent
+            }
+          }
+        }
+      }
+    }
+
+    function emitFacadeAttachments(push, facePlans, {
+      wallMat, trimMat, steelDark, steelGalv, officeGlass, litGlass, rng,
+      shutterMat = null, balconyChance = 0, bayWindows = false, tieRods = false,
+    }) {
+      for (const fp of facePlans) {
+        const place = (mat, w, h, d, u, y, inset, rx = 0) => {
+          push(mat, w, h, d, fp.cx + fp.cos * u + fp.sin * (fp.offset - inset), fp.baseY + y, fp.cz - fp.sin * u + fp.cos * (fp.offset - inset), rx, fp.theta, 0);
+        };
+        for (let row = 0; row < fp.floors; row++) {
+          const fy = fp.yStart + row * fp.storeyH;
+          const sillH = row === 0 ? 0.86 : 0.96;
+          const winH = fp.storeyH - sillH - 0.36;
+          const wy = fy + sillH + winH / 2;
+
+          for (let b = 0; b < fp.bays; b++) {
+            const u = -fp.innerSpan / 2 + (b + 0.5) * fp.pitch;
+            const winW = fp.pitch * 0.58;
+            if (shutterMat) {
+              for (const sgn of [-1, 1]) {
+                place(shutterMat, 0.34, winH * 0.95, 0.06, u + sgn * (winW / 2 + 0.20), wy, -0.04);
+              }
+            } else if (bayWindows && row >= 0 && b % 2 === 1 && winW > 1.75) {
+              place(wallMat, winW + 0.38, 0.26, 0.74, u, fy + sillH - 0.11, -0.35);
+              place(trimMat, winW + 0.44, 0.22, 0.80, u, fy + sillH + winH + 0.12, -0.37);
+              place(rng() < 0.35 ? litGlass : officeGlass, winW * 0.86, winH, 0.08, u, wy, -0.68);
+              for (const sgn of [-1, 1]) place(steelDark, 0.10, winH, 0.70, u + sgn * (winW * 0.45), wy, -0.35);
+            } else if (balconyChance > 0 && row >= 1 && b % 2 === (fp.face % 2) && rng() < balconyChance) {
+              place(trimMat, winW + 0.62, 0.17, 1.32, u, fy + 0.10, -0.58);
+              place(steelDark, winW + 0.62, 0.08, 0.08, u, fy + 1.08, -1.18);
+              place(steelDark, winW + 0.62, 0.05, 0.05, u, fy + 0.62, -1.18);
+              for (const sgn of [-1, 1]) place(steelDark, 0.08, 0.08, 1.24, u + sgn * (winW + 0.58) / 2, fy + 1.08, -0.58);
+              for (let p = -3; p <= 3; p++) place(steelGalv, 0.045, 0.94, 0.045, u + (p / 3) * (winW * 0.48), fy + 0.58, -1.18);
+            }
+            if (tieRods && b < fp.bays - 1) {
+              place(steelDark, 0.28, 0.28, 0.08, u + fp.pitch / 2, fy + 0.10, -0.05);
+            }
+          }
+        }
+      }
+    }
+
+    const ARCHETYPE_MAP = {
+      coastal_brick: 'commercial_arcade',
+      coastal_residence: 'coastal_residence',
+      harbor_apartment: 'harbor_apartment',
+      maritime_office: 'modern_office',
+      modern_office: 'modern_office',
+      commercial_arcade: 'commercial_arcade',
+      customs_block: 'civic_customs',
+      civic_customs: 'civic_customs',
+      industrial_hall: 'industrial_hall',
+      stepped_mixed_use: 'stepped_mixed_use',
+      bonded_warehouse: 'bonded_warehouse',
+      waterfront_rowhouses: 'waterfront_rowhouses',
+    };
+    const ARCHETYPE_LIST = [
+      'commercial_arcade', 'modern_office', 'harbor_apartment', 'civic_customs',
+      'coastal_residence', 'industrial_hall', 'stepped_mixed_use', 'bonded_warehouse', 'waterfront_rowhouses',
+    ];
+
+    // =========================================================================
+    // TRUE 8-STAGE PHASED BUILDING TASK (Measured per-phase execution time!)
+    // =========================================================================
+    function createCoastalBuildingTask(parent, spec, { colliderTarget = null } = {}) {
+      const { cx, cz, width, depth, height, seed = 1, styleName, labelZh, labelEn } = spec;
       const rng = matLib.mulberry32(seed * 7919 + 31);
-      // Map legacy style names + new archetype names to our 6 distinct architectural archetypes
-      const archetypeMap = {
-        coastal_brick: 'commercial_arcade',
-        coastal_residence: 'coastal_residence',
-        harbor_apartment: 'harbor_apartment',
-        maritime_office: 'modern_office',
-        modern_office: 'modern_office',
-        commercial_arcade: 'commercial_arcade',
-        customs_block: 'civic_customs',
-        civic_customs: 'civic_customs',
-        industrial_hall: 'industrial_hall',
-      };
-      const archetypes = ['commercial_arcade', 'modern_office', 'harbor_apartment', 'civic_customs', 'coastal_residence', 'industrial_hall'];
-      const archetype = archetypeMap[styleName] || archetypes[seed % archetypes.length];
+      const archetype = ARCHETYPE_MAP[styleName] || ARCHETYPE_LIST[seed % ARCHETYPE_LIST.length];
 
       const g = new Group();
       g.name = `building-${archetype}-${seed}`;
-      const { push, flush } = createBatcher(g);
-
+      const batcher = createBatcher(g);
+      const { push, flush } = batcher;
       const baseY = 0.16;
-      const steelDark = sharedMats.steelDark;
-      const steelGalv = sharedMats.steelGalv;
-      const officeGlass = matLib.get('window_office');
-      const litGlass = matLib.get('window_lit');
-      const blindGlass = sharedMats.blindPane || officeGlass;
-      const tileRoofMat = matLib.get('roof_tile');
-      const timberMat = matLib.get('wood_timber');
-      const graniteMat = matLib.get('granite');
-      const brickMat = matLib.get('brick_red');
-      const brickCoastal = matLib.get('brick_coastal');
-      const plasterCream = matLib.get('plaster_cream');
-      const plasterSlate = matLib.get('plaster_slate');
-      const concreteAged = matLib.get('concrete_aged');
-      const concreteWet = matLib.get('concrete_wet');
-      const corrugatedMat = matLib.get('corrugated_steel');
-      const redBeacon = sharedMats.redCore || steelDark;
 
-      const addMesh = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+      // Material palette resolved once on task creation (cached in MaterialLibrary)
+      const mats = {
+        steelDark: sharedMats.steelDark,
+        steelGalv: sharedMats.steelGalv,
+        officeGlass: matLib.get('window_office'),
+        litGlass: matLib.get('window_lit'),
+        blindGlass: sharedMats.blindPane || matLib.get('window_office'),
+        tileRoof: matLib.get('roof_tile'),
+        slateRoof: matLib.get('roof_slate'),
+        zincRoof: matLib.get('roof_zinc'),
+        timber: matLib.get('wood_timber'),
+        granite: matLib.get('granite'),
+        brick: matLib.get('brick_red'),
+        brickCoastal: matLib.get('brick_coastal'),
+        plasterCream: matLib.get('plaster_cream'),
+        plasterSlate: matLib.get('plaster_slate'),
+        concreteAged: matLib.get('concrete_aged'),
+        concreteWet: matLib.get('concrete_wet'),
+        corrugated: matLib.get('corrugated_steel'),
+        redBeacon: sharedMats.redCore || sharedMats.steelDark,
+        shutterTeal: sharedMats.cargoTeal || sharedMats.steelDark,
+        awningNavy: sharedMats.cargoNavy || sharedMats.steelDark,
+      };
+
+      const addMesh = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => {
         const m = new Mesh(geo, mat);
         m.position.set(x, y, z);
         m.rotation.set(rx, ry, rz);
+        if (sx !== 1 || sy !== 1 || sz !== 1) m.scale.set(sx, sy, sz);
         m.receiveShadow = true;
         m.matrixAutoUpdate = false; m.updateMatrix();
         g.add(m);
         return m;
       };
 
-      // =========================================================================
-      // ARCHETYPE 1: COASTAL RESIDENCE (L-shaped, pitched tiled ExtrudeGeometry roof, dormers, brick chimney, shutters)
-      // =========================================================================
+      // Shared intermediate geometry state across the 8 independent stages
+      const st = {
+        faceSpecs: [],
+        colliders: [],
+        params: {},
+      };
+
+      // Precompute archetype proportions (lightweight arithmetic only)
       if (archetype === 'coastal_residence') {
-        const wallMat = seed % 2 === 0 ? plasterCream : brickCoastal;
-        const shutterMat = sharedMats.cargoTeal || steelDark;
         const mainW = width * 0.72, mainD = depth * 0.78;
         const wingW = width * 0.44, wingD = depth * 0.56;
-        const mx = cx - (width - mainW) * 0.35, mz = cz - (depth - mainD) * 0.22;
-        const wx = cx + (width - wingW) * 0.42, wz = cz + (depth - wingD) * 0.34;
         const eaveH = Math.min(9.2, Math.max(6.4, height * 0.78));
-        const wingH = eaveH * 0.74;
-        const ridgeH = Math.min(3.8, mainD * 0.24);
-
-        // Stone foundation + timber porch deck + front steps
-        push(graniteMat, mainW + 0.8, 0.72, mainD + 0.8, mx, baseY + 0.36, mz);
-        push(graniteMat, wingW + 0.7, 0.72, wingD + 0.7, wx, baseY + 0.36, wz);
-        push(steelDark, mainW - 0.7, eaveH - 0.3, mainD - 0.7, mx, baseY + eaveH / 2, mz);
-        push(steelDark, wingW - 0.7, wingH - 0.3, wingD - 0.7, wx, baseY + wingH / 2, wz);
-
-        // Timber front porch canopy with columns on south side of main volume
-        const porchZ = mz + mainD / 2 + 1.35;
-        push(timberMat, mainW * 0.66, 0.22, 2.6, mx, baseY + 0.56, porchZ);
-        push(timberMat, mainW * 0.68, 0.18, 2.8, mx, baseY + 3.25, porchZ, 0.16, 0, 0);
-        for (let p = -1; p <= 1; p++) push(timberMat, 0.22, 2.7, 0.22, mx + p * (mainW * 0.28), baseY + 1.9, porchZ + 1.15);
-
-        const floors = Math.max(2, Math.round((eaveH - 0.7) / 3.1));
-        populateFacade(push, {
-          cx: mx, cz: mz, width: mainW, depth: mainD, baseY, yStart: 0.72, floors, storeyH: (eaveH - 0.72) / floors,
-          bayTarget: 3.9, wallMat, trimMat: graniteMat, steelDark, steelGalv, officeGlass, litGlass, blindGlass,
-          rng, shutterMat,
-        });
-        populateFacade(push, {
-          cx: wx, cz: wz, width: wingW, depth: wingD, baseY, yStart: 0.72, floors: Math.max(1, floors - 1), storeyH: (wingH - 0.72) / Math.max(1, floors - 1),
-          bayTarget: 3.8, wallMat: brickMat, trimMat: graniteMat, steelDark, steelGalv, officeGlass, litGlass, blindGlass,
-          rng, shutterMat,
-        });
-
-        // Real ExtrudeGeometry pitched terracotta gable roofs + dormer + brick chimney!
-        const gableGeo = extrudeShape([
-          [-mainD / 2 - 0.75, 0], [0, ridgeH], [mainD / 2 + 0.75, 0],
-          [mainD / 2 + 0.55, -0.22], [0, ridgeH - 0.28], [-mainD / 2 - 0.55, -0.22],
-        ], mainW + 1.1, { bevel: 0.06, rotY: Math.PI / 2 });
-        addMesh(gableGeo, tileRoofMat, mx, baseY + eaveH + 0.05, mz);
-        const gableWallGeo = extrudeShape([[-mainD / 2, 0], [0, ridgeH - 0.15], [mainD / 2, 0]], mainW - 0.1, { bevel: 0, rotY: Math.PI / 2 });
-        addMesh(gableWallGeo, wallMat, mx, baseY + eaveH, mz);
-
-        const wingRoofGeo = extrudeShape([[-wingW / 2 - 0.6, 0], [0, ridgeH * 0.68], [wingW / 2 + 0.6, 0]], wingD + 0.9, { bevel: 0.05 });
-        addMesh(wingRoofGeo, tileRoofMat, wx, baseY + wingH + 0.05, wz);
-
-        // Dormer window protruding from pitched roof + brick chimney stack
-        push(wallMat, 2.6, 1.8, 2.2, mx, baseY + eaveH + ridgeH * 0.42, mz + mainD * 0.26);
-        push(litGlass, 1.5, 1.1, 0.08, mx, baseY + eaveH + ridgeH * 0.42, mz + mainD * 0.26 + 1.12);
-        push(tileRoofMat, 3.0, 0.24, 2.6, mx, baseY + eaveH + ridgeH * 0.42 + 0.96, mz + mainD * 0.26);
-        push(brickMat, 1.15, ridgeH + 2.2, 1.15, mx - mainW * 0.28, baseY + eaveH + (ridgeH + 1.4) / 2, mz - mainD * 0.18);
-        push(graniteMat, 1.35, 0.22, 1.35, mx - mainW * 0.28, baseY + eaveH + ridgeH + 1.85, mz - mainD * 0.18);
-      }
-
-      // =========================================================================
-      // ARCHETYPE 2: MODERN MARITIME OFFICE TOWER (Chamfered podium + stepped glass curtain tower + solar fins + V-columns + skylight atrium)
-      // =========================================================================
-      else if (archetype === 'modern_office') {
-        const podH = 4.6;
-        const towerW = width * 0.84, towerD = depth * 0.82;
-        const topH = Math.max(12.5, height);
+        st.params = {
+          wallMat: seed % 2 === 0 ? mats.plasterCream : mats.brickCoastal,
+          mainW, mainD, wingW, wingD,
+          mx: cx - (width - mainW) * 0.35, mz: cz - (depth - mainD) * 0.22,
+          wx: cx + (width - wingW) * 0.42, wz: cz + (depth - wingD) * 0.34,
+          eaveH, wingH: eaveH * 0.74, ridgeH: Math.min(3.8, mainD * 0.24),
+          floors: Math.max(2, Math.round((eaveH - 0.72) / 3.1)),
+        };
+      } else if (archetype === 'modern_office') {
+        const podH = 4.6, topH = Math.max(12.5, height);
         const upperFloors = Math.max(3, Math.round((topH - podH) / 3.3));
-        const storeyH = (topH - podH) / upperFloors;
-
-        // Chamfered 8-sided concrete podium slab (ExtrudeGeometry)
-        const ch = 2.4;
-        const podPts = [
-          [-width / 2 + ch, -depth / 2], [width / 2 - ch, -depth / 2],
-          [width / 2, -depth / 2 + ch], [width / 2, depth / 2 - ch],
-          [width / 2 - ch, depth / 2], [-width / 2 + ch, depth / 2],
-          [-width / 2, depth / 2 - ch], [-width / 2, -depth / 2 + ch],
-        ];
-        const podRoofGeo = extrudeShape(podPts, 0.55, { bevel: 0.09, rotX: Math.PI / 2 });
-        addMesh(podRoofGeo, concreteAged, cx, baseY + podH, cz);
-        addMesh(podRoofGeo, graniteMat, cx, baseY + 0.30, cz);
-
-        // Recessed double-height glazed ground lobby + angled structural V-columns!
-        push(officeGlass, width - 3.6, podH - 0.5, depth - 3.6, cx, baseY + podH / 2, cz);
-        push(litGlass, width - 5.2, podH - 1.2, depth - 5.2, cx, baseY + podH / 2, cz);
-        for (const sx of [-1, 1]) {
-          for (let vz = -depth * 0.34; vz <= depth * 0.35; vz += Math.max(4.5, depth * 0.34)) {
-            push(steelGalv, 0.34, podH, 0.34, cx + sx * (width / 2 - 1.1), baseY + podH / 2, cz + vz, 0.16, 0, sx * 0.14);
-            push(steelGalv, 0.34, podH, 0.34, cx + sx * (width / 2 - 1.1), baseY + podH / 2, cz + vz, -0.16, 0, sx * 0.14);
-          }
-        }
-
-        // Upper stepped glass curtain-wall tower with vertical aluminum solar-shading fins
-        push(steelDark, towerW - 0.8, topH - podH - 0.3, towerD - 0.8, cx, baseY + podH + (topH - podH) / 2, cz);
-        populateFacade(push, {
-          cx, cz, width: towerW, depth: towerD, baseY, yStart: podH, floors: upperFloors, storeyH,
-          bayTarget: 3.4, wallMat: plasterSlate, trimMat: concreteAged, steelDark, steelGalv,
-          officeGlass, litGlass, blindGlass, rng, verticalFins: true, finMat: steelGalv,
-        });
-
-        // Cantilevered architectural roof crown + sloped glass skylight atrium (distinct modern silhouette!)
-        const crownGeo = extrudeShape([
-          [-towerW / 2 - 0.7, -towerD / 2 - 0.7], [towerW / 2 + 0.7, -towerD / 2 - 0.7],
-          [towerW / 2 + 0.7, towerD / 2 + 0.7], [-towerW / 2 - 0.7, towerD / 2 + 0.7],
-        ], 0.48, { bevel: 0.08, rotX: Math.PI / 2 });
-        addMesh(crownGeo, steelDark, cx, baseY + topH + 0.24, cz);
-        const atriumGeo = extrudeShape([
-          [-towerD * 0.34, 0], [-towerD * 0.18, 2.4], [towerD * 0.34, 0.45], [towerD * 0.34, 0],
-        ], towerW * 0.62, { bevel: 0.05, rotY: Math.PI / 2 });
-        addMesh(atriumGeo, officeGlass, cx, baseY + topH + 0.48, cz);
-        push(steelGalv, towerW * 0.66, 0.18, 0.18, cx, baseY + topH + 2.9, cz - towerD * 0.18);
-        push(redBeacon, 0.28, 0.32, 0.28, cx + towerW * 0.34, baseY + topH + 3.1, cz - towerD * 0.18);
-      }
-
-      // =========================================================================
-      // ARCHETYPE 3: HARBOR APARTMENT (U-shaped courtyard wings, mansard roof, loggia balconies, fire escape, wooden water tower)
-      // =========================================================================
-      else if (archetype === 'harbor_apartment') {
-        const wallMat = seed % 2 === 0 ? brickMat : plasterCream;
-        const trimMat = seed % 2 === 0 ? concreteAged : brickCoastal;
+        st.params = { podH, topH, towerW: width * 0.82, towerD: depth * 0.80, upperFloors, storeyH: (topH - podH) / upperFloors };
+      } else if (archetype === 'harbor_apartment') {
         const groundH = 3.3;
         const upperFloors = Math.max(2, Math.round((height - groundH - 2.0) / 3.1));
         const storeyH = (height - groundH - 2.0) / upperFloors;
-        const eaveH = groundH + upperFloors * storeyH;
-
-        // U-shaped massing: rear spine + two projecting forward wings framing an entry courtyard!
-        const spineD = depth * 0.58;
-        const wingW = width * 0.34, wingD = depth * 0.42;
-        const spineZ = cz - (depth - spineD) / 2;
-        const wingZ = cz + depth / 2 - wingD / 2;
-
-        push(concreteWet, width + 0.4, 0.65, depth + 0.4, cx, baseY + 0.32, cz);
-        push(steelDark, width - 0.7, eaveH - 0.3, spineD - 0.7, cx, baseY + eaveH / 2, spineZ);
-        populateFacade(push, {
-          cx, cz: spineZ, width, depth: spineD, baseY, yStart: groundH, floors: upperFloors, storeyH,
-          bayTarget: 4.1, wallMat, trimMat, steelDark, steelGalv, officeGlass, litGlass, blindGlass,
-          rng, balconyChance: 0.55,
-        });
-        // Ground-floor brick arched courtyard entry
-        push(wallMat, width, groundH, spineD, cx, baseY + groundH / 2, spineZ);
-        push(graniteMat, 4.4, groundH + 0.2, 0.65, cx, baseY + groundH / 2, spineZ + spineD / 2 + 0.15);
-        push(litGlass, 2.8, 2.5, 0.14, cx, baseY + 1.45, spineZ + spineD / 2 + 0.36);
-
-        for (const sgn of [-1, 1]) {
-          const wx = cx + sgn * (width / 2 - wingW / 2);
-          push(steelDark, wingW - 0.6, eaveH - 0.3, wingD - 0.6, wx, baseY + eaveH / 2, wingZ);
-          push(concreteWet, wingW, groundH, wingD, wx, baseY + groundH / 2, wingZ);
-          populateFacade(push, {
-            cx: wx, cz: wingZ, width: wingW, depth: wingD, baseY, yStart: groundH, floors: upperFloors, storeyH,
-            bayTarget: 3.8, wallMat, trimMat, steelDark, steelGalv, officeGlass, litGlass, blindGlass,
-            rng, balconyChance: 0.65,
-          });
-        }
-
-        // Real ExtrudeGeometry Mansard Roof (trapezoidal Parisian/maritime slate mansard crown!)
-        const mansardH = 2.15;
-        const mansardGeo = extrudeShape([
-          [-spineD / 2 - 0.45, 0], [-spineD / 2 + 1.0, mansardH],
-          [spineD / 2 - 1.0, mansardH], [spineD / 2 + 0.45, 0],
-        ], width + 0.8, { bevel: 0.06, rotY: Math.PI / 2 });
-        addMesh(mansardGeo, plasterSlate, cx, baseY + eaveH, spineZ);
-
-        // Exterior zig-zag steel fire-escape staircase on east side
-        const escX = cx + width / 2 + 0.62;
-        for (let f = 0; f < upperFloors; f++) {
-          const ly = baseY + groundH + f * storeyH;
-          push(steelDark, 1.2, 0.11, 3.6, escX, ly, spineZ);
-          push(steelDark, 0.06, 0.06, 3.6, escX + 0.56, ly + 1.0, spineZ);
-          if (f < upperFloors - 1) push(steelDark, 0.82, 0.11, 3.4, escX + 0.12, ly + storeyH * 0.5, spineZ, (f % 2 ? -0.72 : 0.72), 0, 0);
-        }
-
-        // Classic wooden-stave rooftop water tower on steel stilts
-        const wtY = baseY + eaveH + mansardH;
-        const wtx = cx - width * 0.25, wtz = spineZ;
-        for (const lx of [-0.85, 0.85]) for (const lz of [-0.85, 0.85]) {
-          addMesh(unitCyl, steelDark, wtx + lx, wtY + 1.2, wtz + lz);
-          g.children[g.children.length - 1].scale.set(0.10, 2.4, 0.10);
-          g.children[g.children.length - 1].updateMatrix();
-        }
-        const tank = addMesh(unitCyl, timberMat, wtx, wtY + 3.6, wtz);
-        tank.scale.set(1.45, 2.5, 1.45); tank.updateMatrix();
-        const cap = addMesh(unitCyl, steelDark, wtx, wtY + 5.05, wtz);
-        cap.scale.set(1.58, 0.45, 1.58); cap.updateMatrix();
-      }
-
-      // =========================================================================
-      // ARCHETYPE 4: COMMERCIAL ARCADE (Recessed ground colonnade, 45° chamfered corner entry, bay windows, sloped awnings)
-      // =========================================================================
-      else if (archetype === 'commercial_arcade') {
-        const wallMat = seed % 2 === 0 ? brickMat : plasterCream;
-        const trimMat = concreteAged;
-        const awningMat = sharedMats.cargoNavy || steelDark;
+        const spineD = depth * 0.58, wingW = width * 0.34, wingD = depth * 0.42;
+        st.params = {
+          wallMat: seed % 2 === 0 ? mats.brick : mats.plasterCream,
+          trimMat: seed % 2 === 0 ? mats.concreteAged : mats.brickCoastal,
+          groundH, upperFloors, storeyH, eaveH: groundH + upperFloors * storeyH,
+          spineD, wingW, wingD,
+          spineZ: cz - (depth - spineD) / 2,
+          wingZ: cz + depth / 2 - wingD / 2,
+          mansardH: 2.15,
+        };
+      } else if (archetype === 'commercial_arcade') {
         const groundH = 3.85;
         const upperFloors = Math.max(2, Math.round((height - groundH) / 3.1));
         const storeyH = (height - groundH) / upperFloors;
-        const topH = groundH + upperFloors * storeyH;
-
-        // Recessed ground-floor shopfront core behind outer colonnade arcade!
-        push(concreteWet, width + 0.5, 0.42, depth + 0.5, cx, baseY + 0.21, cz);
-        push(steelDark, width - 3.0, groundH - 0.3, depth - 3.0, cx, baseY + groundH / 2, cz);
-        push(litGlass, width - 2.8, 2.6, depth - 2.8, cx, baseY + 1.65, cz);
-        // Perimeter arcade piers & lintel beams supporting the upper floors
-        const xPiers = Math.max(3, Math.round(width / 4.4));
-        const zPiers = Math.max(3, Math.round(depth / 4.4));
-        for (let i = 0; i <= xPiers; i++) {
-          const px = cx - width / 2 + 0.35 + (i / xPiers) * (width - 0.7);
-          for (const pz of [cz - depth / 2 + 0.35, cz + depth / 2 - 0.35]) {
-            push(graniteMat, 0.68, groundH, 0.68, px, baseY + groundH / 2, pz);
-            push(trimMat, 0.88, 0.36, 0.88, px, baseY + 0.42, pz);
-          }
-        }
-        for (let j = 1; j < zPiers; j++) {
-          const pz = cz - depth / 2 + 0.35 + (j / zPiers) * (depth - 0.7);
-          for (const px of [cx - width / 2 + 0.35, cx + width / 2 - 0.35]) {
-            push(graniteMat, 0.68, groundH, 0.68, px, baseY + groundH / 2, pz);
-          }
-        }
-        // Sloped storefront awnings along street sides
-        for (let i = 0; i < xPiers; i++) {
-          const ax = cx - width / 2 + (i + 0.5) * (width / xPiers);
-          push(awningMat, (width / xPiers) - 0.55, 0.16, 1.45, ax, baseY + groundH - 0.25, cz + depth / 2 + 0.62, 0.24, 0, 0);
-        }
-
-        // Upper floors with projecting bay windows & beveled roof cornice
-        push(steelDark, width - 0.7, topH - groundH - 0.3, depth - 0.7, cx, baseY + groundH + (topH - groundH) / 2, cz);
-        populateFacade(push, {
-          cx, cz, width, depth, baseY, yStart: groundH, floors: upperFloors, storeyH,
-          bayTarget: 4.1, wallMat, trimMat, steelDark, steelGalv, officeGlass, litGlass, blindGlass,
-          rng, bayWindows: true,
-        });
-        const corniceGeo = extrudeShape([
-          [-width / 2 - 0.55, -depth / 2 - 0.55], [width / 2 + 0.55, -depth / 2 - 0.55],
-          [width / 2 + 0.55, depth / 2 + 0.55], [-width / 2 - 0.55, depth / 2 + 0.55],
-        ], 0.45, { bevel: 0.10, rotX: Math.PI / 2 });
-        addMesh(corniceGeo, trimMat, cx, baseY + topH + 0.22, cz);
-        // Parapet wall + projecting corner marquee box
-        push(wallMat, width + 0.2, 0.85, 0.36, cx, baseY + topH + 0.82, cz + depth / 2 - 0.18);
-        push(wallMat, width + 0.2, 0.85, 0.36, cx, baseY + topH + 0.82, cz - depth / 2 + 0.18);
-        push(steelDark, 0.38, 3.6, 1.45, cx + width / 2 + 0.55, baseY + groundH + 2.2, cz + depth / 2 - 1.2);
-        push(litGlass, 0.42, 3.2, 1.15, cx + width / 2 + 0.55, baseY + groundH + 2.2, cz + depth / 2 - 1.2);
-      }
-
-      // =========================================================================
-      // ARCHETYPE 5: CIVIC / CUSTOMS HALL (Granite entry steps, fluted colonnade portico, beveled pediment, skylight cupola)
-      // =========================================================================
-      else if (archetype === 'civic_customs') {
-        const wallMat = concreteAged;
-        const trimMat = graniteMat;
-        const plinthH = 1.45;
-        const upperH = Math.max(10.5, height);
+        st.params = {
+          wallMat: seed % 2 === 0 ? mats.brick : mats.plasterCream,
+          groundH, upperFloors, storeyH, topH: groundH + upperFloors * storeyH,
+          xPiers: Math.max(3, Math.round(width / 4.4)),
+          zPiers: Math.max(3, Math.round(depth / 4.4)),
+        };
+      } else if (archetype === 'civic_customs') {
+        const plinthH = 1.45, upperH = Math.max(10.5, height);
         const floors = Math.max(3, Math.round((upperH - plinthH) / 3.4));
-        const storeyH = (upperH - plinthH) / floors;
-
-        // Stepped granite stylobate + grand entrance stairflight on south side
-        push(trimMat, width + 1.0, plinthH, depth + 1.0, cx, baseY + plinthH / 2, cz);
-        for (let s = 0; s < 5; s++) {
-          push(trimMat, width * 0.48, 0.28, 0.55, cx, baseY + 0.14 + s * 0.26, cz + depth / 2 + 2.4 - s * 0.46);
+        st.params = { plinthH, upperH, floors, storeyH: (upperH - plinthH) / floors };
+      } else if (archetype === 'stepped_mixed_use') {
+        const baseH = 4.2;
+        const midH = Math.max(10.2, height * 0.72);
+        const topH = Math.max(midH + 3.4, height);
+        const midFloors = Math.max(2, Math.round((midH - baseH) / 3.1));
+        st.params = {
+          baseH, midH, topH, midFloors, midStoreyH: (midH - baseH) / midFloors,
+          setbackW: width * 0.76, setbackD: depth * 0.74,
+          turretW: Math.min(6.4, width * 0.34), turretD: Math.min(6.4, depth * 0.34),
+        };
+      } else if (archetype === 'bonded_warehouse') {
+        const baseH = 2.2, wallH = Math.max(8.4, height * 0.84);
+        const floors = Math.max(2, Math.round((wallH - baseH) / 3.1));
+        st.params = { baseH, wallH, floors, storeyH: (wallH - baseH) / floors, ridgeH: Math.min(3.6, depth * 0.24) };
+      } else if (archetype === 'waterfront_rowhouses') {
+        const unitCount = 3;
+        const gap = 0.16;
+        const uw = (width - gap * (unitCount - 1)) / unitCount;
+        const units = [];
+        const unitMats = [mats.plasterCream, mats.brick, mats.plasterSlate];
+        const roofKinds = ['tile_gable', 'zinc_shed', 'slate_mansard'];
+        for (let i = 0; i < unitCount; i++) {
+          const ux = cx - width / 2 + uw / 2 + i * (uw + gap);
+          const dzShift = (i === 1 ? -0.9 : (i === 2 ? 0.65 : 0.2));
+          const ud = depth - Math.abs(dzShift) - 0.8;
+          const uh = Math.max(6.8, height * (i === 1 ? 1.12 : (i === 0 ? 0.92 : 0.84)));
+          const fl = Math.max(2, Math.round((uh - 0.8) / 3.05));
+          units.push({ ux, uz: cz + dzShift * 0.5, uw, ud, uh, fl, storeyH: (uh - 0.8) / fl, wallMat: unitMats[(i + seed) % 3], roofKind: roofKinds[(i + seed) % 3] });
         }
-        // Main civic massing + tall classical fluted pilasters along all 4 sides
-        push(steelDark, width - 0.8, upperH - plinthH - 0.2, depth - 0.8, cx, baseY + plinthH + (upperH - plinthH) / 2, cz);
-        populateFacade(push, {
-          cx, cz, width, depth, baseY, yStart: plinthH, floors, storeyH,
-          bayTarget: 4.0, wallMat, trimMat, steelDark, steelGalv, officeGlass, litGlass, blindGlass, rng,
-        });
-        // Projecting front colonnade portico (4 tall columns supporting a real ExtrudeGeometry triangular pediment!)
-        const portW = Math.min(width * 0.62, 14.0);
-        const portZ = cz + depth / 2 + 1.85;
-        for (let c = 0; c < 4; c++) {
-          const colX = cx - portW / 2 + 0.9 + (c / 3) * (portW - 1.8);
-          const col = addMesh(unitCyl, trimMat, colX, baseY + plinthH + (upperH - plinthH) * 0.46, portZ);
-          col.scale.set(0.42, (upperH - plinthH) * 0.92, 0.42); col.updateMatrix();
-        }
-        const pedGeo = extrudeShape([
-          [-portW / 2 - 0.5, 0], [0, 2.35], [portW / 2 + 0.5, 0],
-        ], 2.8, { bevel: 0.08 });
-        addMesh(pedGeo, trimMat, cx, baseY + upperH - 0.2, portZ - 0.7);
-        // Heavy beveled entablature + central glazed roof cupola lantern
-        const entabGeo = extrudeShape([
-          [-width / 2 - 0.6, -depth / 2 - 0.6], [width / 2 + 0.6, -depth / 2 - 0.6],
-          [width / 2 + 0.6, depth / 2 + 0.6], [-width / 2 - 0.6, depth / 2 + 0.6],
-        ], 0.72, { bevel: 0.12, rotX: Math.PI / 2 });
-        addMesh(entabGeo, trimMat, cx, baseY + upperH + 0.36, cz);
-        const cupW = Math.min(width * 0.36, 7.2);
-        push(trimMat, cupW, 2.2, cupW, cx, baseY + upperH + 1.8, cz);
-        push(litGlass, cupW - 0.8, 1.35, cupW + 0.12, cx, baseY + upperH + 1.85, cz);
-        push(litGlass, cupW + 0.12, 1.35, cupW - 0.8, cx, baseY + upperH + 1.85, cz);
-        const cupRoof = extrudeShape([[-cupW / 2 - 0.4, 0], [0, 1.8], [cupW / 2 + 0.4, 0]], cupW + 0.8, { bevel: 0.05 });
-        addMesh(cupRoof, steelDark, cx, baseY + upperH + 2.9, cz);
-      }
-
-      // =========================================================================
-      // ARCHETYPE 6: SAWTOOTH INDUSTRIAL HALL (ExtrudeGeometry serrated north-light roof, portal H-frames, cyclone stack)
-      // =========================================================================
-      else {
+        st.params = { units };
+      } else {
+        // industrial_hall
         const wallH = Math.min(9.5, Math.max(6.8, height * 0.82));
-        push(concreteWet, width + 0.6, 1.4, depth + 0.6, cx, baseY + 0.7, cz);
-        push(corrugatedMat, width, wallH - 1.4, depth, cx, baseY + 1.4 + (wallH - 1.4) / 2, cz);
-        const bays = Math.max(3, Math.round(width / 6.2));
-        for (let i = 0; i <= bays; i++) {
-          const px = cx - width / 2 + (i / bays) * width;
-          for (const pz of [cz - depth / 2 - 0.12, cz + depth / 2 + 0.12]) {
-            push(steelDark, 0.38, wallH + 0.2, 0.38, px, baseY + wallH / 2, pz);
+        st.params = { wallH, sawCount: 3 };
+      }
+
+      const phases = [
+        // =====================================================================
+        // STAGE 1: PRIMARY MASSING & STRUCTURAL CORE
+        // =====================================================================
+        {
+          name: 'structure',
+          run() {
+            const p = st.params;
+            if (archetype === 'coastal_residence') {
+              push(mats.granite, p.mainW + 0.8, 0.72, p.mainD + 0.8, p.mx, baseY + 0.36, p.mz);
+              push(mats.granite, p.wingW + 0.7, 0.72, p.wingD + 0.7, p.wx, baseY + 0.36, p.wz);
+              push(mats.steelDark, p.mainW - 0.75, p.eaveH - 0.3, p.mainD - 0.75, p.mx, baseY + p.eaveH / 2, p.mz);
+              push(mats.steelDark, p.wingW - 0.75, p.wingH - 0.3, p.wingD - 0.75, p.wx, baseY + p.wingH / 2, p.wz);
+            } else if (archetype === 'modern_office') {
+              const ch = 2.4;
+              const podPts = [
+                [-width / 2 + ch, -depth / 2], [width / 2 - ch, -depth / 2],
+                [width / 2, -depth / 2 + ch], [width / 2, depth / 2 - ch],
+                [width / 2 - ch, depth / 2], [-width / 2 + ch, depth / 2],
+                [-width / 2, depth / 2 - ch], [-width / 2, -depth / 2 + ch],
+              ];
+              const podGeo = extrudeShape(podPts, 0.55, { bevel: 0.09, rotX: Math.PI / 2 });
+              addMesh(podGeo, mats.concreteAged, cx, baseY + p.podH, cz);
+              addMesh(podGeo, mats.granite, cx, baseY + 0.30, cz);
+              for (const sx of [-1, 1]) {
+                for (let vz = -depth * 0.34; vz <= depth * 0.35; vz += Math.max(4.5, depth * 0.34)) {
+                  push(mats.steelGalv, 0.34, p.podH, 0.34, cx + sx * (width / 2 - 1.1), baseY + p.podH / 2, cz + vz, 0.16, 0, sx * 0.14);
+                  push(mats.steelGalv, 0.34, p.podH, 0.34, cx + sx * (width / 2 - 1.1), baseY + p.podH / 2, cz + vz, -0.16, 0, sx * 0.14);
+                }
+              }
+              push(mats.steelDark, p.towerW - 0.8, p.topH - p.podH - 0.3, p.towerD - 0.8, cx, baseY + p.podH + (p.topH - p.podH) / 2, cz);
+            } else if (archetype === 'harbor_apartment') {
+              push(mats.concreteWet, width + 0.4, 0.65, depth + 0.4, cx, baseY + 0.32, cz);
+              push(mats.steelDark, width - 0.75, p.eaveH - 0.3, p.spineD - 0.75, cx, baseY + p.eaveH / 2, p.spineZ);
+              push(p.wallMat, width, p.groundH, p.spineD, cx, baseY + p.groundH / 2, p.spineZ);
+              for (const sgn of [-1, 1]) {
+                const wx = cx + sgn * (width / 2 - p.wingW / 2);
+                push(mats.steelDark, p.wingW - 0.65, p.eaveH - 0.3, p.wingD - 0.65, wx, baseY + p.eaveH / 2, p.wingZ);
+                push(mats.concreteWet, p.wingW, p.groundH, p.wingD, wx, baseY + p.groundH / 2, p.wingZ);
+              }
+            } else if (archetype === 'commercial_arcade') {
+              push(mats.concreteWet, width + 0.5, 0.42, depth + 0.5, cx, baseY + 0.21, cz);
+              push(mats.steelDark, width - 3.0, p.groundH - 0.3, depth - 3.0, cx, baseY + p.groundH / 2, cz);
+              for (let i = 0; i <= p.xPiers; i++) {
+                const px = cx - width / 2 + 0.35 + (i / p.xPiers) * (width - 0.7);
+                for (const pz of [cz - depth / 2 + 0.35, cz + depth / 2 - 0.35]) {
+                  push(mats.granite, 0.68, p.groundH, 0.68, px, baseY + p.groundH / 2, pz);
+                  push(mats.concreteAged, 0.88, 0.36, 0.88, px, baseY + 0.42, pz);
+                }
+              }
+              for (let j = 1; j < p.zPiers; j++) {
+                const pz = cz - depth / 2 + 0.35 + (j / p.zPiers) * (depth - 0.7);
+                for (const px of [cx - width / 2 + 0.35, cx + width / 2 - 0.35]) {
+                  push(mats.granite, 0.68, p.groundH, 0.68, px, baseY + p.groundH / 2, pz);
+                }
+              }
+              push(mats.steelDark, width - 0.75, p.topH - p.groundH - 0.3, depth - 0.75, cx, baseY + p.groundH + (p.topH - p.groundH) / 2, cz);
+            } else if (archetype === 'civic_customs') {
+              push(mats.granite, width + 1.0, p.plinthH, depth + 1.0, cx, baseY + p.plinthH / 2, cz);
+              for (let s = 0; s < 5; s++) {
+                push(mats.granite, width * 0.48, 0.28, 0.55, cx, baseY + 0.14 + s * 0.26, cz + depth / 2 + 2.4 - s * 0.46);
+              }
+              push(mats.steelDark, width - 0.85, p.upperH - p.plinthH - 0.2, depth - 0.85, cx, baseY + p.plinthH + (p.upperH - p.plinthH) / 2, cz);
+            } else if (archetype === 'stepped_mixed_use') {
+              // Stepped 1930s Art-Deco base + main block + recessed upper penthouse + corner turret
+              push(mats.granite, width + 0.6, 0.52, depth + 0.6, cx, baseY + 0.26, cz);
+              push(mats.granite, width - 0.4, p.baseH, depth - 0.4, cx, baseY + p.baseH / 2, cz);
+              push(mats.steelDark, width - 1.1, p.midH - p.baseH - 0.2, depth - 1.1, cx, baseY + p.baseH + (p.midH - p.baseH) / 2, cz);
+              push(mats.steelDark, p.setbackW - 0.8, p.topH - p.midH - 0.2, p.setbackD - 0.8, cx, baseY + p.midH + (p.topH - p.midH) / 2, cz);
+              // Corner watch turret massing on SE corner facing Coastal Blvd
+              const tx = cx + width / 2 - p.turretW / 2 + 0.15, tz = cz + depth / 2 - p.turretD / 2 + 0.15;
+              push(mats.plasterCream, p.turretW, p.topH + 2.2, p.turretD, tx, baseY + (p.topH + 2.2) / 2, tz);
+            } else if (archetype === 'bonded_warehouse') {
+              // Heavy rusticated granite loading plinth + brick structural core
+              push(mats.granite, width + 0.8, p.baseH, depth + 0.8, cx, baseY + p.baseH / 2, cz);
+              push(mats.steelDark, width - 0.8, p.wallH - p.baseH - 0.2, depth - 0.8, cx, baseY + p.baseH + (p.wallH - p.baseH) / 2, cz);
+              // Loading dock platform along east/south street edge
+              push(mats.concreteWet, width * 0.72, 1.05, 2.2, cx, baseY + 0.52, cz + depth / 2 + 1.1);
+            } else if (archetype === 'waterfront_rowhouses') {
+              for (const u of p.units) {
+                push(mats.granite, u.uw + 0.22, 0.80, u.ud + 0.22, u.ux, baseY + 0.40, u.uz);
+                push(mats.steelDark, u.uw - 0.65, u.uh - 0.3, u.ud - 0.65, u.ux, baseY + u.uh / 2, u.uz);
+              }
+            } else {
+              push(mats.concreteWet, width + 0.6, 1.4, depth + 0.6, cx, baseY + 0.7, cz);
+              push(mats.corrugated, width, p.wallH - 1.4, depth, cx, baseY + 1.4 + (p.wallH - 1.4) / 2, cz);
+              const bays = Math.max(3, Math.round(width / 6.2));
+              for (let i = 0; i <= bays; i++) {
+                const px = cx - width / 2 + (i / bays) * width;
+                for (const pz of [cz - depth / 2 - 0.12, cz + depth / 2 + 0.12]) {
+                  push(mats.steelDark, 0.38, p.wallH + 0.2, 0.38, px, baseY + p.wallH / 2, pz);
+                }
+              }
+            }
+          },
+        },
+
+        // =====================================================================
+        // STAGE 2: FACADE COMPOSITION, CORNERS, PILASTERS & SPANDRELS
+        // =====================================================================
+        {
+          name: 'facade',
+          run() {
+            const p = st.params;
+            const addPlan = (cfg, opts) => {
+              const plans = computeFacadeLayout(cfg);
+              emitFacadeWallShell(push, plans, opts);
+              st.faceSpecs.push({ plans, opts });
+            };
+            if (archetype === 'coastal_residence') {
+              addPlan({ cx: p.mx, cz: p.mz, width: p.mainW, depth: p.mainD, baseY, yStart: 0.72, floors: p.floors, storeyH: (p.eaveH - 0.72) / p.floors, bayTarget: 3.9, cornerPier: 0.9 },
+                { wallMat: p.wallMat, trimMat: mats.granite, quoins: true, shutterMat: mats.shutterTeal, rhythm: 'center_accent' });
+              const wf = Math.max(1, p.floors - 1);
+              addPlan({ cx: p.wx, cz: p.wz, width: p.wingW, depth: p.wingD, baseY, yStart: 0.72, floors: wf, storeyH: (p.wingH - 0.72) / wf, bayTarget: 3.8, cornerPier: 0.75 },
+                { wallMat: mats.brick, trimMat: mats.granite, shutterMat: mats.shutterTeal, rhythm: 'uniform' });
+            } else if (archetype === 'modern_office') {
+              addPlan({ cx, cz, width: p.towerW, depth: p.towerD, baseY, yStart: p.podH, floors: p.upperFloors, storeyH: p.storeyH, bayTarget: 3.4, cornerPier: 0.75 },
+                { wallMat: mats.plasterSlate, trimMat: mats.concreteAged, verticalFins: true, finMat: mats.steelGalv, rhythm: 'uniform' });
+            } else if (archetype === 'harbor_apartment') {
+              addPlan({ cx, cz: p.spineZ, width, depth: p.spineD, baseY, yStart: p.groundH, floors: p.upperFloors, storeyH: p.storeyH, bayTarget: 4.1, cornerPier: 1.0 },
+                { wallMat: p.wallMat, trimMat: p.trimMat, quoins: true, balconyChance: 0.55, rhythm: 'paired' });
+              for (const sgn of [-1, 1]) {
+                const wx = cx + sgn * (width / 2 - p.wingW / 2);
+                addPlan({ cx: wx, cz: p.wingZ, width: p.wingW, depth: p.wingD, baseY, yStart: p.groundH, floors: p.upperFloors, storeyH: p.storeyH, bayTarget: 3.8, cornerPier: 0.8 },
+                  { wallMat: p.wallMat, trimMat: p.trimMat, balconyChance: 0.65, rhythm: 'uniform' });
+              }
+            } else if (archetype === 'commercial_arcade') {
+              addPlan({ cx, cz, width, depth, baseY, yStart: p.groundH, floors: p.upperFloors, storeyH: p.storeyH, bayTarget: 4.1, cornerPier: 1.05 },
+                { wallMat: p.wallMat, trimMat: mats.concreteAged, pilasterStep: 2, bayWindows: true, rhythm: 'center_accent' });
+            } else if (archetype === 'civic_customs') {
+              addPlan({ cx, cz, width, depth, baseY, yStart: p.plinthH, floors: p.floors, storeyH: p.storeyH, bayTarget: 4.0, cornerPier: 1.15 },
+                { wallMat: mats.concreteAged, trimMat: mats.granite, pilasterStep: 1, quoins: true, corbelLintels: true, rhythm: 'center_accent' });
+            } else if (archetype === 'stepped_mixed_use') {
+              addPlan({ cx, cz, width, depth, baseY, yStart: p.baseH, floors: p.midFloors, storeyH: p.midStoreyH, bayTarget: 3.6, cornerPier: 1.05 },
+                { wallMat: mats.plasterCream, trimMat: mats.granite, pilasterStep: 1, rhythm: 'paired' });
+              addPlan({ cx, cz, width: p.setbackW, depth: p.setbackD, baseY, yStart: p.midH, floors: 1, storeyH: p.topH - p.midH, bayTarget: 3.8, cornerPier: 0.9 },
+                { wallMat: mats.plasterSlate, trimMat: mats.granite, pilasterStep: 2, rhythm: 'center_accent' });
+            } else if (archetype === 'bonded_warehouse') {
+              addPlan({ cx, cz, width, depth, baseY, yStart: p.baseH, floors: p.floors, storeyH: p.storeyH, bayTarget: 3.8, cornerPier: 1.2 },
+                { wallMat: mats.brickCoastal, trimMat: mats.granite, quoins: true, corbelLintels: true, tieRods: true, rhythm: 'paired' });
+            } else if (archetype === 'waterfront_rowhouses') {
+              for (const u of p.units) {
+                addPlan({ cx: u.ux, cz: u.uz, width: u.uw, depth: u.ud, baseY, yStart: 0.80, floors: u.fl, storeyH: u.storeyH, bayTarget: 3.2, cornerPier: 0.65 },
+                  { wallMat: u.wallMat, trimMat: mats.granite, shutterMat: u.wallMat === mats.plasterCream ? mats.shutterTeal : null, balconyChance: u.wallMat === mats.plasterSlate ? 0.5 : 0, rhythm: 'center_accent' });
+              }
+            }
+          },
+        },
+
+        // =====================================================================
+        // STAGE 3: RECESSED WINDOWS, DOORS & GROUND-FLOOR PORTALS
+        // =====================================================================
+        {
+          name: 'openings',
+          run() {
+            const p = st.params;
+            for (const fs of st.faceSpecs) {
+              emitFacadeOpenings(push, fs.plans, {
+                wallMat: fs.opts.wallMat, trimMat: fs.opts.trimMat, steelDark: mats.steelDark,
+                officeGlass: mats.officeGlass, litGlass: mats.litGlass, blindGlass: mats.blindGlass, rng,
+                verticalFins: !!fs.opts.verticalFins, rhythm: fs.opts.rhythm || 'uniform',
+                corbelLintels: !!fs.opts.corbelLintels,
+              });
+            }
+            if (archetype === 'modern_office') {
+              push(mats.officeGlass, width - 3.6, p.podH - 0.5, depth - 3.6, cx, baseY + p.podH / 2, cz);
+              push(mats.litGlass, width - 5.2, p.podH - 1.2, depth - 5.2, cx, baseY + p.podH / 2, cz);
+            } else if (archetype === 'harbor_apartment') {
+              push(mats.granite, 4.4, p.groundH + 0.2, 0.65, cx, baseY + p.groundH / 2, p.spineZ + p.spineD / 2 + 0.15);
+              push(mats.litGlass, 2.8, 2.5, 0.14, cx, baseY + 1.45, p.spineZ + p.spineD / 2 + 0.36);
+            } else if (archetype === 'commercial_arcade') {
+              push(mats.litGlass, width - 2.8, 2.6, depth - 2.8, cx, baseY + 1.65, cz);
+            } else if (archetype === 'stepped_mixed_use') {
+              // Double-height glazed corner shopfront recessed into granite base
+              push(mats.litGlass, width * 0.62, 2.9, 0.12, cx, baseY + 1.85, cz + depth / 2 - 0.14);
+              push(mats.officeGlass, 0.12, 2.9, depth * 0.62, cx + width / 2 - 0.14, baseY + 1.85, cz);
+              const tx = cx + width / 2 - p.turretW / 2 + 0.15, tz = cz + depth / 2 - p.turretD / 2 + 0.15;
+              push(mats.litGlass, p.turretW * 0.52, 1.8, p.turretD + 0.08, tx, baseY + p.topH + 0.65, tz);
+              push(mats.litGlass, p.turretW + 0.08, 1.8, p.turretD * 0.52, tx, baseY + p.topH + 0.65, tz);
+            } else if (archetype === 'bonded_warehouse') {
+              // Deeply recessed cargo loading doors at plinth level
+              for (const ox of [-width * 0.24, 0, width * 0.24]) {
+                push(mats.steelDark, 2.6, 2.8, 0.32, cx + ox, baseY + 1.55, cz + depth / 2 - 0.06);
+                push(mats.timber, 2.2, 2.4, 0.16, cx + ox, baseY + 1.45, cz + depth / 2 + 0.04);
+              }
+            } else if (archetype === 'waterfront_rowhouses') {
+              for (const u of p.units) {
+                push(mats.granite, 2.0, 0.82, 1.25, u.ux, baseY + 0.41, u.uz + u.ud / 2 + 0.58);
+                push(mats.timber, 1.25, 2.25, 0.16, u.ux, baseY + 1.85, u.uz + u.ud / 2 - 0.06);
+                push(mats.litGlass, 1.15, 0.45, 0.12, u.ux, baseY + 3.22, u.uz + u.ud / 2 - 0.06);
+              }
+            } else if (archetype === 'industrial_hall') {
+              const sawSpan = depth / p.sawCount;
+              for (let s = 0; s < p.sawCount; s++) {
+                const gz = cz - depth / 2 + s * sawSpan + sawSpan * 0.08;
+                push(mats.officeGlass, width - 0.8, 1.75, 0.14, cx, baseY + p.wallH + 1.1, gz, -0.25, 0, 0);
+              }
+            }
+          },
+        },
+
+        // =====================================================================
+        // STAGE 4: ROOFLINE, PARAPETS, COPING, CUPOLAS & SKYLIGHTS
+        // =====================================================================
+        {
+          name: 'roof',
+          run() {
+            const p = st.params;
+            if (archetype === 'coastal_residence') {
+              const gableGeo = extrudeShape([
+                [-p.mainD / 2 - 0.75, 0], [0, p.ridgeH], [p.mainD / 2 + 0.75, 0],
+                [p.mainD / 2 + 0.55, -0.22], [0, p.ridgeH - 0.28], [-p.mainD / 2 - 0.55, -0.22],
+              ], p.mainW + 1.1, { bevel: 0.06, rotY: Math.PI / 2 });
+              addMesh(gableGeo, mats.tileRoof, p.mx, baseY + p.eaveH + 0.05, p.mz);
+              const gableWallGeo = extrudeShape([[-p.mainD / 2, 0], [0, p.ridgeH - 0.15], [p.mainD / 2, 0]], p.mainW - 0.1, { bevel: 0, rotY: Math.PI / 2 });
+              addMesh(gableWallGeo, p.wallMat, p.mx, baseY + p.eaveH, p.mz);
+              const wingRoofGeo = extrudeShape([[-p.wingW / 2 - 0.6, 0], [0, p.ridgeH * 0.68], [p.wingW / 2 + 0.6, 0]], p.wingD + 0.9, { bevel: 0.05 });
+              addMesh(wingRoofGeo, mats.tileRoof, p.wx, baseY + p.wingH + 0.05, p.wz);
+              push(p.wallMat, 2.6, 1.8, 2.2, p.mx, baseY + p.eaveH + p.ridgeH * 0.42, p.mz + p.mainD * 0.26);
+              push(mats.litGlass, 1.5, 1.1, 0.08, p.mx, baseY + p.eaveH + p.ridgeH * 0.42, p.mz + p.mainD * 0.26 + 1.12);
+              push(mats.tileRoof, 3.0, 0.24, 2.6, p.mx, baseY + p.eaveH + p.ridgeH * 0.42 + 0.96, p.mz + p.mainD * 0.26);
+            } else if (archetype === 'modern_office') {
+              const crownGeo = extrudeShape([
+                [-p.towerW / 2 - 0.7, -p.towerD / 2 - 0.7], [p.towerW / 2 + 0.7, -p.towerD / 2 - 0.7],
+                [p.towerW / 2 + 0.7, p.towerD / 2 + 0.7], [-p.towerW / 2 - 0.7, p.towerD / 2 + 0.7],
+              ], 0.48, { bevel: 0.08, rotX: Math.PI / 2 });
+              addMesh(crownGeo, mats.steelDark, cx, baseY + p.topH + 0.24, cz);
+              const atriumGeo = extrudeShape([
+                [-p.towerD * 0.34, 0], [-p.towerD * 0.18, 2.4], [p.towerD * 0.34, 0.45], [p.towerD * 0.34, 0],
+              ], p.towerW * 0.62, { bevel: 0.05, rotY: Math.PI / 2 });
+              addMesh(atriumGeo, mats.officeGlass, cx, baseY + p.topH + 0.48, cz);
+              push(mats.steelGalv, p.towerW * 0.66, 0.18, 0.18, cx, baseY + p.topH + 2.9, cz - p.towerD * 0.18);
+              push(mats.redBeacon, 0.28, 0.32, 0.28, cx + p.towerW * 0.34, baseY + p.topH + 3.1, cz - p.towerD * 0.18);
+            } else if (archetype === 'harbor_apartment') {
+              const mansardGeo = extrudeShape([
+                [-p.spineD / 2 - 0.45, 0], [-p.spineD / 2 + 1.0, p.mansardH],
+                [p.spineD / 2 - 1.0, p.mansardH], [p.spineD / 2 + 0.45, 0],
+              ], width + 0.8, { bevel: 0.06, rotY: Math.PI / 2 });
+              addMesh(mansardGeo, mats.slateRoof, cx, baseY + p.eaveH, p.spineZ);
+              for (const sgn of [-1, 1]) {
+                const wx = cx + sgn * (width / 2 - p.wingW / 2);
+                push(mats.granite, p.wingW + 0.35, 0.26, p.wingD + 0.35, wx, baseY + p.eaveH + 0.14, p.wingZ);
+                push(p.wallMat, p.wingW, 0.68, 0.32, wx, baseY + p.eaveH + 0.52, p.wingZ + p.wingD / 2 - 0.16);
+              }
+            } else if (archetype === 'commercial_arcade') {
+              const corniceGeo = extrudeShape([
+                [-width / 2 - 0.55, -depth / 2 - 0.55], [width / 2 + 0.55, -depth / 2 - 0.55],
+                [width / 2 + 0.55, depth / 2 + 0.55], [-width / 2 - 0.55, depth / 2 + 0.55],
+              ], 0.45, { bevel: 0.10, rotX: Math.PI / 2 });
+              addMesh(corniceGeo, mats.concreteAged, cx, baseY + p.topH + 0.22, cz);
+              push(p.wallMat, width + 0.2, 0.88, 0.36, cx, baseY + p.topH + 0.84, cz + depth / 2 - 0.18);
+              push(p.wallMat, width + 0.2, 0.88, 0.36, cx, baseY + p.topH + 0.84, cz - depth / 2 + 0.18);
+              push(mats.granite, width + 0.45, 0.16, 0.50, cx, baseY + p.topH + 1.32, cz + depth / 2 - 0.18);
+              push(mats.granite, width + 0.45, 0.16, 0.50, cx, baseY + p.topH + 1.32, cz - depth / 2 + 0.18);
+            } else if (archetype === 'civic_customs') {
+              const portW = Math.min(width * 0.62, 14.0), portZ = cz + depth / 2 + 1.85;
+              for (let c = 0; c < 4; c++) {
+                const colX = cx - portW / 2 + 0.9 + (c / 3) * (portW - 1.8);
+                addMesh(unitCyl, mats.granite, colX, baseY + p.plinthH + (p.upperH - p.plinthH) * 0.46, portZ, 0, 0, 0, 0.42, (p.upperH - p.plinthH) * 0.92, 0.42);
+              }
+              const pedGeo = extrudeShape([[-portW / 2 - 0.5, 0], [0, 2.35], [portW / 2 + 0.5, 0]], 2.8, { bevel: 0.08 });
+              addMesh(pedGeo, mats.granite, cx, baseY + p.upperH - 0.2, portZ - 0.7);
+              const entabGeo = extrudeShape([
+                [-width / 2 - 0.6, -depth / 2 - 0.6], [width / 2 + 0.6, -depth / 2 - 0.6],
+                [width / 2 + 0.6, depth / 2 + 0.6], [-width / 2 - 0.6, depth / 2 + 0.6],
+              ], 0.72, { bevel: 0.12, rotX: Math.PI / 2 });
+              addMesh(entabGeo, mats.granite, cx, baseY + p.upperH + 0.36, cz);
+              const cupW = Math.min(width * 0.36, 7.2);
+              push(mats.granite, cupW, 2.2, cupW, cx, baseY + p.upperH + 1.8, cz);
+              push(mats.litGlass, cupW - 0.8, 1.35, cupW + 0.12, cx, baseY + p.upperH + 1.85, cz);
+              push(mats.litGlass, cupW + 0.12, 1.35, cupW - 0.8, cx, baseY + p.upperH + 1.85, cz);
+              const cupRoof = extrudeShape([[-cupW / 2 - 0.4, 0], [0, 1.8], [cupW / 2 + 0.4, 0]], cupW + 0.8, { bevel: 0.05 });
+              addMesh(cupRoof, mats.zincRoof, cx, baseY + p.upperH + 2.9, cz);
+            } else if (archetype === 'stepped_mixed_use') {
+              // Stepped terrace parapets + Art-Deco zinc spire cap on corner turret
+              push(mats.granite, width + 0.4, 0.34, depth + 0.4, cx, baseY + p.midH + 0.17, cz);
+              push(mats.granite, p.setbackW + 0.45, 0.34, p.setbackD + 0.45, cx, baseY + p.topH + 0.17, cz);
+              push(mats.zincRoof, p.setbackW - 0.2, 0.22, p.setbackD - 0.2, cx, baseY + p.topH + 0.38, cz);
+              const tx = cx + width / 2 - p.turretW / 2 + 0.15, tz = cz + depth / 2 - p.turretD / 2 + 0.15;
+              const capGeo = extrudeShape([[-p.turretW / 2 - 0.25, 0], [0, 2.6], [p.turretW / 2 + 0.25, 0]], p.turretD + 0.5, { bevel: 0.05 });
+              addMesh(capGeo, mats.zincRoof, tx, baseY + p.topH + 2.2, tz);
+              push(mats.redBeacon, 0.26, 0.34, 0.26, tx, baseY + p.topH + 4.95, tz);
+            } else if (archetype === 'bonded_warehouse') {
+              const gableGeo = extrudeShape([
+                [-depth / 2 - 0.65, 0], [0, p.ridgeH], [depth / 2 + 0.65, 0],
+                [depth / 2 + 0.45, -0.22], [0, p.ridgeH - 0.26], [-depth / 2 - 0.45, -0.22],
+              ], width + 0.9, { bevel: 0.05, rotY: Math.PI / 2 });
+              addMesh(gableGeo, mats.slateRoof, cx, baseY + p.wallH + 0.05, cz);
+              const gableEnd = extrudeShape([[-depth / 2, 0], [0, p.ridgeH - 0.12], [depth / 2, 0]], width - 0.15, { bevel: 0, rotY: Math.PI / 2 });
+              addMesh(gableEnd, mats.brickCoastal, cx, baseY + p.wallH, cz);
+              // Central projecting hoist dormer gable over loading bays
+              const hoistGable = extrudeShape([[-2.4, 0], [0, 2.2], [2.4, 0]], 2.6, { bevel: 0.05 });
+              addMesh(hoistGable, mats.brickCoastal, cx, baseY + p.wallH - 0.2, cz + depth / 2 + 0.2);
+              const hoistRoof = extrudeShape([[-2.7, 0], [0, 2.35], [2.7, 0], [2.5, -0.18], [0, 2.15], [-2.5, -0.18]], 3.1, { bevel: 0.04 });
+              addMesh(hoistRoof, mats.slateRoof, cx, baseY + p.wallH - 0.12, cz + depth / 2 + 0.25);
+            } else if (archetype === 'waterfront_rowhouses') {
+              for (const u of p.units) {
+                if (u.roofKind === 'tile_gable') {
+                  const gGeo = extrudeShape([[-u.ud / 2 - 0.45, 0], [0, 2.3], [u.ud / 2 + 0.45, 0]], u.uw + 0.3, { bevel: 0.05, rotY: Math.PI / 2 });
+                  addMesh(gGeo, mats.tileRoof, u.ux, baseY + u.uh, u.uz);
+                } else if (u.roofKind === 'zinc_shed') {
+                  const sGeo = extrudeShape([[-u.ud / 2 - 0.35, 0.1], [-u.ud / 2 - 0.35, 1.9], [u.ud / 2 + 0.35, 0.3], [u.ud / 2 + 0.35, 0]], u.uw + 0.2, { bevel: 0.04, rotY: Math.PI / 2 });
+                  addMesh(sGeo, mats.zincRoof, u.ux, baseY + u.uh, u.uz);
+                } else {
+                  const mGeo = extrudeShape([[-u.ud / 2 - 0.3, 0], [-u.ud / 2 + 0.8, 1.75], [u.ud / 2 - 0.8, 1.75], [u.ud / 2 + 0.3, 0]], u.uw + 0.2, { bevel: 0.04, rotY: Math.PI / 2 });
+                  addMesh(mGeo, mats.slateRoof, u.ux, baseY + u.uh, u.uz);
+                }
+              }
+            } else {
+              const sawSpan = depth / p.sawCount;
+              const sawPts = [[-depth / 2, 0]];
+              for (let s = 0; s < p.sawCount; s++) {
+                const z0 = -depth / 2 + s * sawSpan;
+                sawPts.push([z0 + sawSpan * 0.15, 2.35], [z0 + sawSpan, 0]);
+              }
+              const sawGeo = extrudeShape(sawPts, width + 0.6, { bevel: 0.04, rotY: Math.PI / 2 });
+              addMesh(sawGeo, mats.corrugated, cx, baseY + p.wallH, cz);
+            }
+          },
+        },
+
+        // =====================================================================
+        // STAGE 5: ARCHITECTURAL ATTACHMENTS, OVERHANGS, CHIMNEYS & SIGNAGE
+        // =====================================================================
+        {
+          name: 'attachments',
+          run() {
+            const p = st.params;
+            for (const fs of st.faceSpecs) {
+              emitFacadeAttachments(push, fs.plans, {
+                wallMat: fs.opts.wallMat, trimMat: fs.opts.trimMat, steelDark: mats.steelDark,
+                steelGalv: mats.steelGalv, officeGlass: mats.officeGlass, litGlass: mats.litGlass, rng,
+                shutterMat: fs.opts.shutterMat || null, balconyChance: fs.opts.balconyChance || 0,
+                bayWindows: !!fs.opts.bayWindows, tieRods: !!fs.opts.tieRods,
+              });
+            }
+            if (archetype === 'coastal_residence') {
+              const porchZ = p.mz + p.mainD / 2 + 1.35;
+              push(mats.timber, p.mainW * 0.66, 0.22, 2.6, p.mx, baseY + 0.56, porchZ);
+              push(mats.timber, p.mainW * 0.68, 0.18, 2.8, p.mx, baseY + 3.25, porchZ, 0.16, 0, 0);
+              for (let k = -1; k <= 1; k++) push(mats.timber, 0.22, 2.7, 0.22, p.mx + k * (p.mainW * 0.28), baseY + 1.9, porchZ + 1.15);
+              push(mats.brick, 1.15, p.ridgeH + 2.2, 1.15, p.mx - p.mainW * 0.28, baseY + p.eaveH + (p.ridgeH + 1.4) / 2, p.mz - p.mainD * 0.18);
+              push(mats.granite, 1.35, 0.22, 1.35, p.mx - p.mainW * 0.28, baseY + p.eaveH + p.ridgeH + 1.85, p.mz - p.mainD * 0.18);
+            } else if (archetype === 'harbor_apartment') {
+              const escX = cx + width / 2 + 0.62;
+              for (let f = 0; f < p.upperFloors; f++) {
+                const ly = baseY + p.groundH + f * p.storeyH;
+                push(mats.steelDark, 1.2, 0.11, 3.6, escX, ly, p.spineZ);
+                push(mats.steelDark, 0.06, 0.06, 3.6, escX + 0.56, ly + 1.0, p.spineZ);
+                if (f < p.upperFloors - 1) push(mats.steelDark, 0.82, 0.11, 3.4, escX + 0.12, ly + p.storeyH * 0.5, p.spineZ, (f % 2 ? -0.72 : 0.72), 0, 0);
+              }
+              const wtY = baseY + p.eaveH + p.mansardH, wtx = cx - width * 0.25, wtz = p.spineZ;
+              for (const lx of [-0.85, 0.85]) for (const lz of [-0.85, 0.85]) addMesh(unitCyl, mats.steelDark, wtx + lx, wtY + 1.2, wtz + lz, 0, 0, 0, 0.10, 2.4, 0.10);
+              addMesh(unitCyl, mats.timber, wtx, wtY + 3.6, wtz, 0, 0, 0, 1.45, 2.5, 1.45);
+              addMesh(unitCyl, mats.steelDark, wtx, wtY + 5.05, wtz, 0, 0, 0, 1.58, 0.45, 1.58);
+            } else if (archetype === 'commercial_arcade') {
+              for (let i = 0; i < p.xPiers; i++) {
+                const ax = cx - width / 2 + (i + 0.5) * (width / p.xPiers);
+                push(mats.awningNavy, (width / p.xPiers) - 0.55, 0.16, 1.45, ax, baseY + p.groundH - 0.25, cz + depth / 2 + 0.62, 0.24, 0, 0);
+              }
+              push(mats.steelDark, 0.38, 3.6, 1.45, cx + width / 2 + 0.55, baseY + p.groundH + 2.2, cz + depth / 2 - 1.2);
+              push(mats.litGlass, 0.42, 3.2, 1.15, cx + width / 2 + 0.55, baseY + p.groundH + 2.2, cz + depth / 2 - 1.2);
+            } else if (archetype === 'bonded_warehouse') {
+              // Steel cathead hoist beam jutting out of upper hoist dormer
+              push(mats.steelDark, 0.24, 0.28, 2.6, cx, baseY + p.wallH + 1.05, cz + depth / 2 + 1.35);
+              push(mats.steelGalv, 0.08, 1.6, 0.08, cx, baseY + p.wallH + 0.2, cz + depth / 2 + 2.35);
+            } else if (archetype === 'industrial_hall') {
+              addMesh(unitCyl, mats.steelGalv, cx + width / 2 + 1.1, baseY + p.wallH * 0.72, cz - depth * 0.2, 0, 0, 0, 0.68, p.wallH * 1.45, 0.68);
+            }
+
+            // Rainwater downspout pipe
+            g.add(makePipeCurve([
+              [cx - width / 2 - 0.08, baseY + Math.min(height, 10) - 0.2, cz - depth / 2 + 0.45],
+              [cx - width / 2 - 0.18, baseY + Math.min(height, 10) - 0.7, cz - depth / 2 + 0.45],
+              [cx - width / 2 - 0.18, baseY + 0.65, cz - depth / 2 + 0.45],
+              [cx - width / 2 - 0.32, baseY + 0.22, cz - depth / 2 + 0.45],
+            ], 0.085, mats.steelGalv));
+
+            if (labelZh) {
+              const decalMat = matLib.createDecalMaterial(labelZh, labelEn || 'SALTLINE COASTAL DISTRICT');
+              const sign = new Mesh(unitBox, decalMat);
+              sign.scale.set(Math.min(5.8, width * 0.44), 1.38, 0.09);
+              sign.position.set(cx, baseY + 3.65, cz + depth / 2 + 0.16);
+              sign.matrixAutoUpdate = false; sign.updateMatrix();
+              g.add(sign);
+            }
+          },
+        },
+
+        // =====================================================================
+        // STAGE 6: VISIBLE GROUND-FLOOR INTERIOR STRUCTURE
+        // =====================================================================
+        {
+          name: 'interior',
+          run() {
+            const p = st.params;
+            if (archetype === 'modern_office' || archetype === 'commercial_arcade' || archetype === 'stepped_mixed_use') {
+              // Recessed lobby stone floor, reception desk & warm illuminated ceiling baffle visible through shopfront glass
+              const iw = width * 0.52, id = depth * 0.46;
+              push(mats.granite, iw, 0.18, id, cx, baseY + 0.32, cz);
+              push(mats.timber, Math.min(4.2, iw * 0.45), 1.05, 0.92, cx, baseY + 0.88, cz + id * 0.22);
+              push(mats.litGlass, iw * 0.72, 0.08, 0.48, cx, baseY + 3.25, cz + id * 0.15);
+            } else if (archetype === 'waterfront_rowhouses') {
+              for (const u of p.units) {
+                push(mats.timber, 1.4, 0.16, 1.2, u.ux, baseY + 0.82, u.uz + u.ud / 2 - 0.65);
+              }
+            }
+          },
+        },
+
+        // =====================================================================
+        // STAGE 7: ACCURATE MULTI-VOLUME COLLIDER GENERATION
+        // =====================================================================
+        {
+          name: 'colliders',
+          run() {
+            const p = st.params;
+            const addCol = (x0, y0, z0, x1, y1, z1, surface = 'concrete') => {
+              const specBox = { min: new Vector3(x0, y0, z0), max: new Vector3(x1, y1, z1), surface };
+              st.colliders.push(specBox);
+              if (Array.isArray(colliderTarget)) colliderTarget.push(specBox);
+            };
+            if (archetype === 'harbor_apartment') {
+              addCol(cx - width / 2, baseY, p.spineZ - p.spineD / 2, cx + width / 2, baseY + p.eaveH, p.spineZ + p.spineD / 2);
+              for (const sgn of [-1, 1]) {
+                const wx = cx + sgn * (width / 2 - p.wingW / 2);
+                addCol(wx - p.wingW / 2, baseY, p.wingZ - p.wingD / 2, wx + p.wingW / 2, baseY + p.eaveH, p.wingZ + p.wingD / 2);
+              }
+            } else if (archetype === 'coastal_residence') {
+              addCol(p.mx - p.mainW / 2, baseY, p.mz - p.mainD / 2, p.mx + p.mainW / 2, baseY + p.eaveH, p.mz + p.mainD / 2);
+              addCol(p.wx - p.wingW / 2, baseY, p.wz - p.wingD / 2, p.wx + p.wingW / 2, baseY + p.wingH, p.wz + p.wingD / 2);
+            } else if (archetype === 'waterfront_rowhouses') {
+              for (const u of p.units) {
+                addCol(u.ux - u.uw / 2, baseY, u.uz - u.ud / 2, u.ux + u.uw / 2, baseY + u.uh, u.uz + u.ud / 2);
+              }
+            } else {
+              addCol(cx - width / 2, baseY, cz - depth / 2, cx + width / 2, baseY + height, cz + depth / 2);
+            }
+          },
+        },
+
+        // =====================================================================
+        // STAGE 8: GPU FLUSH & FINAL SCENE ACTIVATION
+        // =====================================================================
+        {
+          name: 'activate',
+          run() {
+            flush();
+            parent.add(g);
+          },
+        },
+      ];
+
+      let phaseIdx = 0;
+      const phaseTimings = [];
+
+      return {
+        phaseNames: phases.map(p => p.name),
+        step() {
+          if (phaseIdx >= phases.length) return true;
+          const ph = phases[phaseIdx];
+          const opsBefore = batcher.ops;
+          const t0 = nowMs();
+          ph.run();
+          const elapsed = Number((nowMs() - t0).toFixed(3));
+          phaseTimings.push({ phase: ph.name, ms: elapsed, ops: batcher.ops - opsBefore });
+          phaseIdx++;
+          if (phaseIdx >= phases.length) {
+            const totalMs = Number(phaseTimings.reduce((s, r) => s + r.ms, 0).toFixed(3));
+            const maxPhaseMs = Number(Math.max(...phaseTimings.map(r => r.ms)).toFixed(3));
+            recordBuildTiming({ id: g.name, archetype, totalMs, maxPhaseMs, phases: phaseTimings });
+            return true;
           }
-        }
-        // Multi-bay serrated Sawtooth Roof profile via ExtrudeGeometry!
-        const sawCount = 3;
-        const sawSpan = depth / sawCount;
-        const sawPts = [[-depth / 2, 0]];
-        for (let s = 0; s < sawCount; s++) {
-          const z0 = -depth / 2 + s * sawSpan;
-          sawPts.push([z0 + sawSpan * 0.15, 2.35], [z0 + sawSpan, 0]);
-        }
-        const sawGeo = extrudeShape(sawPts, width + 0.6, { bevel: 0.04, rotY: Math.PI / 2 });
-        addMesh(sawGeo, corrugatedMat, cx, baseY + wallH, cz);
-        for (let s = 0; s < sawCount; s++) {
-          const gz = cz - depth / 2 + s * sawSpan + sawSpan * 0.08;
-          push(officeGlass, width - 0.8, 1.75, 0.14, cx, baseY + wallH + 1.1, gz, -0.25, 0, 0);
-        }
-        // Exterior steel cyclone dust collector & exhaust stack
-        const stack = addMesh(unitCyl, steelGalv, cx + width / 2 + 1.1, baseY + wallH * 0.72, cz - depth * 0.2);
-        stack.scale.set(0.68, wallH * 1.45, 0.68); stack.updateMatrix();
-      }
-
-      flush();
-
-      // Corner TubeGeometry rainwater downspouts
-      g.add(makePipeCurve([
-        [cx - width / 2 - 0.08, baseY + Math.min(height, 10) - 0.2, cz - depth / 2 + 0.45],
-        [cx - width / 2 - 0.18, baseY + Math.min(height, 10) - 0.7, cz - depth / 2 + 0.45],
-        [cx - width / 2 - 0.18, baseY + 0.65, cz - depth / 2 + 0.45],
-        [cx - width / 2 - 0.32, baseY + 0.22, cz - depth / 2 + 0.45],
-      ], 0.085, steelGalv));
-
-      // Ground-floor weathered facade signage Decal
-      if (labelZh) {
-        const decalMat = matLib.createDecalMaterial(labelZh, labelEn || 'SALTLINE COASTAL DISTRICT');
-        const sign = new Mesh(unitBox, decalMat);
-        sign.scale.set(Math.min(5.8, width * 0.44), 1.38, 0.09);
-        sign.position.set(cx, baseY + 3.65, cz + depth / 2 + 0.14);
-        sign.matrixAutoUpdate = false; sign.updateMatrix();
-        g.add(sign);
-      }
-
-      parent.add(g);
-      return g;
+          return false;
+        },
+        get phaseIndex() { return phaseIdx; },
+        get totalPhases() { return phases.length; },
+        get phaseTimings() { return phaseTimings; },
+        get colliders() { return st.colliders; },
+        get archetype() { return archetype; },
+        get group() { return g; },
+      };
     }
 
-    function buildDistantBuilding(parent, { cx,cz,width:w,depth:d,height:h,style }) {
+    function buildCoastalBuilding(parent, spec) {
+      const task = createCoastalBuildingTask(parent, spec);
+      while (!task.step()) {}
+      return task.group;
+    }
+
+    function buildDistantBuilding(parent, { cx, cz, width: w, depth: d, height: h, style }) {
       const group = new Group();
-      const {push,flush} = createBatcher(group);
-      const mass = (dx,dz,width,depth,base,height,material) =>
-        push(material,width,height,depth,cx+dx,.16+base+height/2,cz+dz);
-      const wall=sharedMats.brickWeathered, trim=sharedMats.concreteDirty;
-      if (style==='modern_office') {
-        mass(0,0,w,d,0,h*.25,trim); mass(0,0,w*.77,d*.79,h*.25,h*.65,sharedMats.smokedPane);
-        mass(0,0,w*.52,d*.52,h*.9,h*.12,sharedMats.steelDark);
-      } else if (style==='harbor_apartment') {
-        mass(0,-d*.21,w,d*.58,0,h,wall);
-        for (const side of [-1,1]) mass(w*.33*side,d*.29,w*.34,d*.42,0,h,wall);
+      const { push, flush } = createBatcher(group);
+      const mass = (dx, dz, width, depth, base, height, material) =>
+        push(material, width, height, depth, cx + dx, .16 + base + height / 2, cz + dz);
+      const wall = sharedMats.brickWeathered, trim = sharedMats.concreteDirty;
+      if (style === 'modern_office') {
+        mass(0, 0, w, d, 0, h * .25, trim);
+        mass(0, 0, w * .77, d * .79, h * .25, h * .65, sharedMats.smokedPane);
+        mass(0, 0, w * .52, d * .52, h * .9, h * .12, sharedMats.steelDark);
+      } else if (style === 'harbor_apartment') {
+        mass(0, -d * .21, w, d * .58, 0, h, wall);
+        for (const side of [-1, 1]) mass(w * .33 * side, d * .29, w * .34, d * .42, 0, h, wall);
+      } else if (style === 'stepped_mixed_use') {
+        mass(0, 0, w, d, 0, h * .72, trim);
+        mass(0, 0, w * .76, d * .74, h * .72, h * .28, sharedMats.slateSteel);
+        mass(w * .34, d * .34, w * .32, d * .32, 0, h + 2.2, trim);
+      } else if (style === 'waterfront_rowhouses') {
+        const uw = w / 3;
+        mass(-uw, 0, uw * .96, d * .9, 0, h * .92, trim);
+        mass(0, -.4, uw * .96, d * .88, 0, h * 1.12, wall);
+        mass(uw, .3, uw * .96, d * .92, 0, h * .84, sharedMats.slateSteel);
       } else {
-        mass(0,0,w,d,0,h*.80,style==='industrial_hall' ? sharedMats.steelClad : trim);
-        if (style==='industrial_hall' || style==='coastal_residence') {
-          const count=style==='industrial_hall'?4:2;
-          for(let i=0;i<count;i++) push(sharedMats.corrugated,w+.4,.18,d/count*1.05,cx,h*.85,cz-d/2+(i+.5)*d/count,.22);
-        } else mass(0,0,w*.77,d*.71,h*.80,h*.18,wall);
+        mass(0, 0, w, d, 0, h * .80, style === 'industrial_hall' ? sharedMats.steelClad : (style === 'bonded_warehouse' ? wall : trim));
+        if (style === 'industrial_hall' || style === 'coastal_residence' || style === 'bonded_warehouse') {
+          const count = style === 'industrial_hall' ? 4 : 2;
+          for (let i = 0; i < count; i++) push(sharedMats.corrugated, w + .4, .18, d / count * 1.05, cx, h * .85, cz - d / 2 + (i + .5) * d / count, .22);
+        } else mass(0, 0, w * .77, d * .71, h * .80, h * .18, wall);
       }
       flush(); parent.add(group); return group;
     }
@@ -582,7 +944,6 @@
       const stone = matLib.get('granite');
       const concreteTrim = matLib.get('concrete_aged');
       const litWin = matLib.get('window_lit');
-      // Leave a three-bay entrance for receiving cargo from Coastal Boulevard.
       for (let i = 0; i < 9; i++) {
         const at = north + i * bay;
         if (i >= 3 && i < 6) continue;
@@ -595,7 +956,6 @@
         collide(east - .20, ground, at, east + .04, eave, at + bay);
       }
       external.placeFacadeModules(g, placements);
-      // Granite foundation plinth + brick end walls + stepped stone cornice
       push(stone, width + .35, .58, depth + .35, x, ground + .29, z);
       for (const end of [north, south]) {
         push(brick, width, eave, .42, x, eave / 2 + ground, end);
@@ -605,7 +965,6 @@
       push(brick, .44, eave, depth, west, eave / 2 + ground, z);
       push(stone, .64, .28, depth + .5, west, eave + ground + .10, z);
       collide(west - .22, ground, north, west + .22, eave, south);
-      // Recessed sawtooth north-light roof framed by a brick parapet + stone coping (eliminates giant grey flat slab!)
       const span = width / 3, rise = 1.95;
       push(brick, .38, 1.15, depth + .2, east - .18, eave + ground + .58, z);
       push(stone, .58, .20, depth + .45, east - .18, eave + ground + 1.22, z);
@@ -615,7 +974,6 @@
         push(m.smokedPane, .12, rise * .86, depth - .6, center + span / 2 - .12, eave + rise / 2, z);
         for (let j = 0; j <= 6; j++) push(m.steelGalv, .16, rise * .88, .12, center + span / 2 - .10, eave + rise / 2, north + .3 + j * (depth - .6) / 6);
       }
-      // Articulated steel loading canopy with fascia beam, knee braces, soffit lights & warm transom clerestory
       const openSpan = bay * 3;
       push(m.steelDark, 3.35, .18, openSpan + .7, east + 1.55, 4.35, z);
       push(concreteTrim, 3.55, .24, openSpan + .9, east + 1.55, 4.52, z);
@@ -653,7 +1011,6 @@
         c.receiveShadow = true; c.matrixAutoUpdate = false; c.updateMatrix();
         g.add(c);
       };
-      // Molded stone belt-course cornice separating ground floor from upper brick story
       push(stone, roofW + .85, .30, roofD + .85, mid, 4.16, midZ);
       push(masonry, .44, 4.18, roofD, back, 6.28, midZ);
       for (const z of [z0, z1]) push(masonry, roofW, 4.18, .44, mid, 6.28, z);
@@ -668,13 +1025,11 @@
         if (i % 3 === 0) module('wall_pier_standard_01', 4.19);
       }
       externalAssets.placeFacadeModules(g, placements);
-      // Warm glowing interior backing behind select upper brick windows so night.jpg & dusk look lived-in!
       for (let i = 0; i < bays; i++) {
         if (i % 3 === 1 || i === 4) {
           push(litWin, .08, 1.95, pitch * .62, front + .28, 6.18, z0 + (i + .5) * pitch);
         }
       }
-      // Articulated Roof Deck with Perimeter Brick Parapet + Beveled Stone Coping + Membrane Seams + HVAC + Skylights!
       const roofY = 8.42;
       push(concreteTrim, roofW + .4, .26, roofD + .4, mid, roofY, midZ);
       const parH = .72;
@@ -701,7 +1056,6 @@
       }
       push(m.steelGalv, 1.6, .58, 1.4, mid - 5.2, roofY + .42, midZ + 7.2);
       for (const vz of [midZ - 4.5, midZ + 2.2, midZ + 8.8]) placeCyl(m.steelGalv, 0.22, 1.35, back - 2.2, roofY + .85, vz);
-      // Offset radio watch room penthouse with beveled roof overhang & comms mast
       const towerX = back - 3.8, towerZ = z0 + 3.7;
       push(masonry, 7.4, 2.25, 7.2, towerX, 9.65, towerZ);
       push(stone, 7.75, .20, 7.55, towerX, 10.76, towerZ);
@@ -713,7 +1067,6 @@
       push(stone, 8.6, .12, 8.4, towerX, 12.56, towerZ);
       placeCyl(m.steelGalv, 0.09, 4.2, towerX + 2.2, 14.6, towerZ - 2.0);
       push(m.redCore || m.steelDark, .24, .28, .24, towerX + 2.2, 16.8, towerZ - 2.0);
-      // Deep brick pilasters with granite bases & caps at street level tying ribbon windows to upper brick wing
       for (const z of [bz0 + .52, entZ - 7.7, entZ - 2.4, entZ + 2.4, entZ + 7.7, bz1 - .52]) {
         push(stone, .94, .68, .88, bx0 - .17, .50, z);
         push(masonry, .82, 3.12, .74, bx0 - .17, 2.38, z);
@@ -724,31 +1077,15 @@
       return g;
     }
 
-    function createCoastalBuildingTask(parent, spec) {
-      let step = 0;
-      let builtGroup = null;
-      return {
-        step() {
-          if (step === 0) {
-            step = 1;
-            return false;
-          }
-          if (step === 1) {
-            builtGroup = buildCoastalBuilding(parent, spec);
-            step = 2;
-            return true;
-          }
-          return true;
-        },
-        get group() { return builtGroup; },
-      };
-    }
-
     function dispose() {
       for (const geo of createdGeos) geo.dispose?.();
     }
 
-    return { buildCoastalBuilding, createCoastalBuildingTask, buildFreightExchange, buildDistantBuilding, buildDispatchWing, dispose };
+    return {
+      buildCoastalBuilding, createCoastalBuildingTask, buildFreightExchange,
+      buildDistantBuilding, buildDispatchWing, dispose,
+      archetypes: ARCHETYPE_LIST,
+    };
   }
 
   WE.createBuildingGenerator = createBuildingGenerator;

@@ -139,25 +139,75 @@
           let ao = 0.85 + fbm * 0.15;
 
           if (kind === 'brick') {
+            const rows = 14, cols = 7;
+            const row = Math.floor(v * rows);
+            const bv = (v * rows) % 1;
+            const bu = ((u * cols) + (row % 2 ? 0.5 : 0)) % 1;
+            const mortar = bv < 0.10 || bu < 0.055;
+            const brickCol = Math.floor((u * cols + (row % 2 ? 0.5 : 0)) % cols);
+            const tileTone = hash2(brickCol, row, seed + 19);
+            const kilnVar = hash2(brickCol + 17, row * 3, seed + 83);
+            const bevelEdge = Math.min(bv - 0.10, 1 - bv, bu - 0.055, 1 - bu);
+            const edgeWear = bevelEdge < 0.06 ? (0.06 - bevelEdge) / 0.06 : 0;
+            if (mortar) { h = 0.14 + fine * 0.09; mix = 0.72 + (fbm - 0.5) * 0.16; rough = 0.96; ao = 0.48; }
+            else {
+              h = 0.70 + (tileTone - 0.5) * 0.14 + fine * 0.16 - edgeWear * 0.16;
+              mix = (tileTone - 0.5) * 0.56 + (kilnVar - 0.5) * 0.24 + (streak - 0.5) * weathering * 0.48;
+              rough = roughness + (tileTone - 0.5) * 0.14 + edgeWear * 0.08;
+              ao = 0.94 - edgeWear * 0.20;
+            }
+          } else if (kind === 'roof_tile') {
+            const rows = 11, cols = 9;
+            const bv = (v * rows) % 1;
+            const bu = (u * cols) % 1;
+            const scallop = Math.sin(bu * Math.PI);
+            const overlap = bv < 0.15 ? 0.22 : 0.76;
+            const tileVar = hash2(Math.floor(u * cols), Math.floor(v * rows), seed + 71);
+            const lichen = Math.max(0, fbm - 0.64) * weathering * 0.85;
+            h = overlap * (0.42 + 0.58 * scallop) + fine * 0.08;
+            mix = (tileVar - 0.5) * 0.46 + (1 - bv) * 0.18 + lichen + (streak - 0.5) * weathering * 0.35;
+            rough = roughness + (1 - scallop) * 0.12 + lichen * 0.14;
+            ao = bv < 0.16 ? 0.44 : 0.86 + scallop * 0.14;
+          } else if (kind === 'roof_slate') {
             const rows = 12, cols = 6;
             const row = Math.floor(v * rows);
             const bv = (v * rows) % 1;
             const bu = ((u * cols) + (row % 2 ? 0.5 : 0)) % 1;
-            const mortar = bv < 0.11 || bu < 0.065;
-            const tileTone = hash2(Math.floor((u * cols + (row % 2 ? 0.5 : 0)) % cols), row, seed + 19);
-            if (mortar) { h = 0.16 + fine * 0.08; mix = 0.68; rough = 0.95; ao = 0.52; }
-            else { h = 0.68 + (tileTone - 0.5) * 0.12 + fine * 0.18; mix = (tileTone - 0.5) * 0.48 + (streak - 0.5) * weathering * 0.55; rough = roughness + (tileTone - 0.5) * 0.12; ao = 0.92; }
-          } else if (kind === 'roof_tile') {
-            const rows = 10, cols = 8;
-            const bv = (v * rows) % 1;
-            const bu = (u * cols) % 1;
-            const scallop = Math.sin(bu * Math.PI);
-            const overlap = bv < 0.14 ? 0.25 : 0.72;
-            const tileVar = hash2(Math.floor(u * cols), Math.floor(v * rows), seed + 71);
-            h = overlap * (0.45 + 0.55 * scallop) + fine * 0.08;
-            mix = (tileVar - 0.5) * 0.42 + (1 - bv) * 0.18 + (streak - 0.5) * weathering * 0.4;
-            rough = roughness + (1 - scallop) * 0.12;
-            ao = bv < 0.16 ? 0.48 : 0.88 + scallop * 0.12;
+            const seam = bv < 0.08 || bu < 0.03;
+            const tileVar = hash2(Math.floor(u * cols), row, seed + 61);
+            const cleft = fbm2D(u * 4.0, v * 12.0, 4, 3, seed + 93);
+            h = seam ? 0.22 : 0.58 + bv * 0.22 + (cleft - 0.5) * 0.14;
+            mix = seam ? 0.65 : (tileVar - 0.5) * 0.42 + (cleft - 0.5) * 0.22;
+            rough = seam ? 0.94 : roughness + (tileVar - 0.5) * 0.14;
+            ao = bv < 0.10 ? 0.46 : 0.88 + bv * 0.10;
+          } else if (kind === 'roof_zinc') {
+            const seams = 8;
+            const bu = (u * seams) % 1;
+            const standingSeam = bu < 0.07 || bu > 0.95;
+            const panelId = Math.floor(u * seams);
+            const panelTone = hash2(panelId, 3, seed + 37);
+            const patina = Math.max(0, streak - 0.56) * weathering * 0.9;
+            h = standingSeam ? 0.88 : 0.44 + (fbm - 0.5) * 0.08 + fine * 0.05;
+            mix = (panelTone - 0.5) * 0.22 + patina + (standingSeam ? -0.14 : 0);
+            rough = roughness + patina * 0.24 + (panelTone - 0.5) * 0.08;
+            ao = standingSeam ? 0.72 : 0.94 - patina * 0.12;
+          } else if (kind === 'grass') {
+            const bladeDir = fbm2D(u * 14.0, v * 4.5, 6, 3, seed + 137);
+            const tuft = fbm2D(u * 5.0, v * 5.0, 5, 4, seed + 191);
+            const soilPatch = Math.max(0, (0.42 - fbm) * 2.4);
+            const clover = Math.max(0, (tuft - 0.66) * 2.5);
+            h = 0.28 + bladeDir * 0.42 + tuft * 0.26 - soilPatch * 0.28;
+            mix = soilPatch * 0.78 - clover * 0.34 + (bladeDir - 0.5) * 0.32;
+            rough = 0.86 + soilPatch * 0.10 + (1 - bladeDir) * 0.06;
+            ao = 0.68 + bladeDir * 0.22 + tuft * 0.10;
+          } else if (kind === 'soil') {
+            const clod = voronoiEdge2D(u, v, 10, seed + 149);
+            const pebble = hash2(Math.floor(u * 48), Math.floor(v * 48), seed + 211) > 0.96 ? 0.32 : 0;
+            const root = Math.max(0, 0.05 - voronoiEdge2D(u * 1.5, v * 1.5, 5, seed + 223)) * 8.0;
+            h = 0.38 + fbm * 0.30 + pebble - (clod < 0.07 ? 0.22 : 0) + root * 0.12;
+            mix = (fbm - 0.5) * 0.55 - pebble * 0.45 + root * 0.30;
+            rough = Math.max(0.55, roughness - pebble * 0.25);
+            ao = 0.66 + fbm * 0.26;
           } else if (kind === 'granite') {
             const rows = 6, cols = 4;
             const bv = (v * rows) % 1, bu = ((u * cols) + (Math.floor(v * rows) % 2 ? 0.5 : 0)) % 1;
@@ -177,9 +227,12 @@
             rough = seam ? 0.95 : roughness + (woodGrain - 0.5) * 0.16;
             ao = seam ? 0.50 : 0.86 + woodGrain * 0.12;
           } else if (kind === 'concrete_cracked' || kind === 'stone') {
-            const edge = voronoiEdge2D(u, v, kind === 'stone' ? 6 : 4, seed + 41);
-            const crack = edge < 0.045 ? (1 - edge / 0.045) : 0;
-            h -= crack * 0.55; mix += crack * 0.65; rough += crack * 0.18; ao = 0.92 - crack * 0.45;
+            const edge = voronoiEdge2D(u, v, kind === 'stone' ? 7 : 4, seed + 41);
+            const strata = kind === 'stone' ? fbm2D(u * 1.4, v * 6.5, 4, 3, seed + 173) : 0.5;
+            const crack = edge < 0.048 ? (1 - edge / 0.048) : 0;
+            h = (kind === 'stone' ? 0.42 + strata * 0.38 : h) - crack * 0.55;
+            mix += crack * 0.68 + (strata - 0.5) * (kind === 'stone' ? 0.45 : 0);
+            rough += crack * 0.18; ao = 0.92 - crack * 0.48;
           } else if (kind === 'metal_rusted') {
             const rustMask = Math.max(0, Math.min(1, (fbm + streak * 0.45 - (0.95 - weathering * 0.55)) * 2.8));
             const seam = (y % 64 < 2 || x % 128 < 2) ? 0.35 : 0;
@@ -195,13 +248,14 @@
             rough = roughness * (1 - rustMask) + 0.90 * rustMask;
             ao = 0.62 + rib * 0.38;
           } else if (kind === 'window_glass') {
-            const blind = Math.sin(v * Math.PI * 26) * 0.5 + 0.5;
-            const grad = 0.35 + 0.65 * (1 - v);
-            const roomDepth = fbm2D(u * 2.0, v * 2.0, 4, 3, seed + 55);
-            h = 0.5 + blind * 0.08;
-            mix = (grad * 0.55 + roomDepth * 0.35 - 0.45) + (v < 0.32 ? blind * 0.22 : 0);
-            rough = 0.10 + (1 - grad) * 0.12;
-            ao = 0.95;
+            const blind = Math.sin(v * Math.PI * 28) * 0.5 + 0.5;
+            const skyGrad = Math.pow(1 - v, 1.35);
+            const roomDepth = fbm2D(u * 2.2, v * 2.0, 4, 3, seed + 55);
+            const frameEdge = (u < 0.03 || u > 0.97 || v < 0.03 || v > 0.97) ? 1 : 0;
+            h = 0.5 + (v < 0.28 ? blind * 0.05 : 0);
+            mix = frameEdge ? -0.45 : (skyGrad * 0.58 + roomDepth * 0.32 - 0.42) + (v < 0.28 ? blind * 0.18 : 0);
+            rough = frameEdge ? 0.45 : (0.07 + (1 - skyGrad) * 0.09 + (v < 0.28 ? 0.04 : 0));
+            ao = frameEdge ? 0.72 : 0.96;
           } else if (kind === 'asphalt') {
             const agg = hash2(x, y, seed + 13);
             h = 0.5 + (agg - 0.5) * 0.32 + (fbm - 0.5) * 0.25;
@@ -320,9 +374,11 @@
       sidewalk_paver:   { baseHex: 0x8a8c88, accentHex: 0x555855, kind: 'sidewalk_paver', weathering: 0.44, wetness: 0.28, roughness: 0.84, metalness: 0.04, seed: 37, resolution: 512, normalStrength: 2.8 },
       tank_industrial:  { baseHex: 0xc8cbc6, accentHex: 0x6f5542, kind: 'tank_industrial', weathering: 0.58, wetness: 0.18, roughness: 0.52, metalness: 0.34, seed: 39, resolution: 512, normalStrength: 2.6 },
       plaster_interior: { baseHex: 0x9fa39e, accentHex: 0x7c827e, kind: 'plaster_interior', weathering: 0.18, wetness: 0.0, roughness: 0.88, metalness: 0.02, seed: 41, resolution: 256, normalStrength: 1.2 },
-      brick_red:        { baseHex: 0x7e483a, accentHex: 0x4a342c, kind: 'brick', weathering: 0.55, wetness: 0.18, roughness: 0.86, metalness: 0.04, seed: 44, resolution: 512 },
-      brick_coastal:    { baseHex: 0x6d5548, accentHex: 0x403732, kind: 'brick', weathering: 0.62, wetness: 0.25, roughness: 0.88, metalness: 0.04, seed: 55, resolution: 512 },
+      brick_red:        { baseHex: 0x7e483a, accentHex: 0x4a342c, kind: 'brick', weathering: 0.55, wetness: 0.18, roughness: 0.86, metalness: 0.04, seed: 44, resolution: 512, normalStrength: 2.9 },
+      brick_coastal:    { baseHex: 0x6d5548, accentHex: 0x403732, kind: 'brick', weathering: 0.62, wetness: 0.25, roughness: 0.88, metalness: 0.04, seed: 55, resolution: 512, normalStrength: 2.9 },
       roof_tile:        { baseHex: 0x7f4432, accentHex: 0x4e291e, kind: 'roof_tile', weathering: 0.50, wetness: 0.22, roughness: 0.78, metalness: 0.05, seed: 59, resolution: 512, normalStrength: 3.2 },
+      roof_slate:       { baseHex: 0x465159, accentHex: 0x2c343a, kind: 'roof_slate', weathering: 0.48, wetness: 0.22, roughness: 0.74, metalness: 0.08, seed: 60, resolution: 512, normalStrength: 3.0 },
+      roof_zinc:        { baseHex: 0x68747a, accentHex: 0x445158, kind: 'roof_zinc', weathering: 0.42, wetness: 0.18, roughness: 0.44, metalness: 0.62, seed: 61, resolution: 512, normalStrength: 3.1 },
       granite:          { baseHex: 0x898a84, accentHex: 0x595b57, kind: 'granite', weathering: 0.42, wetness: 0.15, roughness: 0.80, metalness: 0.06, seed: 62, resolution: 512 },
       wood_timber:      { baseHex: 0x6b4e38, accentHex: 0x3e2d1f, kind: 'wood', weathering: 0.58, wetness: 0.20, roughness: 0.84, metalness: 0.03, seed: 64, resolution: 256 },
       plaster_cream:    { baseHex: 0x9b9587, accentHex: 0x69645a, kind: 'plaster', weathering: 0.46, wetness: 0.18, roughness: 0.84, metalness: 0.03, seed: 66, resolution: 512 },
@@ -330,11 +386,12 @@
       metal_rusted:     { baseHex: 0x4c565c, accentHex: 0x733a22, kind: 'metal_rusted', weathering: 0.72, wetness: 0.22, roughness: 0.52, metalness: 0.68, seed: 88, resolution: 256 },
       metal_painted:    { baseHex: 0x3a4d59, accentHex: 0x26323a, kind: 'metal_rusted', weathering: 0.35, wetness: 0.20, roughness: 0.46, metalness: 0.58, seed: 99, resolution: 256 },
       corrugated_steel: { baseHex: 0x435058, accentHex: 0x6b3e28, kind: 'corrugated', weathering: 0.52, wetness: 0.24, roughness: 0.56, metalness: 0.55, seed: 105, resolution: 512, normalStrength: 3.4 },
-      window_office:    { baseHex: 0x263945, accentHex: 0x698899, kind: 'window_glass', weathering: 0.15, wetness: 0.1, roughness: 0.14, metalness: 0.65, seed: 108, resolution: 256, normalStrength: 0.6 },
-      window_lit:       { baseHex: 0xb89054, accentHex: 0xffe0a8, kind: 'window_glass', weathering: 0.08, wetness: 0.0, roughness: 0.20, metalness: 0.18, seed: 109, resolution: 256, normalStrength: 0.5, emissiveHex: 0xffc978, emissiveIntensity: 0.42, nightEmissive: { day: 0.28, night: 1.55 } },
+      window_office:    { baseHex: 0x1f3442, accentHex: 0x7aa0b5, kind: 'window_glass', weathering: 0.12, wetness: 0.08, roughness: 0.10, metalness: 0.72, seed: 108, resolution: 256, normalStrength: 0.45 },
+      window_lit:       { baseHex: 0xb89054, accentHex: 0xffe0a8, kind: 'window_glass', weathering: 0.08, wetness: 0.0, roughness: 0.16, metalness: 0.22, seed: 109, resolution: 256, normalStrength: 0.4, emissiveHex: 0xffc978, emissiveIntensity: 0.44, nightEmissive: { day: 0.28, night: 1.55 } },
       road_asphalt:     { baseHex: 0x2d3236, accentHex: 0x1b1e21, kind: 'asphalt', weathering: 0.50, wetness: 0.45, roughness: 0.86, metalness: 0.05, seed: 111, resolution: 512 },
-      cliff_stone:      { baseHex: 0x545952, accentHex: 0x333732, kind: 'stone', weathering: 0.72, wetness: 0.30, roughness: 0.92, metalness: 0.04, seed: 123, resolution: 512 },
-      grass_coastal:    { baseHex: 0x354a33, accentHex: 0x223020, kind: 'concrete', weathering: 0.62, wetness: 0.22, roughness: 0.94, metalness: 0.02, seed: 131, resolution: 256 },
+      cliff_stone:      { baseHex: 0x545952, accentHex: 0x333732, kind: 'stone', weathering: 0.72, wetness: 0.30, roughness: 0.92, metalness: 0.04, seed: 123, resolution: 512, normalStrength: 3.1 },
+      grass_coastal:    { baseHex: 0x3a5234, accentHex: 0x4b3f2b, kind: 'grass', weathering: 0.58, wetness: 0.24, roughness: 0.92, metalness: 0.02, seed: 131, resolution: 512, normalStrength: 2.8 },
+      coastal_soil:     { baseHex: 0x4d3f31, accentHex: 0x2d241b, kind: 'soil', weathering: 0.65, wetness: 0.32, roughness: 0.94, metalness: 0.02, seed: 137, resolution: 512, normalStrength: 3.0 },
     };
 
     function get(name, overrideOpts) {

@@ -18,7 +18,7 @@
     document.head.appendChild(style);
   }
 
-  window.createPortDrivableVehicle = (world, { startPos, startYaw = 0, bevelBox } = {}) => {
+  window.createPortDrivableVehicle = (world, { startPos, startYaw = 0, bevelBox, multiplayer = false, canDrive = () => true } = {}) => {
     const { THREE, scene, physics, fx, audio } = world;
     const { Group, Mesh, BoxGeometry, CylinderGeometry, SphereGeometry,
       MeshStandardMaterial, MeshBasicMaterial, SpotLight, PointLight, Vector3 } = THREE;
@@ -295,7 +295,7 @@
     if (hitsSolidWall(pos.x, pos.y, pos.z, startYaw)) pos.set(-48, 0, 5);
     let yaw = startYaw;
     let speed = 0, steerAngle = 0, pitch = 0, roll = 0;
-    let driving = false, lightsOn = true, thirdPerson = true, clock = 0, turretCooldown = 0, flashTimer = 0;
+    let driving = false, active = true, lightsOn = true, thirdPerson = true, clock = 0, turretCooldown = 0, flashTimer = 0;
     const camPosSmooth = new Vector3();
     const camLookTarget = new Vector3();
     const muzzleWorld = new Vector3(), aimDir = new Vector3();
@@ -343,6 +343,7 @@
     }
 
     function onKey(e, down) {
+      if (!active || !canDrive() || multiplayer !== Boolean(world.mpGadgets?.active)) return;
       if (down && (world.game?.state !== "playing" || world.game?.cinematic?.active || world.game?.arrival)) return;
       if (document.querySelector('.developer-menu[open]') || document.querySelector('.menu.open')) return;
       if (e.code === 'KeyW') keys.w = down;
@@ -352,15 +353,15 @@
       else if (e.code === 'KeyJ') keys.fire = down;
       else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = down;
       else if (e.code === 'Space') keys.space = down;
-      else if (down && !e.repeat && e.code === 'KeyF') toggleDrive(world.player);
+      else if (down && !e.repeat && e.code === 'KeyF' && !e.saltlineVehicleHandled && !world.mpVehicles?.driving) toggleDrive(world.player);
       else if (down && !e.repeat && e.code === 'KeyR' && driving) unstuckVehicle();
       else if (down && !e.repeat && e.code === 'KeyC' && driving) {
         thirdPerson = !thirdPerson;
         world.tactical?.notify?.(thirdPerson ? '🎥 已切换：第三人称追尾驾驶视角' : '🎥 已切换：第一人称驾驶舱视角',
           thirdPerson ? '🎥 Camera: 3rd-Person Chase' : '🎥 Camera: 1st-Person Cockpit', false, 2.0);
       }
-      else if (down && !e.repeat && e.code === 'KeyG' && !driving) {
-        summonNear(world.player);
+      else if (down && !e.repeat && e.code === 'KeyG' && !driving && !multiplayer) {
+        if (!summonNear(world.player)) return;
         world.tactical?.notify?.('🚙 已将 SAR 四驱巡逻车召唤至前方空地！按 [F] 登车', '🚙 SAR 4x4 summoned ahead! Press [F] to drive', false, 3.0);
       }
       else if (down && !e.repeat && e.code === 'KeyL' && driving) {
@@ -371,7 +372,7 @@
     const kd = e => onKey(e, true);
     const ku = e => onKey(e, false);
     const md = e => {
-      if (e.button === 0 && driving && world.game?.state === 'playing' && !document.querySelector('.developer-menu[open]') && !document.querySelector('.menu.open')) keys.fire = true;
+      if (e.button === 0 && driving && multiplayer === Boolean(world.mpGadgets?.active) && world.game?.state === 'playing' && !document.querySelector('.developer-menu[open]') && !document.querySelector('.menu.open')) keys.fire = true;
     };
     const mu = e => { if (e.button === 0) keys.fire = false; };
     window.addEventListener('keydown', kd, { signal: world.chapterSignal });
@@ -401,7 +402,7 @@
     }
 
     function summonNear(player) {
-      if (!player?.pos) return;
+      if (!active || !player?.pos || driving) return false;
       const pyaw = player.yaw ?? 0;
       const candidates = [
         [player.pos.x - Math.sin(pyaw) * 5.5, player.pos.z - Math.cos(pyaw) * 5.5],
@@ -409,20 +410,21 @@
         [player.pos.x + 5.5, player.pos.z], [player.pos.x - 5.5, player.pos.z],
         [player.pos.x, player.pos.z + 5.5], [player.pos.x, player.pos.z - 5.5],
       ];
-      let chosen = candidates[0];
       for (const c of candidates) {
         const gy = typeof physics?.groundHeight === 'function' ? physics.groundHeight(c[0], c[1], player.pos.y + .9) : player.pos.y;
-        if (!hitsSolidWall(c[0], gy, c[1], pyaw)) { chosen = c; break; }
+        if (hitsSolidWall(c[0], gy, c[1], pyaw)) continue;
+        pos.set(c[0], gy, c[1]);
+        yaw = pyaw;
+        speed = 0;
+        root.position.copy(pos);
+        root.rotation.y = yaw;
+        return true;
       }
-      const gy = typeof physics?.groundHeight === 'function' ? physics.groundHeight(chosen[0], chosen[1], player.pos.y + .9) : player.pos.y;
-      pos.set(chosen[0], gy, chosen[1]);
-      yaw = pyaw;
-      speed = 0;
-      root.position.copy(pos);
-      root.rotation.y = yaw;
+      return false;
     }
 
     function update(dt, player) {
+      if (!active) return;
       if (!(dt > 0)) return;
       driver.actor.visible = driving && thirdPerson;
       clock += dt;
@@ -612,10 +614,35 @@
     }
 
     function dispose() {
+      window.removeEventListener?.('keydown', kd);
+      window.removeEventListener?.('keyup', ku);
+      window.removeEventListener?.('mousedown', md);
+      window.removeEventListener?.('mouseup', mu);
+      if (driving) world.weapon?.setVisible?.(true);
+      driving = false;
       root.removeFromParent();
       hud.remove();
       promptEl.remove();
       pinEl.remove();
+    }
+
+    function setActive(value) {
+      active = Boolean(value);
+      root.visible = active;
+      if (!active) {
+        if (driving) {
+          world.weapon?.setVisible?.(true);
+          world.berthSlice?.companion?.setSeated?.(false);
+        }
+        driving = false;
+        speed = 0;
+        headlight.intensity = 0;
+        muzzleFlash.visible = false;
+        for (const key of Object.keys(keys)) keys[key] = false;
+        hud.hidden = true;
+        promptEl.hidden = true;
+        pinEl.style.display = 'none';
+      }
     }
 
     function setPosition(newPos) {
@@ -626,7 +653,7 @@
     }
 
     return {
-      update, summonNear, setPosition, dispose,
+      update, summonNear, setPosition, setActive, dispose,
       get mesh() { return root; },
       isDriving() { return driving; },
       get driving() { return driving; },

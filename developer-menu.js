@@ -297,7 +297,7 @@
       world.openWorld?.cycleSky?.();
     });
     const evWorldMapBtn = addAction(eventsList, '🗺️ Open 520m GTA Island Map (M)', '🗺️ 打开 520m 全岛战术大地图（M 键）', () => {
-      close();
+      close(false);
       world.openWorld?.toggleMap?.(true);
     });
     const evStopAllBtn = addAction(eventsList, '🛑 Stop & Reset All Active Events', '🛑 立即停止并复位所有进行中的大事件', () => {
@@ -443,7 +443,7 @@
       tsunamiBtn.button.hidden = !onTriggerTsunami;
       evGunshipBtn.button.hidden = !(onTriggerBerthClimax || world.berthSlice?.triggerClimaxSetPiece);
       evCrashBtn.button.hidden = !onTriggerCrash;
-      evWorldMapBtn.button.hidden = !world.openWorld?.toggleMap;
+      evWorldMapBtn.button.hidden = !world.openWorld?.toggleMap || Boolean(world.game?.conquest);
       doorBtn.button.disabled = !showcaseHeli;
       if (activeTab === 'events') rebuildStages();
       if (activeTab === 'teleport') rebuildWaypoints();
@@ -470,13 +470,13 @@
       onOpen();
     }
 
-    function close() {
+    function close(restorePointer = true) {
       if (!panel.open) return;
       panel.close();
-      onClose(recapture && canOpen());
+      onClose(restorePointer && recapture && canOpen());
     }
 
-    closeButton.addEventListener('click', close);
+    closeButton.addEventListener('click', () => close());
     panel.addEventListener('cancel', event => {
       event.preventDefault();
       close();

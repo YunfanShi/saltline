@@ -14,6 +14,7 @@
       .sl-water-vignette{position:fixed;inset:0;z-index:15;pointer-events:none;background:radial-gradient(circle at 50% 50%,rgba(12,48,64,0) 38%,rgba(8,36,50,.78) 100%);opacity:0;transition:opacity .25s ease}
       .sl-storm-vignette{position:fixed;inset:0;z-index:14;pointer-events:none;background:radial-gradient(circle at 50% 35%,rgba(8,14,20,0) 45%,rgba(5,10,16,.58) 100%);opacity:0;transition:opacity 1.2s ease}
       .sl-storm-flash{position:fixed;inset:0;z-index:16;pointer-events:none;background:rgba(210,235,255,.78);opacity:0;transition:opacity .07s ease-out}
+      .sl-blast-flash{position:fixed;inset:0;z-index:16;pointer-events:none;background:radial-gradient(circle at 50% 50%,rgba(255,218,138,.52) 0%,rgba(255,112,36,.28) 52%,rgba(255,64,18,0) 82%);opacity:0;transition:opacity .12s ease-out}
       .sl-disaster-banner{position:fixed;top:148px;left:50%;transform:translateX(-50%);z-index:21;background:rgba(10,16,22,.92);border:1px solid rgba(102,217,240,.65);border-left:4px solid #e85842;color:#eef6f8;padding:9px 18px;border-radius:6px;font:700 13px/1.4 system-ui,-apple-system,sans-serif;pointer-events:none;box-shadow:0 8px 26px rgba(0,0,0,.55)}
       .sl-disaster-banner[hidden]{display:none}
     `;
@@ -152,6 +153,9 @@
     const activeBlasts = [];
     const activeFlares = [];
     const blastTimers = [];
+    const activeFlyovers = [];
+    const activeTracers = [];
+    let blastFlashTimer = null;
 
     function spawnFireballExplosion(pos, scale = 1.0) {
       const coreMat = new MeshBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: .95, depthWrite: false });
@@ -168,6 +172,16 @@
       if (light) { light.position.set(pos.x, pos.y + 3.2 * scale, pos.z); fxRoot.add(light); }
       fxRoot.add(core, outer, shock);
       activeBlasts.push({ core, outer, shock, light, coreMat, outerMat, shockMat, age: 0, dur: .78, scale });
+      const pPos = world.player?.pos;
+      if (pPos) {
+        const dist = pPos.distanceTo(pos);
+        if (dist < 70) {
+          const strength = Math.min(.78, (1 - dist / 70) * .68 * Math.min(1.5, scale));
+          blastFlash.style.opacity = String(strength);
+          clearTimeout(blastFlashTimer);
+          blastFlashTimer = setTimeout(() => { blastFlash.style.opacity = '0'; }, 130);
+        }
+      }
     }
 
     function spawnSkyFlare(origin, vx, vy, vz, hex = 0xffc857) {
@@ -265,10 +279,12 @@
     stormVignette.className = 'sl-storm-vignette';
     const stormFlash = document.createElement('div');
     stormFlash.className = 'sl-storm-flash';
+    const blastFlash = document.createElement('div');
+    blastFlash.className = 'sl-blast-flash';
     const banner = document.createElement('div');
     banner.className = 'sl-disaster-banner';
     banner.hidden = true;
-    document.body.append(vignette, stormVignette, stormFlash, banner);
+    document.body.append(vignette, stormVignette, stormFlash, blastFlash, banner);
 
     const up = new Vector3(0, 1, 0);
     let tsunamiActive = false, tsunamiElapsed = 0, waterLevel = -1, sprayTick = 0, submergeDamageTick = 0;
@@ -409,6 +425,73 @@
       return true;
     }
 
+    function buildInterceptorJet() {
+      const g = new Group();
+      const hullMat = new MeshStandardMaterial({ color: 0x1d262e, roughness: .42, metalness: .65 });
+      const canopyMat = new MeshStandardMaterial({ color: 0x3b6578, roughness: .15, metalness: .72 });
+      const burnerMat = new MeshBasicMaterial({ color: 0xff8a2b, transparent: true, opacity: .94 });
+      const strobeMat = new MeshBasicMaterial({ color: 0xff3b2f });
+      const fuselage = new Mesh(new BoxGeometry(1.35, .82, 8.6), hullMat);
+      const nose = new Mesh(new BoxGeometry(.82, .56, 2.4), hullMat);
+      nose.position.set(0, -.04, 5.1);
+      const canopy = new Mesh(new BoxGeometry(.78, .48, 2.1), canopyMat);
+      canopy.position.set(0, .52, 1.8);
+      const wing = new Mesh(new BoxGeometry(9.4, .18, 2.6), hullMat);
+      wing.position.set(0, -.06, -.4);
+      const tailL = new Mesh(new BoxGeometry(.16, 1.45, 1.7), hullMat);
+      tailL.position.set(-.88, .72, -3.5); tailL.rotation.z = .24;
+      const tailR = new Mesh(new BoxGeometry(.16, 1.45, 1.7), hullMat);
+      tailR.position.set(.88, .72, -3.5); tailR.rotation.z = -.24;
+      const burnL = new Mesh(fireballGeo, burnerMat);
+      burnL.scale.set(.38, .38, 1.35); burnL.position.set(-.42, 0, -4.85);
+      const burnR = new Mesh(fireballGeo, burnerMat);
+      burnR.scale.set(.38, .38, 1.35); burnR.position.set(.42, 0, -4.85);
+      const strobeL = new Mesh(fireballGeo, strobeMat);
+      strobeL.scale.setScalar(.22); strobeL.position.set(-4.65, 0, -.6);
+      const strobeR = new Mesh(fireballGeo, strobeMat);
+      strobeR.scale.setScalar(.22); strobeR.position.set(4.65, 0, -.6);
+      g.add(fuselage, nose, canopy, wing, tailL, tailR, burnL, burnR, strobeL, strobeR);
+      return { group: g, mats: [hullMat, canopyMat, burnerMat, strobeMat], geos: [fuselage.geometry, nose.geometry, canopy.geometry, wing.geometry, tailL.geometry] };
+    }
+
+    function spawnSkyTracer(origin, target) {
+      const dir = target.clone().sub(origin);
+      const dist = dir.length();
+      if (dist < 1) return;
+      dir.divideScalar(dist);
+      const mat = new MeshBasicMaterial({ color: Math.random() > .35 ? 0xff6229 : 0xffcf5c, transparent: true, opacity: .94 });
+      const mesh = new Mesh(boltGeo, mat);
+      mesh.scale.set(.42, 6.5, .42);
+      mesh.position.copy(origin);
+      mesh.quaternion.setFromUnitVectors(up, dir);
+      fxRoot.add(mesh);
+      activeTracers.push({ mesh, mat, vel: dir.multiplyScalar(135), target: target.clone(), age: 0, dur: Math.min(.75, dist / 135) });
+    }
+
+    function triggerSkyBattlePass({ from, to, strafeTarget, count = 2 } = {}) {
+      const startBase = from ? from.clone() : new Vector3(-26, 26, 20);
+      const endBase = to ? to.clone() : new Vector3(-26, 20, -145);
+      const tgtBase = strafeTarget ? strafeTarget.clone() : startBase.clone().lerp(endBase, .5).setY(.8);
+      const n = Math.max(1, Math.min(3, count));
+      for (let i = 0; i < n; i++) {
+        blastTimers.push(setTimeout(() => {
+          const lateral = (i - (n - 1) / 2) * 14;
+          const f = startBase.clone().add(new Vector3(lateral, i * 2.4, 0));
+          const t = endBase.clone().add(new Vector3(lateral * .7, i * 1.8, 0));
+          const jet = buildInterceptorJet();
+          jet.group.position.copy(f);
+          jet.group.lookAt(t);
+          fxRoot.add(jet.group);
+          activeFlyovers.push({
+            ...jet, from: f, to: t, strafeTarget: tgtBase.clone(),
+            age: 0, dur: 3.6, strafeTick: .28, trailTick: 0, passBoomed: false, bankSign: i % 2 === 0 ? 1 : -1,
+          });
+          audio?.play?.('rail_touchdown', { pos: f, ref: 95, gain: .82, jitter: .08 });
+        }, i * 550));
+      }
+      return true;
+    }
+
     function triggerEvent(id) {
       if (id === 'tsunami') return triggerTsunami();
       if (id === 'lightning_storm') return triggerLightningStorm();
@@ -431,14 +514,17 @@
     function stopAllEvents() {
       clearTimeout(flashTimer);
       clearTimeout(thunderTimer);
+      clearTimeout(blastFlashTimer);
       for (const id of blastTimers.splice(0)) clearTimeout(id);
       tsunamiActive = false;
+      waterLevel = -1;
       stormActive = false;
       barrageActive = false;
       chainActive = false;
       tsunamiRoot.visible = false;
       vignette.style.opacity = '0';
       stormFlash.style.opacity = '0';
+      blastFlash.style.opacity = '0';
       banner.hidden = true;
       setOppressiveAtmosphere(false);
       for (const b of tempBolts.splice(0)) fxRoot.remove(b.group);
@@ -454,10 +540,63 @@
         if (f.light) fxRoot.remove(f.light);
         f.mat.dispose();
       }
+      for (const j of activeFlyovers.splice(0)) {
+        fxRoot.remove(j.group);
+        j.mats.forEach(m => m.dispose());
+        j.geos.forEach(g => g.dispose());
+      }
+      for (const tr of activeTracers.splice(0)) {
+        fxRoot.remove(tr.mesh);
+        tr.mat.dispose();
+      }
     }
 
     function update(dt, player) {
       if (!(dt > 0)) return;
+
+      for (let i = activeFlyovers.length - 1; i >= 0; i--) {
+        const j = activeFlyovers[i];
+        j.age += dt;
+        const t = Math.min(1, j.age / j.dur);
+        j.group.position.lerpVectors(j.from, j.to, t);
+        j.group.lookAt(j.to);
+        j.group.rotateZ(Math.sin(t * Math.PI) * .32 * j.bankSign);
+        j.trailTick += dt;
+        if (j.trailTick >= .14) {
+          j.trailTick = 0;
+          fx?.smoke?.(j.group.position, { size: 2.2, life: 1.9, color: 0xd6e2e8, alpha: .34, rise: .2, count: 1 });
+        }
+        j.strafeTick -= dt;
+        if (j.strafeTick <= 0 && t > .12 && t < .82) {
+          j.strafeTick = .16;
+          const spread = new Vector3((Math.random() - .5) * 14, 0, (Math.random() - .5) * 14);
+          spawnSkyTracer(j.group.position.clone().add(new Vector3(0, -.5, 0)), j.strafeTarget.clone().add(spread));
+        }
+        if (!j.passBoomed && t >= .45) {
+          j.passBoomed = true;
+          audio?.play?.('explosion', { pos: j.group.position, ref: 110, gain: .85, jitter: .1 });
+          if (player?.pos && player.pos.distanceTo(j.group.position) < 95) player.addShake?.(.36);
+        }
+        if (j.age >= j.dur) {
+          fxRoot.remove(j.group);
+          j.mats.forEach(m => m.dispose());
+          j.geos.forEach(g => g.dispose());
+          activeFlyovers.splice(i, 1);
+        }
+      }
+
+      for (let i = activeTracers.length - 1; i >= 0; i--) {
+        const tr = activeTracers[i];
+        tr.age += dt;
+        tr.mesh.position.addScaledVector(tr.vel, dt);
+        if (tr.age >= tr.dur) {
+          fx?.sparks?.(tr.target, up, 12);
+          fx?.smoke?.(tr.target, { size: 2.0, life: 1.6, color: 0x26211d, alpha: .55, rise: .9, count: 2 });
+          fxRoot.remove(tr.mesh);
+          tr.mat.dispose();
+          activeTracers.splice(i, 1);
+        }
+      }
 
       for (let i = activeBlasts.length - 1; i >= 0; i--) {
         const b = activeBlasts[i];
@@ -606,6 +745,7 @@
 
         if (tsunamiElapsed >= TSUNAMI_DURATION) {
           tsunamiActive = false;
+          waterLevel = -1;
           tsunamiRoot.visible = false;
           vignette.style.opacity = '0';
           if (!stormActive) setOppressiveAtmosphere(false);
@@ -667,7 +807,7 @@
       const anyActive = tsunamiActive || stormActive || barrageActive || chainActive;
       banner.hidden = !anyActive;
 
-      if (autoRandom && !anyActive && player?.alive && !world.openWorld?.freeRoam) {
+      if (autoRandom && !anyActive && player?.alive && world.openWorld?.freeRoam) {
         autoRandomTimer -= dt;
         if (autoRandomTimer <= 0) {
           autoRandomTimer = 55 + Math.random() * 30;
@@ -695,6 +835,7 @@
       vignette.remove();
       stormVignette.remove();
       stormFlash.remove();
+      blastFlash.remove();
       banner.remove();
     }
 
@@ -706,6 +847,7 @@
       triggerTideGateDemolition,
       triggerHighwayAmbush,
       triggerVictoryFlareBarrage,
+      triggerSkyBattlePass,
       spawnFireballExplosion,
       triggerEvent,
       triggerRandomEvent,

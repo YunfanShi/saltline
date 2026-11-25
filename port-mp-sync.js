@@ -7,9 +7,9 @@
   const SEND_INTERVAL_MS = 50; // 20 Hz matching IRONFRONT
   const RECONNECT_DELAYS = [250, 500, 1000, 1500, 2500, 3500, 4500];
 
-  function createPortMultiplayerSync(world, { getConquest, getSquad, getGadgets } = {}) {
+  function createPortMultiplayerSync(world, { getConquest, getSquad, getGadgets, getVehicles } = {}) {
     const { THREE, scene, fx, audio } = world;
-    const { Group, Mesh, CylinderGeometry, MeshBasicMaterial, Vector3 } = THREE;
+    const { Group, Mesh, BoxGeometry, CylinderGeometry, MeshBasicMaterial, MeshStandardMaterial, Vector3 } = THREE;
     const t = (en, zh) => window.SaltlineLocale?.t(en, zh) ?? en;
 
     const root = new Group();
@@ -22,6 +22,7 @@
     const up = new Vector3(0, 1, 0);
     const tracers = [];
     const remotes = new Map(); // id -> { group, human, labelEl, pos, targetPos, yaw, targetYaw, team, role, hp, alive, downed, name, stride, age }
+    const srvEnemies = new Map(); // enemyId -> { mesh, pos, targetPos, type, hp, alive }
 
     const netBadge = document.createElement('div');
     netBadge.className = 'port-mp-net-badge';
@@ -36,8 +37,11 @@
     let connected = false;
     let reconnecting = false;
     let closedByUser = false;
+    let connectionGeneration = 0;
     let lastSendAt = 0;
     let lastConquestSendAt = 0;
+    let sentWinner = null;
+    let pendingPromotion = false;
 
     function spawnTracer(fromArr, dirArr, team) {
       const from = new Vector3(fromArr[0], fromArr[1], fromArr[2]);
@@ -139,11 +143,29 @@
         );
       } else if (ev.kind === 'ammoBox' && Array.isArray(payload.pos)) {
         getGadgets?.()?.placeAmmoBox?.(new Vector3(...payload.pos), true);
+      } else if (ev.kind === 'heavyShot' && Array.isArray(payload.origin) && Array.isArray(payload.dir)) {
+        getVehicles?.()?.fireProjectile?.({
+          origin: new Vector3(...payload.origin),
+          dir: new Vector3(...payload.dir),
+          speed: payload.speed || 140,
+          gravity: payload.gravity ?? 1,
+          damage: payload.damage || 30,
+          blast: payload.blast || 0,
+          isMissile: Boolean(payload.isMissile),
+          fromRemote: true,
+        });
+      } else if (ev.kind === 'vehicleHit' && payload.id != null) {
+        const v = getVehicles?.()?.vehicles?.find(x => x.id === payload.id);
+        if (v) getVehicles?.()?.damageVehicle?.(v, Number(payload.damage) || 0, true);
+      } else if (ev.kind === 'enemyKilled') {
+        getConquest?.()?.killedMachine?.({ affectsTickets: session.yourId === session.hostId });
       }
     }
 
     function applySnapshot(msg) {
       if (!session) return;
+      const promoted = pendingPromotion || session.hostId !== session.yourId && msg.hostId === session.yourId;
+      pendingPromotion = false;
       session.hostId = msg.hostId;
       const seen = new Set();
       for (const entry of msg.players ?? []) {
@@ -170,17 +192,36 @@
         if (!seen.has(id)) removeRemote(id);
       }
 
-      // Sync shared conquest state from Host if we are a non-host client
+      // Only the host advances the shared match; guests apply its complete snapshot.
       const conquest = getConquest?.();
-      if (conquest && msg.conquest && session.yourId !== session.hostId) {
-        if (msg.conquest.tickets) {
-          conquest.tickets.blue = msg.conquest.tickets.blue;
-          conquest.tickets.red = msg.conquest.tickets.red;
-        }
-        if (Array.isArray(msg.conquest.points)) {
-          for (let i = 0; i < conquest.points.length && i < msg.conquest.points.length; i++) {
-            Object.assign(conquest.points[i], msg.conquest.points[i]);
+      if (conquest && msg.conquest && (session.yourId !== session.hostId || promoted)) {
+        conquest.applySharedState?.(msg.conquest);
+      }
+
+      // Sync shared IRONFRONT vehicles from server
+      if (Array.isArray(msg.vehicles)) {
+        getVehicles?.()?.applyRemoteVehicles?.(msg.vehicles);
+      }
+
+      // Sync server-authoritative AI enemies across all LAN players
+      if (Array.isArray(msg.enemies)) {
+        for (const se of msg.enemies) {
+          let entry = srvEnemies.get(se.id);
+          if (!entry) {
+            const isGull = se.type === 'gull';
+            const mesh = new Mesh(
+              isGull ? new BoxGeometry(0.95, 0.35, 1.1) : new BoxGeometry(0.65, 0.72, 1.25),
+              new MeshStandardMaterial({ color: isGull ? 0x6b2824 : 0x452c28, roughness: 0.48, metalness: 0.65 })
+            );
+            mesh.castShadow = true;
+            root.add(mesh);
+            entry = { id: se.id, type: se.type, mesh, pos: new Vector3(...se.pos), targetPos: new Vector3(...se.pos), hp: se.hp, alive: se.alive };
+            srvEnemies.set(se.id, entry);
           }
+          entry.targetPos.set(se.pos[0], se.pos[1] + (se.type === 'hound' ? 0.45 : 0), se.pos[2]);
+          entry.hp = se.hp;
+          entry.alive = se.alive;
+          entry.mesh.visible = se.alive;
         }
       }
 
@@ -195,17 +236,25 @@
       wsUrl.searchParams.set('room', session.code);
       wsUrl.searchParams.set('token', session.token);
 
+      const previousSocket = ws;
+      ws = null;
+      if (previousSocket) {
+        try { previousSocket.close(); } catch {}
+      }
       const sock = new WebSocket(wsUrl);
       ws = sock;
       sock.onopen = () => {
+        if (ws !== sock || closedByUser) return;
         connected = true;
         reconnecting = false;
         updateBadge();
       };
       sock.onmessage = event => {
+        if (ws !== sock || closedByUser) return;
         let msg;
         try { msg = JSON.parse(event.data); } catch { return; }
         if (msg.type === 'welcome' && msg.room) {
+          pendingPromotion = session.hostId !== msg.room.yourId && msg.room.hostId === msg.room.yourId;
           session.yourId = msg.room.yourId;
           session.hostId = msg.room.hostId;
         } else if (msg.type === 'snapshot') {
@@ -224,13 +273,14 @@
     async function attemptReconnect() {
       if (reconnecting || closedByUser || !session) return;
       reconnecting = true;
+      const generation = connectionGeneration;
       updateBadge();
       for (const delay of RECONNECT_DELAYS) {
         await new Promise(r => setTimeout(r, delay));
-        if (closedByUser || !session || connected) return;
+        if (generation !== connectionGeneration || closedByUser || !session || connected) return;
         openSocket();
         await new Promise(r => setTimeout(r, 400));
-        if (connected) return;
+        if (generation !== connectionGeneration || connected) return;
       }
       reconnecting = false;
       updateBadge();
@@ -257,11 +307,16 @@
       disconnect();
       closedByUser = false;
       session = { ...nextSession };
+      lastSendAt = 0;
+      lastConquestSendAt = 0;
+      sentWinner = null;
+      pendingPromotion = false;
       openSocket();
       updateBadge();
     }
 
     function disconnect() {
+      connectionGeneration++;
       closedByUser = true;
       connected = false;
       reconnecting = false;
@@ -298,6 +353,19 @@
           break;
         }
       }
+      // Check ray hit against server-authoritative shared AI enemies
+      for (const se of srvEnemies.values()) {
+        if (!se.alive) continue;
+        const toTarget = se.pos.clone().sub(origin);
+        const along = toTarget.dot(dir);
+        if (along < 0.5 || along > 140) continue;
+        const perpSq = toTarget.lengthSq() - along * along;
+        if (perpSq <= 0.85 * 0.85) {
+          sendEvent('enemyHit', { enemyId: se.id, damage: shot?.weapon === 'sidearm' ? 26 : 34 });
+          world.hud?.hit?.(false, false);
+          break;
+        }
+      }
     });
 
     // Press E near a downed LAN teammate to revive them
@@ -330,9 +398,9 @@
       if (!session) return;
 
       const now = performance.now();
+      const conquest = getConquest?.();
       if (connected && player?.pos && now - lastSendAt >= SEND_INTERVAL_MS) {
         lastSendAt = now;
-        const conquest = getConquest?.();
         const squad = getSquad?.();
         send({
           type: 'state',
@@ -344,32 +412,31 @@
             alive: Boolean(player.alive),
             downed: Boolean(squad?.downed),
             crouch: Boolean(player.crouching),
-            driving: Boolean(world.vehicle?.driving),
+            driving: Boolean(world.vehicle?.driving || world.mpGadgets?.driving || world.mpVehicles?.driving),
             role: world.loadout?.role ?? 'medic',
             kills: conquest?.kills ?? 0,
             deaths: conquest?.deaths ?? 0,
             captures: conquest?.captures ?? 0,
           },
         });
-        if (conquest && session.yourId === session.hostId && now - lastConquestSendAt >= 200) {
-          lastConquestSendAt = now;
-          send({
-            type: 'conquest',
-            conquest: {
-              tickets: { blue: conquest.tickets.blue, red: conquest.tickets.red },
-              points: conquest.points.map(p => ({
-                owner: p.owner,
-                control: p.control,
-                contested: p.contested,
-                locked: p.locked,
-                secured: p.secured,
-              })),
-            },
-          });
-        }
+      }
+      if (connected && conquest && session.yourId === session.hostId &&
+        (now - lastConquestSendAt >= 200 || conquest.winner && conquest.winner !== sentWinner)) {
+        lastConquestSendAt = now;
+        sentWinner = conquest.winner;
+        send({ type: 'conquest', conquest: conquest.exportSharedState() });
+        const vehList = getVehicles?.()?.exportVehicles?.();
+        if (vehList?.length) send({ type: 'vehicles', vehicles: vehList });
       }
 
       updateBadge();
+
+      // Interpolate server-authoritative AI enemies
+      for (const se of srvEnemies.values()) {
+        if (!se.alive) continue;
+        se.pos.lerp(se.targetPos, 1 - Math.exp(-dt * 12));
+        se.mesh.position.copy(se.pos);
+      }
 
       // Interpolate remote human players & project floating nameplates
       const cam = world.camera;
@@ -427,6 +494,22 @@
       connect,
       disconnect,
       sendEvent,
+      updateConquest(dt, player, enemies, allies = []) {
+        const conquest = getConquest?.();
+        if (!session || !conquest) return null;
+        if (session.yourId !== session.hostId) return conquest.updateGuest(dt);
+        const blue = [...allies];
+        const red = [...enemies];
+        for (const remote of remotes.values()) {
+          const unit = { alive: remote.alive && !remote.downed, pos: remote.targetPos };
+          (remote.team === 'red' ? red : blue).push(unit);
+        }
+        if (session.team === 'red') {
+          red.push(player);
+          return conquest.update(dt, { alive: false }, red, blue);
+        }
+        return conquest.update(dt, player, red, blue);
+      },
       update,
       dispose,
       get active() { return Boolean(session); },

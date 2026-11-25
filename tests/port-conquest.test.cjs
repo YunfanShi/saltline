@@ -109,6 +109,16 @@ test('Breakthrough attackers lose when their time or reinforcements expire', () 
   assert.equal(attrition.useSupport('mark'), false);
 });
 
+test('failed vehicle deployment leaves support points and cooldown unchanged', () => {
+  const game = start();
+  assert.equal(game.useSupport('motorcycle', at(0), null, () => false), false);
+  assert.equal(game.supportPoints, 3);
+  assert.equal(game.support.motorcycleUntil, 0);
+  assert.equal(game.useSupport('motorcycle', at(0), null, () => true), true);
+  assert.equal(game.supportPoints, 1);
+  assert.equal(game.support.motorcycleUntil, 20);
+});
+
 test('allies help secure sectors and support calls spend earned points', () => {
   const game = start({ mode: 'breakthrough' });
   assert.equal(game.useSupport('mark'), true);

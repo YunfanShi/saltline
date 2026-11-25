@@ -43,3 +43,28 @@ test('an escort follows the player along a leg longer than both proximity radii'
   mission.update(.1, player, false);
   assert.equal(nurse.position.x, stoppedAt);
 });
+
+test('resuming a partially completed pilot handoff restores the escort at the table', () => {
+  const window = { SaltlineCampaign: { createEvidence: () => ({ snapshot: {} }) } };
+  vm.runInNewContext(readFileSync(require.resolve('../port-campaign-continuation.js'), 'utf8'), { window });
+  class Vector {
+    constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
+    copy(other) { Object.assign(this, other); return this; }
+    subVectors(a, b) { return this.copy({ x:a.x-b.x, y:a.y-b.y, z:a.z-b.z }); }
+    length() { return Math.hypot(this.x, this.y, this.z); }
+    distanceTo(other) { return Math.hypot(this.x-other.x, this.y-other.y, this.z-other.z); }
+    addScaledVector(other, scale) { this.x += other.x*scale; this.y += other.y*scale; this.z += other.z*scale; return this; }
+  }
+  const harris = { name:'harris', position:new Vector(), rotation:{}, userData:{} };
+  const table = new Vector(30, 0, 0);
+  const layout = { id:'last-pilot', model:{}, points:{ harris:new Vector(), 'harris-handoff':table },
+    objects:{ harris }, routes:{ bridge:[new Vector(10, 0, 0), table] } };
+  const mission = window.createPortContinuationChapter({ THREE:{ Vector3:Vector }, physics:{ lineOfSight:() => true } }, layout);
+  mission.reset({ phase:'escort', stage:5, resume:'harris-handoff', route:'bridge', handoffStep:1 });
+  mission.show(true);
+  const player = { alive:true, pos:table, eye:new Vector(30, 1, 0) };
+  const result = mission.update(.6, player, true);
+  assert.equal(harris.position.x, 30);
+  assert.equal(result.checkpointChanged, true);
+  assert.equal(mission.checkpoint.handoffStep, 2);
+});

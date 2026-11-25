@@ -7,16 +7,21 @@ const vm = require('node:vm');
 const source = readFileSync(path.join(__dirname, '../developer-menu.js'), 'utf8');
 
 function setup() {
+  const elements = [];
   function element() {
-    return {
+    const listeners = {};
+    const node = {
       open: false,
       append() {},
       setAttribute() {},
       querySelector: element,
-      addEventListener() {},
+      addEventListener(type, listener) { listeners[type] = listener; },
+      click() { listeners.click?.(); },
       showModal() { this.open = true; },
       close() { this.open = false; },
     };
+    elements.push(node);
+    return node;
   }
   const calls = [];
   let capture;
@@ -30,13 +35,15 @@ function setup() {
   };
   const document = { createElement: element, getElementById: element, addEventListener() {} };
   vm.runInNewContext(source, { window, document });
-  const menu = window.createDeveloperMenu({
-    world: {
+  const world = {
       player: { pos: { x: 0, y: 0, z: 0 }, health: 100 },
       weapon: { ammo: 30, reserve: 120 },
       enemies: { aliveCount: () => 3 },
       input: { locked: true },
-    },
+      openWorld: { toggleMap: open => calls.push(['map', open]) },
+  };
+  const menu = window.createDeveloperMenu({
+    world,
     canOpen: () => playing,
     isCampaign: () => true,
     onOpen: () => calls.push('pause'),
@@ -51,7 +58,7 @@ function setup() {
     });
     return result;
   }
-  return { menu, calls, press, stopPlaying: () => { playing = false; } };
+  return { menu, calls, press, elements, stopPlaying: () => { playing = false; } };
 }
 
 test('Escape closes the developer menu and does not reach the game pause handler', () => {
@@ -63,6 +70,16 @@ test('Escape closes the developer menu and does not reach the game pause handler
   assert.equal(menu.open, false);
   assert.deepEqual(calls, ['pause', ['resume', true]]);
   assert.deepEqual(press('Escape'), { prevented: false, stopped: false });
+});
+
+test('opening the world map does not recapture pointer lock behind the map', () => {
+  const { menu, calls, press, elements } = setup();
+  press('Backquote');
+  const button = elements.find(e => e.textContent === '🗺️ Open 520m GTA Island Map (M)');
+  assert.ok(button);
+  button.click();
+  assert.equal(menu.open, false);
+  assert.deepEqual(calls, ['pause', ['resume', false], ['map', true]]);
 });
 
 test('the shortcut ignores repeats and does not open outside an active match', () => {

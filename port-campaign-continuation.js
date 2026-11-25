@@ -450,7 +450,11 @@
           m.speak('The ship has cut off the causeway. Take Harris across the upper bridge, or free the trapped workers first.', '巨轮撞断主岸道！带哈里斯走高架引航桥，或先救出避险棚的被困工人！');
           m.effect({ sound:'rail_touchdown', shake:.48, pos:points.impact });
         }
-        if (m.phase === 'escort' && harris) m.follow(harris, paths[m.state.route], player, dt, 2.7);
+        if (m.phase === 'escort' && harris) {
+          const route = paths[m.state.route];
+          if (m.state.handoffStep > 0 && !m.hasFollow) m.restoreFollow(harris, route);
+          m.follow(harris, route, player, dt, 2.7);
+        }
       },
       draw() {
         m.gate('causeway-wreck', !m.state.impact);
@@ -588,6 +592,13 @@
           actor.rotation.y = Math.atan2(step.x,step.z);
           actor.userData.pose?.(age, travel > 0);
         }
+      },
+      restoreFollow(actor, route) {
+        if (!route?.length) return;
+        actor.position.copy(route[route.length - 1]);
+        follower = actor;
+        path = route;
+        waypoint = route.length;
       },
       followMarkers(end, short) {
         const next = path?.[waypoint];

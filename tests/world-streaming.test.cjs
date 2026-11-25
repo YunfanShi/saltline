@@ -103,3 +103,88 @@ test('LightingSystem invalidates stale light cache and modulates dynamic night l
   assert.ok(Math.abs(winMat.emissiveIntensity - 1.6) < 0.01);
   ls.dispose();
 });
+
+test('BuildingGenerator executes true 8-stage phased generation with per-phase timing across all 9 archetypes', () => {
+  const scopeB = vm.createContext({ window: {}, performance });
+  vm.runInContext(fs.readFileSync(require.resolve('../WorldEngine/Materials/MaterialLibrary.js'), 'utf8'), scopeB);
+  vm.runInContext(fs.readFileSync(require.resolve('../WorldEngine/Assets/BuildingGenerator.js'), 'utf8'), scopeB);
+
+  class Vec2 { constructor(x = 0, y = 0) { this.x = x; this.y = y; } }
+  class Vec3 { constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; } }
+  class Mat4 { clone() { return new Mat4(); } }
+  class Obj3D {
+    constructor() { this.children = []; this.position = { set() {} }; this.rotation = { set() {} }; this.scale = { set() {} }; this.matrix = new Mat4(); }
+    add(...items) { this.children.push(...items); }
+    updateMatrix() {}
+  }
+  class Geo {
+    constructor() { this.userData = {}; }
+    translate() {} rotateX() {} rotateY() {} computeVertexNormals() {} dispose() {}
+  }
+  class Inst extends Obj3D { constructor(geo, mat, count) { super(); this.geometry = geo; this.material = mat; this.count = count; this.isInstancedMesh = true; } setMatrixAt() {} dispose() {} }
+  class Mat { constructor(o = {}) { Object.assign(this, o); this.userData = {}; } clone() { return new Mat(this); } dispose() {} }
+  const FakeTHREE = {
+    Group: Obj3D, Mesh: class extends Obj3D { constructor(g, m) { super(); this.geometry = g; this.material = m; } },
+    BoxGeometry: Geo, CylinderGeometry: Geo, ExtrudeGeometry: Geo, Shape: class {},
+    InstancedMesh: Inst, Object3D: Obj3D, Vector2: Vec2, Vector3: Vec3,
+    MeshStandardMaterial: Mat, MeshBasicMaterial: Mat, Color: class {},
+  };
+
+  const matLib = scopeB.window.WorldEngine.createMaterialLibrary(FakeTHREE, {});
+  const shared = { steelDark: new Mat(), steelGalv: new Mat(), blindPane: new Mat(), redCore: new Mat(), cargoTeal: new Mat(), cargoNavy: new Mat() };
+  const gen = scopeB.window.WorldEngine.createBuildingGenerator(FakeTHREE, matLib, shared);
+
+  assert.equal(gen.archetypes.length, 9);
+  for (const style of gen.archetypes) {
+    const parent = new Obj3D();
+    const colliders = [];
+    const task = gen.createCoastalBuildingTask(parent, { cx: -50, cz: -100, width: 24, depth: 18, height: 14, seed: 7, styleName: style, labelZh: '测试建筑' }, { colliderTarget: colliders });
+    assert.deepEqual(Array.from(task.phaseNames), ['structure', 'facade', 'openings', 'roof', 'attachments', 'interior', 'colliders', 'activate']);
+    let steps = 0, done = false;
+    while (!done) {
+      done = task.step();
+      steps++;
+      if (!done) assert.equal(parent.children.length, 0, `${style}: should not mount to parent before activate phase`);
+    }
+    assert.equal(steps, 8, `${style}: must take exactly 8 phased steps`);
+    assert.equal(parent.children.length, 1, `${style}: must mount on final activate phase`);
+    assert.equal(task.phaseTimings.length, 8);
+    assert.ok(task.phaseTimings[0].ops > 0, `${style}: structure phase must perform real work`);
+    assert.ok(colliders.length >= 1, `${style}: colliders phase must emit collider specs`);
+    for (const pt of task.phaseTimings) assert.ok(pt.ms >= 0);
+  }
+  assert.equal(scopeB.window.SALTLINE_BUILD_TIMINGS.length, 9);
+  gen.dispose();
+  matLib.dispose();
+});
+
+test('UrbanPlanningSystem exposes irregular setbacks, alleys, plazas, and green spaces; MaterialLibrary fixes grass_coastal', () => {
+  const quarter = engine.planCoastalQuarter({});
+  assert.ok(quarter.lots.length >= 9);
+  assert.ok(quarter.alleys.length >= 3);
+  assert.ok(quarter.plazas.length >= 2);
+  assert.ok(quarter.greenSpaces.length >= 6);
+  const styles = new Set(quarter.lots.map(l => l.style));
+  assert.ok(styles.has('stepped_mixed_use'));
+  assert.ok(styles.has('bonded_warehouse'));
+  assert.ok(styles.has('waterfront_rowhouses'));
+
+  const matSrc = fs.readFileSync(require.resolve('../WorldEngine/Materials/MaterialLibrary.js'), 'utf8');
+  assert.match(matSrc, /grass_coastal:\s*\{[^}]*kind:\s*'grass'/);
+  assert.match(matSrc, /coastal_soil:\s*\{[^}]*kind:\s*'soil'/);
+  assert.match(matSrc, /roof_slate:\s*\{[^}]*kind:\s*'roof_slate'/);
+  assert.match(matSrc, /roof_zinc:\s*\{[^}]*kind:\s*'roof_zinc'/);
+});
+
+test('preloaded chunks retain shared owned resources until every chunk unloads',()=>{
+  let disposals=0;
+  const geometry={userData:{streamOwned:true},dispose(){disposals++}};
+  const sectors=[0,16].map(center=>({center,streamRadius:10,loaded:true,
+    shell:{traverse(fn){fn({geometry})}},detail:{traverse(){}}}));
+  const manager=engine.createChunkManager({sectors,hysteresis:2,dormantTtlSec:1});
+  const move=x=>manager.update(1,{distanceTo:center=>Math.abs(x-center)});
+  move(0); move(0);
+  assert.equal(disposals,0);
+  move(40); move(40);
+  assert.equal(disposals,1);
+});
