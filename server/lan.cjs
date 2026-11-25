@@ -15,7 +15,7 @@ const MAX_BODY_BYTES = 2048;
 const WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ROOT = path.resolve(__dirname, '..');
 const ASSETS = new Set([
-  'index.html', 'zh.js',
+  'index.html', 'zh.js', 'saltline-ui.css',
   'port-campaign.js', 'port-commander.js', 'port-conquest.js', 'port-rail-yard.js', 'port-expansion.js', 'port-campaign-events.js',
   'port-campaign-ui.js', 'port-campaign-ui.css', 'port-campaign-runtime.js',
   'port-campaign-continuation-layout.js', 'port-campaign-continuation.js',
@@ -35,7 +35,7 @@ const ASSETS = new Set([
   'art/campaign-prologue.jpg', 'art/campaign-berth.jpg', 'art/campaign-rail.jpg', 'art/campaign-drydock.jpg', 'art/campaign-tidegate.jpg',
   'art/campaign-anchorage.jpg', 'art/campaign-return-harbor.jpg', 'art/campaign-night-record.jpg',
   'art/campaign-last-pilot.jpg', 'art/campaign-reopen.jpg',
-  'art/port-conquest.jpg', 'art/port-breakthrough.jpg', 'art/port-lan.jpg',
+  'art/port-conquest.jpg', 'art/port-breakthrough.jpg', 'art/port-lan.jpg', 'art/coastal-quarter.jpg',
 ]);
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',

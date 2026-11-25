@@ -29,6 +29,39 @@ test('a dormant chunk retains shared geometry until the last reference unloads',
   assert.equal(manager.getStats().trackedResources,0);
 });
 
+test('quality LOD changes preserve loaded collision and leave renderer resolution to its owner',()=>{
+  let colliders = 0, pixelChanges = 0;
+  const shell = { visible:false }, detail = { visible:false };
+  const skyline = { visible:true };
+  const sector = { center:0, streamRadius:200, detailRadius:100, shell, detail,
+    onLodChange(loaded, detailed, quality) {
+      const full = loaded && (detailed || !['low','medium'].includes(quality));
+      shell.visible = full;
+      skyline.visible = !full;
+    } };
+  const mgr = engine.createChunkManager({ sectors:[sector], quality:'low',
+    renderer:{ setPixelRatio(){ pixelChanges++; } }, manageResolution:false,
+    syncColliders(sec, enabled){ colliders += enabled ? 1 : -1; } });
+  const move = distance => mgr.update(.016,{ distanceTo:()=>distance });
+  move(80);
+  assert.equal(sector.loaded,true);
+  assert.equal(colliders,1);
+  assert.equal(shell.visible,false);
+  assert.equal(skyline.visible,true);
+  move(20);
+  assert.equal(shell.visible,true);
+  assert.equal(skyline.visible,false);
+  move(120);
+  assert.equal(shell.visible,false);
+  mgr.setQuality('high');
+  move(120);
+  assert.equal(shell.visible,true);
+  assert.equal(colliders,1);
+  mgr.dispose();
+  assert.equal(colliders,0);
+  assert.equal(pixelChanges,0);
+});
+
 test('all textures and buffers of shipped glTF models resolve locally',()=>{
   const path=require('node:path');
   const root=path.join(__dirname,'../assets/models');

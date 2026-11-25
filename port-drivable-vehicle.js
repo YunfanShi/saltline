@@ -426,6 +426,10 @@
     function update(dt, player) {
       if (!active) return;
       if (!(dt > 0)) return;
+      const quality = world.quality?.name;
+      const range = quality === 'low' ? 32 : quality === 'medium' ? 44 : Infinity;
+      const cameraPos = world.camera?.position;
+      root.visible = driving || !cameraPos || cameraPos.distanceToSquared(pos) <= range * range;
       driver.actor.visible = driving && thirdPerson;
       clock += dt;
 

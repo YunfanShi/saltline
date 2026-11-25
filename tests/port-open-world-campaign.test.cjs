@@ -68,3 +68,25 @@ test('Open-World Campaign progress unlocks acts sequentially and persists across
   assert.equal(reloaded.status('ow-0'), 'next');
   assert.equal(reloaded.status('ow-1'), 'locked');
 });
+
+test('open-world mission guidance clears after completion and during free roam', () => {
+  const source = require('node:fs').readFileSync(require.resolve('../port-open-world-district.js'), 'utf8');
+  const start = source.indexOf('    function currentObjectiveInfo() {');
+  const end = source.indexOf('\n    function update(dt, playerPos)', start);
+  assert.ok(start >= 0 && end > start);
+  const makeInfo = require('node:vm').runInNewContext(`(freeRoam, cityCampaignActive, stage) => {
+    const isMultiplayer = () => false;
+    const shootTargets = [];
+    const tsunamiSurviveClock = 0;
+    class Vector3 { constructor(x, y, z) { Object.assign(this, { x, y, z }); } }
+    ${source.slice(start, end)}
+    return currentObjectiveInfo();
+  }`);
+  assert.ok(makeInfo(false, true, 1).en);
+  for (const [roam, active, stage] of [[true, false, 1], [false, false, 1], [false, true, 8]]) {
+    const info = makeInfo(roam, active, stage);
+    assert.equal(info.en, '');
+    assert.equal(info.zh, '');
+    assert.equal(info.pos, null);
+  }
+});

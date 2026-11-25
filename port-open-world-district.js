@@ -184,23 +184,6 @@
       .sl-stealth-pill.alert{background:rgba(235,88,68,.2);color:#ff9486;border-color:rgba(255,148,134,.45)}
       .sl-interact-prompt{position:fixed;left:50%;bottom:136px;transform:translateX(-50%);z-index:24;background:rgba(10,16,21,.92);border:1px solid rgba(240,196,108,.65);border-left:4px solid #f0c46c;border-radius:6px;padding:8px 16px;color:#f5f8fa;font:700 13px/1.3 system-ui,-apple-system,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none;display:none}
       .sl-interact-prompt.on{display:block}
-      .sl-act-card{position:fixed;left:50%;top:18%;transform:translate(-50%,-14px) scale(.97);z-index:32;pointer-events:none;text-align:center;opacity:0;transition:opacity .55s ease,transform .55s cubic-bezier(.22,1,.36,1);background:linear-gradient(90deg,rgba(8,14,19,0),rgba(8,14,19,.92) 16%,rgba(8,14,19,.92) 84%,rgba(8,14,19,0));padding:16px 56px;border-top:1px solid rgba(240,185,78,.68);border-bottom:1px solid rgba(240,185,78,.68)}
-      .sl-act-card.show{opacity:1;transform:translate(-50%,0) scale(1)}
-      .sl-act-kicker{font:700 11px/1 ui-monospace,monospace;letter-spacing:.34em;color:#f0b94e;text-transform:uppercase;margin-bottom:6px}
-      .sl-act-title{font:800 28px/1.15 system-ui,-apple-system,sans-serif;color:#f4fafc;letter-spacing:.1em;text-shadow:0 2px 16px rgba(0,0,0,.8)}
-      .sl-act-sub{font:500 13.5px/1.38 system-ui,-apple-system,sans-serif;color:#b2e2ee;margin-top:6px}
-      .sl-cinema-bar{position:fixed;left:0;right:0;height:0;z-index:30;background:#04080c;pointer-events:none;transition:height .65s cubic-bezier(.22,1,.36,1)}
-      .sl-cinema-bar.top{top:0;border-bottom:1px solid rgba(240,185,78,.28)}
-      .sl-cinema-bar.bottom{bottom:0;border-top:1px solid rgba(240,185,78,.28)}
-      .sl-cinema-bar.on{height:58px}
-      .sl-story-box{position:fixed;left:50%;bottom:74px;transform:translate(-50%,10px);z-index:33;width:min(680px,88vw);background:rgba(7,13,18,.90);border:1px solid rgba(102,217,240,.38);border-left:4px solid #66d9f0;border-radius:6px;padding:10px 16px;color:#edf7fa;pointer-events:none;opacity:0;transition:opacity .35s ease,transform .35s ease;box-shadow:0 10px 28px rgba(0,0,0,.55);backdrop-filter:blur(6px)}
-      .sl-story-box.show{opacity:1;transform:translate(-50%,0)}
-      .sl-story-box.hostile{border-left-color:#f05442;border-color:rgba(240,84,66,.45)}
-      .sl-story-box.rescue{border-left-color:#42d982;border-color:rgba(66,217,130,.45)}
-      .sl-story-speaker{font:700 11px/1 ui-monospace,monospace;letter-spacing:.16em;color:#66d9f0;margin-bottom:5px;text-transform:uppercase}
-      .sl-story-box.hostile .sl-story-speaker{color:#ff8978}
-      .sl-story-box.rescue .sl-story-speaker{color:#72f0a8}
-      .sl-story-line{font:600 14px/1.45 system-ui,-apple-system,sans-serif;color:#f3fafc}
       .sl-finale-card{position:fixed;inset:0;z-index:62;background:rgba(5,10,15,.82);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;color:#eef8fb}
       .sl-finale-card.open{display:flex}
       .sl-finale-inner{width:min(580px,92vw);background:rgba(11,18,25,.96);border:1px solid rgba(240,185,78,.55);border-radius:10px;padding:28px 32px;text-align:center;box-shadow:0 22px 54px rgba(0,0,0,.72)}
@@ -210,8 +193,6 @@
       .sl-finale-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
       .sl-finale-btn{background:rgba(102,217,240,.18);color:#dff8ff;border:1px solid rgba(102,217,240,.55);border-radius:6px;padding:9px 20px;font:700 13px/1 system-ui,sans-serif;cursor:pointer}
       .sl-finale-btn.primary{background:rgba(240,185,78,.24);color:#fff2cc;border-color:rgba(240,185,78,.72)}
-      .sl-cod-typewriter{position:fixed;left:24px;bottom:28px;z-index:34;pointer-events:none;font:700 12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;color:#d8f8e8;text-shadow:0 1px 10px rgba(0,0,0,.92),0 0 12px rgba(102,217,240,.35);border-left:2.5px solid #66d9f0;padding:4px 0 4px 12px;letter-spacing:.09em;white-space:pre-line;opacity:0;transition:opacity .45s ease}
-      .sl-cod-typewriter.show{opacity:1}
       .sl-cod-hitmarker{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.82);z-index:35;width:28px;height:28px;pointer-events:none;opacity:0;color:#ffffff;filter:drop-shadow(0 0 5px rgba(0,0,0,.85));transition:opacity .08s ease-out,transform .08s ease-out}
       .sl-cod-hitmarker.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
       .sl-cod-hitmarker.kill{color:#ff7b42;filter:drop-shadow(0 0 8px rgba(255,123,66,.85));transform:translate(-50%,-50%) scale(1.22)}
@@ -360,6 +341,7 @@
 
     const externalAssets = typeof window.createSaltlineExternalAssets === 'function'
       ? window.createSaltlineExternalAssets(THREE) : null;
+    const utilityPoles = [];
     const WE = window.WorldEngine || null;
     const matLib = WE?.createMaterialLibrary ? WE.createMaterialLibrary(THREE, world.mats) : null;
     const buildingGen = WE?.createBuildingGenerator && matLib ? WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane }) : null;
@@ -368,8 +350,21 @@
     const industrialGen = WE?.createIndustrialGenerator && matLib ? WE.createIndustrialGenerator(THREE, matLib, M) : null;
     const atmosphereSys = WE?.createAtmosphereSystem ? WE.createAtmosphereSystem(THREE, root, updaters) : null;
     function placeExternal(parent, assetId, x, y, z, yaw = 0, scale = 1.0) {
-      return externalAssets ? externalAssets.place(parent, assetId, x, y, z, yaw, scale) : null;
+      const prop = externalAssets?.place(parent, assetId, x, y, z, yaw, scale) ?? null;
+      if (prop && assetId === 'modular_electricity_poles') utilityPoles.push(prop);
+      return prop;
     }
+    function streetDetailRange() {
+      const quality = world.quality?.name;
+      return quality === 'low' ? 45 : quality === 'medium' ? 70 : Infinity;
+    }
+    updaters.push(() => {
+      const position = world.camera?.position;
+      const radius = streetDetailRange();
+      for (const pole of utilityPoles) {
+        pole.visible = !position || position.distanceToSquared(pole.position) <= radius * radius;
+      }
+    });
 
     function makeSector(id, nameZh, nameEn, center, streamRadius = 275) {
       const group = new Group();
@@ -1737,14 +1732,36 @@
       addCyl(city.detail, M.steelDark, .09, .86, -33.45, .74, bz);
       addCyl(city.detail, M.steelGalv, .10, .08, -33.45, 1.18, bz);
     }
-    for (let z = -34; z >= -140; z -= 6.5) addBox(city.detail, M.yellowPaint, .18, .015, 3.2, -26, .24, z);
+    // Keep road-marking batches local so the renderer can cull each stretch independently.
+    const roadMarkings = new Map();
+    function addRoadMarking(mat, w, d, x, z) {
+      const key = `${mat === M.yellowPaint ? 'yellow' : 'white'}:${w}:${d}:${Math.floor(x / 24)}:${Math.floor(z / 24)}`;
+      if (!roadMarkings.has(key)) roadMarkings.set(key, { mat, w, d, positions: [] });
+      roadMarkings.get(key).positions.push([x, z]);
+    }
+    for (let z = -34; z >= -140; z -= 6.5) addRoadMarking(M.yellowPaint, .18, 3.2, -26, z);
     for (let x = -100; x <= 18; x += 6.5) {
       if (Math.abs(x + 26) < 9) continue;
-      addBox(city.detail, M.yellowPaint, 3.2, .015, .18, x, .24, -84);
+      addRoadMarking(M.yellowPaint, 3.2, .18, x, -84);
     }
     for (let i = -3; i <= 3; i++) {
-      addBox(city.detail, M.whitePaint, .7, .015, 3.2, -26 + i * 1.6, .24, -74);
-      addBox(city.detail, M.whitePaint, .7, .015, 3.2, -26 + i * 1.6, .24, -94);
+      addRoadMarking(M.whitePaint, .7, 3.2, -26 + i * 1.6, -74);
+      addRoadMarking(M.whitePaint, .7, 3.2, -26 + i * 1.6, -94);
+    }
+    for (const { mat, w, d, positions } of roadMarkings.values()) {
+      if (positions.length < 2 || typeof THREE.InstancedMesh !== 'function') {
+        for (const [x, z] of positions) addBox(city.detail, mat, w, .015, d, x, .24, z);
+        continue;
+      }
+      const mesh = new THREE.InstancedMesh(getWorldBoxGeo(w, .015, d), mat, positions.length);
+      const transform = new THREE.Object3D();
+      positions.forEach(([x, z], index) => {
+        transform.position.set(x, .24, z);
+        transform.updateMatrix();
+        mesh.setMatrixAt(index, transform.matrix);
+      });
+      mesh.receiveShadow = true;
+      city.detail.add(mesh);
     }
     // Downtown Traffic Signal Gantries & Seafront Promenade Balustrade + Benches
     for (const [tx, tz] of [[-35.5, -75.5], [-16.5, -92.5]]) {
@@ -1898,6 +1915,11 @@
       } else {
         const lot = makeParcel(blk.style, blk.cx, blk.cz, 172, 95);
         const skyline = buildingGen.buildDistantBuilding(root, blk);
+        lot.onLodChange = (loaded, detailed, quality) => {
+          const showFull = loaded && (detailed || (quality !== 'low' && quality !== 'medium'));
+          lot.shell.visible = showFull;
+          skyline.visible = !showFull;
+        };
         let architecture = null;
         let buildTask = null;
         lot.onBuild = () => {
@@ -2792,7 +2814,13 @@
       let npcAge = 0;
       updaters.push(dt => {
         npcAge += dt;
-        for (let i = 0; i < cityNpcs.length; i++) cityNpcs[i].pose('stand', 0, npcAge + i * 1.1, false);
+        const position = world.camera?.position;
+        const radius = streetDetailRange();
+        for (let i = 0; i < cityNpcs.length; i++) {
+          const npc = cityNpcs[i];
+          npc.actor.visible = !position || position.distanceToSquared(npc.actor.position) <= radius * radius;
+          if (npc.actor.visible) npc.pose('stand', 0, npcAge + i * 1.1, false);
+        }
       });
     }
 
@@ -2834,18 +2862,8 @@
     }
 
     // =========================================================================
-    // CINEMATIC COD-STYLE ACT TITLE CARD + 《失联名单》 RADIO DRAMA + GARRISON SQUADS
+    // Campaign radio and completion screen
     // =========================================================================
-    const actCard = document.createElement('div');
-    actCard.className = 'sl-act-card';
-    actCard.innerHTML = `<div class="sl-act-kicker" data-k></div><div class="sl-act-title" data-t></div><div class="sl-act-sub" data-s></div>`;
-    const cinemaTop = document.createElement('div');
-    cinemaTop.className = 'sl-cinema-bar top';
-    const cinemaBot = document.createElement('div');
-    cinemaBot.className = 'sl-cinema-bar bottom';
-    const storyBox = document.createElement('div');
-    storyBox.className = 'sl-story-box';
-    storyBox.innerHTML = `<div class="sl-story-speaker" data-sp></div><div class="sl-story-line" data-ln></div>`;
     const finaleCard = document.createElement('div');
     finaleCard.className = 'sl-finale-card';
     finaleCard.innerHTML = `
@@ -2860,37 +2878,13 @@
           <button class="sl-finale-btn" data-finale-replay>🔄 从第一幕重玩</button>
         </div>
       </div>`;
-    const codTypewriter = document.createElement('div');
-    codTypewriter.className = 'sl-cod-typewriter';
     const codHitmarker = document.createElement('div');
     codHitmarker.className = 'sl-cod-hitmarker';
     codHitmarker.innerHTML = `<svg viewBox="0 0 28 28" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="4" y1="4" x2="10" y2="10"/><line x1="24" y1="4" x2="18" y2="10"/><line x1="4" y1="24" x2="10" y2="18"/><line x1="24" y1="24" x2="18" y2="18"/></svg>`;
-    document.body.append(actCard, cinemaTop, cinemaBot, storyBox, finaleCard, codTypewriter, codHitmarker);
-    let actCardTimer = null, cinemaTimer = null, storyHideTimer = null;
-    let typewriterInterval = null, typewriterHideTimer = null, hitmarkerTimer = null;
+    document.body.append(finaleCard, codHitmarker);
+    let hitmarkerTimer = null;
     const storyTimers = [];
     let finaleSpinActive = false;
-
-    function playCodTypewriter(idx) {
-      const sc = actScripts[idx];
-      if (!sc || freeRoam || isMultiplayer()) return;
-      if (typewriterInterval) { clearInterval(typewriterInterval); typewriterInterval = null; }
-      if (typewriterHideTimer) { clearTimeout(typewriterHideTimer); typewriterHideTimer = null; }
-      const full = `${sc.codTime || 'DAY 01 · 05:34:00'}
-${sc.codLoc || 'SALTLINE COASTAL PORT'}
-SAR-04 · LIN / MARA CHEN`;
-      let pos = 0;
-      codTypewriter.textContent = '';
-      codTypewriter.classList.add('show');
-      typewriterInterval = setInterval(() => {
-        pos += 2;
-        codTypewriter.textContent = full.slice(0, pos) + (pos < full.length ? '▌' : '');
-        if (pos >= full.length) {
-          clearInterval(typewriterInterval); typewriterInterval = null;
-          typewriterHideTimer = setTimeout(() => codTypewriter.classList.remove('show'), 4600);
-        }
-      }, 36);
-    }
 
     function flashHitmarker(isKill = false) {
       if (freeRoam || isMultiplayer()) return;
@@ -2902,54 +2896,42 @@ SAR-04 · LIN / MARA CHEN`;
       hitmarkerTimer = setTimeout(() => codHitmarker.classList.remove('show', 'kill'), isKill ? 220 : 140);
     }
 
-    function setLetterbox(on, autoOffMs = 0) {
-      cinemaTop.classList.toggle('on', !!on);
-      cinemaBot.classList.toggle('on', !!on);
-      if (cinemaTimer) clearTimeout(cinemaTimer);
-      if (on && autoOffMs > 0) { cinemaTimer = setTimeout(() => setLetterbox(false), autoOffMs); }
-    }
-
     function clearStoryTimers() {
       for (const id of storyTimers.splice(0)) clearTimeout(id);
-      if (storyHideTimer) { clearTimeout(storyHideTimer); storyHideTimer = null; }
-      storyBox.classList.remove('show');
     }
 
-    function showStoryBeat(speaker, line, tone = 'ally', durMs = 5200) {
+    function showStoryBeat({ speaker, line, tone, dur = 5200 }) {
       if (freeRoam || isMultiplayer()) return;
-      storyBox.className = 'sl-story-box show' + (tone === 'hostile' ? ' hostile' : tone === 'rescue' ? ' rescue' : '');
-      storyBox.querySelector('[data-sp]').textContent = speaker;
-      storyBox.querySelector('[data-ln]').textContent = line;
-      world.hud?.radio?.(`${speaker}：${line}`, durMs / 1000);
-      if (storyHideTimer) clearTimeout(storyHideTimer);
-      storyHideTimer = setTimeout(() => storyBox.classList.remove('show'), durMs);
+      const [name] = speaker.split(' · ');
+      const names = {
+        LIN: ['Lin', '林恩'], 'MARA CHEN': ['Mara Chen', '玛拉·陈'],
+        'MARITIME RESCUE FLEET': ['Rescue Fleet', '救援舰队'], REED: ['Reed', '里德'], WARD: ['Ward', '沃德'],
+      };
+      world.hud?.radio?.(line, dur / 1000, null, {
+        speaker: names[name] ? local(...names[name]) : name,
+        side: tone === 'hostile' ? 'hostile' : 'ally',
+      });
     }
 
     function playStorySequence(beats) {
       clearStoryTimers();
       if (!Array.isArray(beats) || freeRoam) return;
       for (const b of beats) {
-        storyTimers.push(setTimeout(() => showStoryBeat(b.speaker, b.line, b.tone, b.dur ?? 5200), (b.at ?? 0) * 1000));
+        storyTimers.push(setTimeout(() => showStoryBeat(b), (b.at ?? 0) * 1000));
       }
     }
 
     finaleCard.querySelector('[data-finale-roam]').addEventListener('click', () => {
       finaleCard.classList.remove('open');
-      setLetterbox(false);
       setFreeRoam(true, true);
     });
     finaleCard.querySelector('[data-finale-replay]').addEventListener('click', () => {
       finaleCard.classList.remove('open');
-      setLetterbox(false);
       jumpToStage(0, { teleport: true, clearEnemies: true });
     });
 
     const actScripts = [
       {
-        codTime: 'DAY 01 · 05:34:12', codLoc: 'BERTH 4 HARBOR · SALTLINE',
-        kicker: 'ACT I · 05:34 · BERTH 4 HARBOR',
-        title: '四号泊位 · 失联名单',
-        sub: '摧毁 2 座铁砧防空干扰塔，揭开老霍克 05:31 / 05:34 伪造撤离记录',
         beats: [
           { at: .2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '林恩，我拿到老霍克 05:34 亲笔签的值班交接条——可里德的封港系统却伪造他在 05:31 就离港了！' },
           { at: 5.8, speaker: 'REED · PORT DIRECTOR（截获频道）', tone: 'hostile', line: '四号泊位已经封存！沃德，别让 SAR 的人把货单带出码头，干扰塔全功率压制！' },
@@ -2958,10 +2940,6 @@ SAR-04 · LIN / MARA CHEN`;
         spawns: [['hound', -10, 0, -12], ['hound', 10, 0, 6]],
       },
       {
-        codTime: 'DAY 01 · 05:51:04', codLoc: 'COASTAL BLVD · DOWNTOWN SECTOR',
-        kicker: 'ACT II · COASTAL CITY BOULEVARD',
-        title: '沿海城区 · 高速撞卡',
-        sub: '驾驶武装 SAR 四驱车高速撞碎铁砧封城路障，杀出沿海主干道',
         beats: [
           { at: .4, speaker: 'WARD · ANVIL COMMANDER（敌方频道）', tone: 'hostile', line: '05:50 搜救艇早已召回！所有单位封死沿海大道十字路口，连人带车给我拦截下来！' },
           { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '按 [G] 召唤四驱车、[F] 上车！车顶 12.7mm 机枪按左键就能扫射——油门踩到底，直接撞穿前面路障！' },
@@ -2969,10 +2947,6 @@ SAR-04 · LIN / MARA CHEN`;
         spawns: [['hound', -22, 0, -68], ['hound', -30, 0, -82], ['gull', -26, 12, -74]],
       },
       {
-        codTime: 'DAY 01 · 06:14:28', codLoc: 'SW CRYO DEPOT & TRIAGE CLINIC',
-        kicker: 'ACT III · SW COLD-STORAGE & CLINIC',
-        title: '西南冷雾库 · 第十七人',
-        sub: '攻入西南冷雾库与战地分诊中心，击毁 2 台冷库锁控箱抢出托马斯的原始档案',
         beats: [
           { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '我哥托马斯·万斯是名单里被抹掉的第十七人——他生前发现铁砧借冷链集装箱走私军用干扰舱！' },
           { at: 6.2, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '冷库主控已锁死！切掉西南片区高压配电，让风暴替我们把那批档案彻底封冻！' },
@@ -2980,10 +2954,6 @@ SAR-04 · LIN / MARA CHEN`;
         spawns: [['hound', -146, 0, 70], ['hound', -144, 0, 96], ['gull', -154, 12, 78]],
       },
       {
-        codTime: 'DAY 01 · 06:39:50', codLoc: 'WEST RAIL MARSHALLING YARD',
-        kicker: 'ACT IV · WEST RAIL FREIGHT YARD',
-        title: '西区铁路货场 · 截停专列',
-        sub: '雷暴中北上西区编组站，炸毁 2 处铁路信号主控闸迫停铁砧证物专列',
         beats: [
           { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '雷暴已经压过来了！铁砧正把四号泊位全部原始货单装上西区货运专列，准备钻进山洞转移！' },
           { at: 6.2, speaker: 'LIN · SAR-04', tone: 'ally', line: '收到，绝不能让专列出谷！我会炸毁东股道和西塔台两处信号闸，把整列火车逼停在货场里！' },
@@ -2991,10 +2961,6 @@ SAR-04 · LIN / MARA CHEN`;
         spawns: [['hound', -142, 0, -6], ['hound', -184, 0, 12], ['gull', -164, 13, 0]],
       },
       {
-        codTime: 'DAY 01 · 07:08:15', codLoc: 'WEST RIDGE COMMS · ELEV +14M',
-        kicker: 'ACT V · WEST MOUNTAIN RIDGE +14M',
-        title: '西岸山地卫星站 · 登顶劫持',
-        sub: '沿盘山高架公路爬升 +14m 登顶，狙击 3 个卫星散热芯向全城公开《失联名单》',
         beats: [
           { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '油罐连爆把专列彻底截停了！十七人的证物链齐了——开车冲上 +14m 西岸山顶，劫持卫星大锅公开广播！' },
           { at: 6.4, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '全员死守山顶雷达站！如果他们连上海事局卫星，立刻启动「零号泄洪」，炸毁南防潮闸淹掉整座港区！' },
@@ -3002,10 +2968,6 @@ SAR-04 · LIN / MARA CHEN`;
         spawns: [['hound', -180, 14, -84], ['hound', -182, 14, -70], ['gull', -190, 26, -78]],
       },
       {
-        codTime: 'DAY 01 · 07:19:42', codLoc: 'SLUICE ZERO · 12M STORM SURGE',
-        kicker: 'ACT VI · SLUICE ZERO · 12M TSUNAMI',
-        title: '零号泄洪 · 12 米东海海啸',
-        sub: '沃德炸毁南防潮闸企图毁尸灭迹！死守 +14m 山顶俯瞰 12 米巨浪吞没港区',
         beats: [
           { at: .2, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '引爆南防潮闸！既然证据藏不住了，就让东海把整座盐线港冲干净！' },
           { at: 5.5, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '名单已经上传完毕！抓紧掩体，12 米风暴潮正在拍碎海堤——在 +14m 山顶撑过这 12 秒！' },
@@ -3013,10 +2975,6 @@ SAR-04 · LIN / MARA CHEN`;
         spawns: [],
       },
       {
-        codTime: 'DAY 01 · 07:42:09', codLoc: 'SOUTH DRYDOCK & 22M LIGHTHOUSE',
-        kicker: 'ACT VII · SOUTH DRYDOCK & HEADLAND',
-        title: '南港船坞 · 风暴点灯',
-        sub: '顶着海上重炮覆盖冲向南港海角，摧毁 2 座电源干扰器重启 22 米灯塔指引舰队',
         beats: [
           { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: 'SAR-04，已收到十七人《失联名单》铁证！救援舰队已抵东海雾墙外，但南角灯塔熄灭，请求立刻复明！' },
           { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '洪峰退了！冲下盘山路直奔南港旧船坞——小心敌舰炮火，炸掉灯塔旁的干扰器点亮海湾！' },
@@ -3024,10 +2982,6 @@ SAR-04 · LIN / MARA CHEN`;
         spawns: [['hound', -14, 0, 118], ['hound', 6, 0, 126], ['gull', 0, 14, 130]],
       },
       {
-        codTime: 'DAY 01 · 08:05:33', codLoc: 'NW COASTAL AIRFIELD · RUNWAY 07',
-        kicker: 'ACT VIII · NW COASTAL AIRFIELD',
-        title: '海岸应急机场 · 终局撤离',
-        sub: '灯塔重燃、舰队入港！顶着跑道炮火全速冲进西北机场拱形机库完成撤离',
         beats: [
           { at: .2, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '已目视南角灯塔强光！先遣舰队正进港接管防务，西北机场救援运输机已启动引擎，全速前往机库汇合！' },
           { at: 6.0, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '托马斯和十七个兄弟不会白白失联了……林恩，把油门踩到底，冲进 110 米跑道尽头的拱形机库！' },
@@ -3036,18 +2990,12 @@ SAR-04 · LIN / MARA CHEN`;
       },
     ];
 
-    function showActCard(idx) {
-      const sc = actScripts[idx];
-      if (!sc || freeRoam) return;
-      actCard.querySelector('[data-k]').textContent = sc.kicker;
-      actCard.querySelector('[data-t]').textContent = sc.title;
-      actCard.querySelector('[data-s]').textContent = sc.sub;
-      actCard.classList.add('show');
-      setLetterbox(true, 3600);
-      if (actCardTimer) clearTimeout(actCardTimer);
-      actCardTimer = setTimeout(() => actCard.classList.remove('show'), 4200);
-      playCodTypewriter(idx);
-      if (sc.beats) playStorySequence(sc.beats);
+    function playActBriefing(idx) {
+      const act = OPEN_WORLD_ACTS[idx];
+      if (freeRoam || !act) return;
+      const title = local(...act.title);
+      world.hud?.showChapter?.(title.split(' · ').at(-1));
+      if (actScripts[idx]?.beats) playStorySequence(actScripts[idx].beats);
     }
 
     function spawnStageDefenders(idx) {
@@ -3069,7 +3017,6 @@ SAR-04 · LIN / MARA CHEN`;
     let freeRoam = !!(window.SALTLINE_OPEN_WORLD_ROAM || world.params?.mode === 'openworld');
     let cityCampaignActive = !freeRoam; // Default to 8-Act Battlefield Open-World Campaign in mission mode!
     let photoMode = false;
-    const isMainStoryActive = () => false;
     function syncOpenWorldMissionProps() {
       const showProps = cityCampaignActive && !freeRoam && !isMultiplayer();
       jammerRoot.visible = showProps;
@@ -3077,7 +3024,6 @@ SAR-04 · LIN / MARA CHEN`;
       for (const rb of roadblockProps) rb.mesh.visible = showProps && rb.intact;
     }
     syncOpenWorldMissionProps();
-    const discoveredLandmarks = new Set();
 
     const photoPill = document.createElement('div');
     photoPill.className = 'sl-photo-pill';
@@ -3088,10 +3034,7 @@ SAR-04 · LIN / MARA CHEN`;
 
     function setPhotoMode(on) {
       photoMode = typeof on === 'boolean' ? on : !photoMode;
-      hud.classList.toggle('photo-hidden', photoMode);
       minimap.classList.toggle('photo-hidden', photoMode);
-      pinLayer.classList.toggle('photo-hidden', photoMode);
-      guideStripEl.classList.toggle('photo-hidden', photoMode);
       photoPill.classList.toggle('on', photoMode);
       const uiRoot = document.getElementById('ui');
       if (uiRoot) uiRoot.style.opacity = photoMode ? '0' : '1';
@@ -3102,20 +3045,20 @@ SAR-04 · LIN / MARA CHEN`;
       window.SALTLINE_OPEN_WORLD_ROAM = freeRoam;
       if (freeRoam) {
         cityCampaignActive = false;
+        world.hud?.setObjective?.('');
+        world.hud?.showChapter?.('');
+        world.hud?.setMarkers?.([]);
+        world.hud?.clearRadio?.();
+        clearStoryTimers();
         syncOpenWorldMissionProps();
-        actCard.classList.remove('show');
         world.enemies?.clear?.();
         if (world.developer?.flags) world.developer.flags.noEnemies = true;
-        if (announceChange) {
-          world.tactical?.notify?.('🌏 已进入「开放世界·自由漫游」模式！[E] 交互 · [F] 开车 · [M] 地图',
-            '🌏 Open World Free-Roam Active! [E] Interact · [F] Drive · [M] Map', false, 5.0);
-        }
       } else {
         cityCampaignActive = true;
         syncOpenWorldMissionProps();
         if (world.developer?.flags) world.developer.flags.noEnemies = false;
         if (announceChange) {
-          showActCard(stage);
+          playActBriefing(stage);
           spawnStageDefenders(stage);
         }
       }
@@ -3156,14 +3099,11 @@ SAR-04 · LIN / MARA CHEN`;
     mapOverlay.innerHTML = `
       <div class="sl-map-card">
         <div class="sl-map-header">
-          <div>
-            <div class="sl-map-title">盐线市海滨全城地图 [M] · 东海净空 / 西岸连续陆地</div>
-            <div class="sl-map-sub">右侧深蓝为纯开放东海（零乱建）· 左侧为两纵三横 7 大连通区 · 点击任意区设 GPS 或快速传送</div>
-          </div>
+          <div class="sl-map-title">${local('Coastal district map', '盐线地图')}</div>
           <div class="sl-map-top-btns">
             <button class="sl-map-mode-btn" data-toggle-mode></button>
-            <button class="sl-map-close" data-sky-btn>🌤️ 切天色 [T]</button>
-            <button class="sl-map-close" data-close>关闭 [M]</button>
+            <button class="sl-map-close" data-sky-btn>${local('Time of day [T]', '天色 [T]')}</button>
+            <button class="sl-map-close" data-close>${local('Close [M]', '关闭 [M]')}</button>
           </div>
         </div>
         <div class="sl-map-canvas">
@@ -3171,7 +3111,7 @@ SAR-04 · LIN / MARA CHEN`;
             <!-- Open East Sea on the right (x > +26) -->
             <rect x="26" y="-236" width="60" height="396" fill="#072233"/>
             <line x1="26" y1="-236" x2="26" y2="160" stroke="#5ccbe0" stroke-width="2" stroke-dasharray="6 4"/>
-            <text x="45" y="-40" fill="#529ab0" font-size="10" font-weight="700" writing-mode="tb">东海航道 · 纯开放海域</text>
+            <text x="45" y="-40" fill="#7b9396" font-size="10" font-weight="700" writing-mode="tb">${local('East Sea', '东海')}</text>
             <!-- North-South Central Rail Corridor & Twin Tunnel + South Drydock Basin -->
             <g stroke="#90a4ae" stroke-width="3" stroke-dasharray="5 3" fill="none" opacity="0.85">
               <line x1="-133" y1="-115" x2="-133" y2="144"/>
@@ -3289,7 +3229,7 @@ SAR-04 · LIN / MARA CHEN`;
     }
 
     function renderMapEntries(playerPos) {
-      mapModeBtn.textContent = freeRoam ? '🌏 当前：自由漫游（点此切回全城 8 幕战役）' : '🔥 当前：全城 8 幕战役（点此切自由漫游）';
+      mapModeBtn.textContent = freeRoam ? local('Switch to campaign', '切换到战役') : local('Switch to free roam', '切换到漫游');
       mapZonesG.innerHTML = '';
       mapListEl.innerHTML = '';
       for (const d of districts) {
@@ -3301,7 +3241,7 @@ SAR-04 · LIN / MARA CHEN`;
         g.innerHTML = `
           <rect x="${rx}" y="${rz}" width="${rw}" height="${rh}" rx="6"
             fill="${d.color}" fill-opacity="${isLoaded ? '0.48' : '0.22'}"
-            stroke="${isLoaded ? '#66d9f0' : 'rgba(255,255,255,0.28)'}" stroke-width="${isLoaded ? '2.2' : '1.2'}"/>
+            stroke="rgba(219, 223, 213, .5)" stroke-width="1.2"/>
           <text x="${rx + rw / 2}" y="${rz + rh / 2 + 3}" text-anchor="middle" fill="#eef9fc" font-size="10.5" font-weight="700">${d.nameZh.slice(3, 10)}</text>
         `;
         g.addEventListener('click', () => setGpsDistrict(d));
@@ -3311,13 +3251,12 @@ SAR-04 · LIN / MARA CHEN`;
         item.className = 'sl-map-item' + (isLoaded ? ' active' : '');
         item.innerHTML = `
           <div class="sl-map-item-top">
-            <span>${d.nameZh}</span>
-            <span class="sl-map-badge ${isLoaded ? 'loaded' : ''}">${d.id === 'berth' ? '核心常驻' : (isLoaded ? '已加载' : '远景可见')}</span>
+            <span>${local(d.nameEn, d.nameZh.slice(3))}</span>
           </div>
           <div style="font-size:11px;color:#99b7c1">${d.scenic}</div>
           <div class="sl-map-actions">
-            <button class="sl-map-btn" data-gps-btn>📍 设 GPS 导航</button>
-            <button class="sl-map-btn tp" data-tp-btn>⚡ 快速传送</button>
+            <button class="sl-map-btn" data-gps-btn>${local('Set GPS', '设 GPS')}</button>
+            <button class="sl-map-btn tp" data-tp-btn>${local('Fast travel', '传送')}</button>
           </div>
         `;
         item.querySelector('[data-gps-btn]').addEventListener('click', () => setGpsDistrict(d));
@@ -3453,10 +3392,6 @@ SAR-04 · LIN / MARA CHEN`;
     // =========================================================================
     // 8-ACT CONNECTED COASTAL CITY CAMPAIGN ("盐线市·失联名单")
     // =========================================================================
-    const beaconMat = new MeshBasicMaterial({ color: 0x56cfe6, transparent: true, opacity: .28, depthWrite: false });
-    const skyBeacon = new Mesh(new CylinderGeometry(.72, .72, 48, 12, 1, true), beaconMat);
-    root.add(skyBeacon);
-
     let stage = 0;
     let tsunamiSurviveClock = 0, runwayArtilleryClock = 0, bridgeBarrageTriggered = false, introActShown = false;
     let act2ChaseTriggered = false, act8RunwayPassTriggered = false;
@@ -3466,7 +3401,7 @@ SAR-04 · LIN / MARA CHEN`;
       if (nextStage > stage) owProgress.completeStage(stage);
       stage = nextStage;
       if (nextStage < 8) {
-        showActCard(nextStage);
+        playActBriefing(nextStage);
         spawnStageDefenders(nextStage);
       }
     }
@@ -3504,7 +3439,7 @@ SAR-04 · LIN / MARA CHEN`;
         world.disasters?.triggerTsunami?.();
       }
       if (idx === 6) world.disasters?.triggerArtilleryBarrage?.();
-      showActCard(idx);
+      playActBriefing(idx);
       spawnStageDefenders(idx);
     }
 
@@ -3606,6 +3541,7 @@ SAR-04 · LIN / MARA CHEN`;
       const ring = new Mesh(new THREE.RingGeometry(5.2, 6.2, 32), ringMat);
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(op.pos.x, op.pos.y + .06, op.pos.z);
+      ring.visible = false;
       root.add(ring);
       return { ...op, ring, ringMat };
     });
@@ -3711,22 +3647,12 @@ SAR-04 · LIN / MARA CHEN`;
       } finally { droneBlastGuard = false; }
     });
 
-    // Start hidden until active gameplay (NEVER blocks the Main Title Menu!)
-    const hud = document.createElement('div');
-    hud.className = 'sl-world-hud sl-menu-hidden';
-    hud.innerHTML = `<div class="sl-world-zone" data-zone>当前区域：四号泊位核心港区</div><div data-perf>FPS --</div><div class="sl-stealth-pill" data-stealth>🟢 隐蔽潜行 · 东海净空</div><div class="sl-world-op" data-op></div><div class="sl-world-hint" data-support>[Z]空投(2) · [K]烟雾(3) · [X]炮击(5) · [G]四驱车 · [M]地图</div>`;
-    document.body.appendChild(hud);
-    const zoneEl = hud.querySelector('[data-zone]');
-    const perfEl = hud.querySelector('[data-perf]');
-    const stealthEl = hud.querySelector('[data-stealth]');
-    const opEl = hud.querySelector('[data-op]');
-
     // Live GTA / 异环-Style Corner Minimap (Strict x <= +26 Coastline, hidden on Main Menu!)
     const minimap = document.createElement('div');
     minimap.className = 'sl-minimap sl-menu-hidden';
     minimap.title = '点击或按 [M] 打开全城战术大地图';
     minimap.innerHTML = `
-      <div class="sl-minimap-head"><span>盐线市雷达 (东海净空)</span><span>[M]</span></div>
+      <div class="sl-minimap-head"><span>地图</span><span>[M]</span></div>
       <svg viewBox="-236 -236 300 396" preserveAspectRatio="xMidYMid meet">
         <rect x="26" y="-236" width="60" height="396" fill="#072233"/>
         <line x1="26" y1="-236" x2="26" y2="160" stroke="#5ccbe0" stroke-width="2.5"/>
@@ -3758,29 +3684,9 @@ SAR-04 · LIN / MARA CHEN`;
     const mmRouteL = minimap.querySelector('[data-mm-route]');
     const mmTargetC = minimap.querySelector('[data-mm-target]');
 
-    // 3D Horizon Landmark Pins (hidden on Main Menu!)
-    const pinLayer = document.createElement('div');
-    pinLayer.className = 'sl-pin-layer sl-menu-hidden';
-    document.body.appendChild(pinLayer);
-    const landmarkIcons = { berth: '⚓', city: '🏙️', sw_clinic: '🏥', rail_west: '🚂', mountain: '⛰️', south_harbor: '🗼', airfield: '✈️' };
-    const landmarkPins = districts.map(d => {
-      const el = document.createElement('div');
-      el.className = 'sl-pin';
-      el.innerHTML = `${landmarkIcons[d.id] || '📍'} ${d.nameZh.slice(3, 9)}<b data-dist></b>`;
-      pinLayer.appendChild(el);
-      const anchor = new Vector3(d.rect[0] + d.rect[2] / 2, d.id === 'mountain' || d.id === 'south_harbor' ? 24 : 16, d.rect[1] + d.rect[3] / 2);
-      return { d, el, distEl: el.querySelector('[data-dist]'), anchor };
-    });
-    const projTmp = new Vector3();
-    const objPinEl = document.createElement('div');
-    objPinEl.className = 'sl-obj-pin sl-menu-hidden';
-    const guideStripEl = document.createElement('div');
-    guideStripEl.className = 'sl-guide-strip sl-menu-hidden';
-    document.body.append(objPinEl, guideStripEl);
-
     if (freeRoam) setFreeRoam(true, false);
 
-    let fpsSmooth = 60, hudTimer = 0, aliveClock = 0;
+    let hudTimer = 0, aliveClock = 0;
 
     function syncColliders(sec, enable) {
       if (!physics?.addBox || !physics?.removeBox) return;
@@ -3790,54 +3696,39 @@ SAR-04 · LIN / MARA CHEN`;
         for (const b of sec.activeColliders.splice(0)) physics.removeBox(b);
       }
     }
-    const chunkMgr = WE?.createChunkManager ? WE.createChunkManager({ renderer: world.renderer, sectors: [...sectors, ...parcels], quality: world.params?.q || 'high', syncColliders, targetFps: 55 }) : null;
-
-    function detectZoneObj(pos) {
-      if (!pos) return districts[0];
-      if (pos.x < -107) {
-        if (pos.z < -120) return districts[6]; // airfield
-        if (pos.z < -35) return districts[4];  // mountain
-        if (pos.z > 35) return districts[2];   // sw_clinic
-        return districts[3];                   // rail_west
-      }
-      if (pos.z < -30) return districts[1];    // city
-      if (pos.z > 28) return districts[5];     // south_harbor
-      return districts[0];                     // berth
-    }
+    const chunkMgr = WE?.createChunkManager ? WE.createChunkManager({ renderer: world.renderer, sectors: [...sectors, ...parcels], quality: world.quality?.name || world.params?.q || 'high', syncColliders, targetFps: 55, manageResolution: false }) : null;
 
     function currentObjectiveInfo() {
-      if (freeRoam) {
-        return { pos: null, zh: `🌏 开放世界自由漫游 · 天色：${skyPresets[skyIdx].zh} · 已探索 ${discoveredLandmarks.size}/7 区`, en: `🌏 Open World Free-Roam · ${skyPresets[skyIdx].en} · ${discoveredLandmarks.size}/7` };
-      }
+      if (freeRoam || !cityCampaignActive || isMultiplayer() || stage >= 8) return { pos: null, zh: '', en: '' };
       if (stage === 0) {
         const next = shootTargets.find(t => t.stage === 0 && t.alive);
         const done = 2 - shootTargets.filter(t => t.stage === 0 && t.alive).length;
-        return { pos: next?.pos, zh: `ACT I (1/8)：击毁四号泊位干扰塔 (${done}/2)`, en: `ACT I (1/8): Destroy Berth Jammers (${done}/2)` };
+        return { pos: next?.pos, zh: `击毁四号泊位干扰塔 (${done}/2)`, en: `Destroy Berth Jammers (${done}/2)` };
       }
-      if (stage === 1) return { pos: new Vector3(-26, .5, -76), zh: 'ACT II (2/8)：北门按 [F] 开四驱车撞穿城区路障', en: 'ACT II (2/8): Smash City Roadblock in 4x4 (F)' };
+      if (stage === 1) return { pos: new Vector3(-26, .5, -76), zh: '北门按 [F] 开四驱车撞穿城区路障', en: 'Smash City Roadblock in 4x4 (F)' };
       if (stage === 2) {
         const next = shootTargets.find(t => t.stage === 2 && t.alive);
         const done = 2 - shootTargets.filter(t => t.stage === 2 && t.alive).length;
-        return { pos: next?.pos, zh: `ACT III (3/8)：攻入西南冷雾库击毁锁控箱 (${done}/2)`, en: `ACT III (3/8): Break SW Cryo-Locks (${done}/2)` };
+        return { pos: next?.pos, zh: `攻入西南冷雾库击毁锁控箱 (${done}/2)`, en: `Break SW Cryo-Locks (${done}/2)` };
       }
       if (stage === 3) {
         const next = shootTargets.find(t => t.stage === 3 && t.alive);
         const done = 2 - shootTargets.filter(t => t.stage === 3 && t.alive).length;
-        return { pos: next?.pos, zh: `ACT IV (4/8)：西区铁路货场炸毁信号闸 (${done}/2)`, en: `ACT IV (4/8): Blow West Rail Breakers (${done}/2)` };
+        return { pos: next?.pos, zh: `西区铁路货场炸毁信号闸 (${done}/2)`, en: `Blow West Rail Breakers (${done}/2)` };
       }
       if (stage === 4) {
         const next = shootTargets.find(t => t.stage === 4 && t.alive);
         const done = 3 - shootTargets.filter(t => t.stage === 4 && t.alive).length;
-        return { pos: next?.pos, zh: `ACT V (5/8)：登 +14m 西岸山顶狙击卫星散热芯 (${done}/3)`, en: `ACT V (5/8): Snipe Mountain Cores (${done}/3)` };
+        return { pos: next?.pos, zh: `登 +14m 西岸山顶狙击卫星散热芯 (${done}/3)`, en: `Snipe Mountain Cores (${done}/3)` };
       }
-      if (stage === 5) return { pos: new Vector3(-174, 14.5, -78), zh: `ACT VI (6/8)：12米东海海啸袭港！山顶避险 (${Math.ceil(tsunamiSurviveClock)}s)`, en: `ACT VI (6/8): Survive Tsunami (${Math.ceil(tsunamiSurviveClock)}s)` };
+      if (stage === 5) return { pos: new Vector3(-174, 14.5, -78), zh: `12米东海海啸袭港！山顶避险 (${Math.ceil(tsunamiSurviveClock)}s)`, en: `Survive Tsunami (${Math.ceil(tsunamiSurviveClock)}s)` };
       if (stage === 6) {
         const next = shootTargets.find(t => t.stage === 6 && t.alive);
         const done = 2 - shootTargets.filter(t => t.stage === 6 && t.alive).length;
-        return { pos: next?.pos, zh: `ACT VII (7/8)：南港岸角重启 22m 海湾灯塔 (${done}/2)`, en: `ACT VII (7/8): Restore South Lighthouse (${done}/2)` };
+        return { pos: next?.pos, zh: `南港岸角重启 22m 海湾灯塔 (${done}/2)`, en: `Restore South Lighthouse (${done}/2)` };
       }
-      if (stage === 7) return { pos: new Vector3(-172, .5, -200), zh: 'ACT VIII (8/8)：全速冲进西北机场拱形机库撤离', en: 'ACT VIII (8/8): Race into Airfield Hangar' };
-      return { pos: null, zh: '🏆 盐线市 8 幕全城战役全线通关！按 [M] 自由畅游全城', en: '🏆 All 8 City Campaign Acts Complete! Press [M] to roam' };
+      if (stage === 7) return { pos: new Vector3(-172, .5, -200), zh: '撤离至西北机场机库', en: 'Extract at the airfield hangar' };
+      return { pos: null, zh: '', en: '' };
     }
 
     function update(dt, playerPos) {
@@ -3846,31 +3737,25 @@ SAR-04 · LIN / MARA CHEN`;
       const inGame = !menuOpen && !isMultiplayer() && (!world.game || world.game.state === 'playing');
       if (world.backdrop?.skyline?.visible) world.backdrop.skyline.visible = false;
       if (world.backdrop?.lamps?.visible) world.backdrop.lamps.visible = false;
-      hud.classList.toggle('sl-menu-hidden', !inGame);
       minimap.classList.toggle('sl-menu-hidden', !inGame);
-      pinLayer.classList.toggle('sl-menu-hidden', !inGame);
-      objPinEl.classList.toggle('sl-menu-hidden', !inGame);
-      guideStripEl.classList.toggle('sl-menu-hidden', !inGame);
       if (!inGame) {
         interactPrompt.classList.remove('on');
-        actCard.classList.remove('show');
-        objPinEl.style.display = 'none';
         return;
       }
       atmosphereSys?.syncDaylight(lightingSys?.advance(dt));
       aliveClock += dt;
-      fpsSmooth = fpsSmooth * .92 + (1 / Math.max(.004, dt)) * .08;
       for (const fn of updaters) fn(dt);
 
       syncOpenWorldMissionProps();
       if (!introActShown && cityCampaignActive && !freeRoam && aliveClock > 1.8) {
         introActShown = true;
-        showActCard(0);
+        playActBriefing(0);
       }
 
-      let loadedCount = 0;
       if (chunkMgr) {
-        loadedCount = chunkMgr.update(dt, playerPos).loadedCount;
+        const quality = world.quality?.name || world.params?.q;
+        if (quality && quality !== chunkMgr.quality) chunkMgr.setQuality(quality);
+        chunkMgr.update(dt, playerPos);
       } else {
         for (const sec of sectors) {
           const dist = playerPos ? playerPos.distanceTo(sec.center) : 999;
@@ -3885,7 +3770,6 @@ SAR-04 · LIN / MARA CHEN`;
             sec.detailed = wantDetail;
             sec.detail.visible = wantDetail;
           }
-          if (sec.loaded) loadedCount++;
         }
       }
 
@@ -3905,20 +3789,8 @@ SAR-04 · LIN / MARA CHEN`;
         interactPrompt.classList.remove('on');
       }
 
-      if (playerPos) {
-        const zObj = detectZoneObj(playerPos);
-        if (!discoveredLandmarks.has(zObj.id)) {
-          discoveredLandmarks.add(zObj.id);
-          if (freeRoam && discoveredLandmarks.size > 1) {
-            world.tactical?.notify?.(`🏞️ 发现区域：${zObj.nameZh} — ${zObj.scenic} (${discoveredLandmarks.size}/7)`,
-              `🏞️ Discovered: ${zObj.nameEn} (${discoveredLandmarks.size}/7)`, false, 4.2);
-          }
-        }
-      }
-
       if (customGpsTarget && playerPos && playerPos.distanceTo(customGpsTarget) < 12) {
         customGpsTarget = null;
-        world.tactical?.notify?.('📍 已抵达 GPS 目的地！', '📍 Arrived at GPS destination!', false, 2.5);
       }
 
       if (cityCampaignActive && !freeRoam) {
@@ -3926,7 +3798,6 @@ SAR-04 · LIN / MARA CHEN`;
         supportState.artilleryCd = Math.max(0, supportState.artilleryCd - dt);
         supportState.smokeCd = Math.max(0, supportState.smokeCd - dt);
         for (const op of outposts) {
-          op.ring.visible = true;
           if (!op.captured && playerPos && playerPos.distanceTo(op.pos) < 13) {
             op.progress = Math.min(100, op.progress + dt * 30);
             if (op.progress >= 100) {
@@ -3989,7 +3860,6 @@ SAR-04 · LIN / MARA CHEN`;
                   world.enemies.spawn('gull', new Vector3(-148, 15, -182), { state: 'alert', target: playerPos });
                 } catch {}
               }
-              world.tactical?.notify?.('✈️ 敌机正沿 110 米跑道低空扫射！立刻冲进前方拱形机库！', '✈️ Jets strafing runway! Push into the hangar NOW!', true, 4.5);
             }
             runwayArtilleryClock += dt;
             if (runwayArtilleryClock >= 1.85) {
@@ -4005,8 +3875,11 @@ SAR-04 · LIN / MARA CHEN`;
           if (playerPos.distanceTo(new Vector3(-172, .2, -200)) < 12.5) {
             owProgress.completeStage(7);
             stage = 8;
+            world.hud?.setObjective?.('');
+            world.hud?.showChapter?.('');
+            world.hud?.setMarkers?.([]);
+            world.hud?.clearRadio?.();
             finaleSpinActive = true;
-            setLetterbox(true, 0);
             world.disasters?.stopAllEvents?.();
             world.disasters?.triggerVictoryFlareBarrage?.(new Vector3(-168, 2.5, -184));
             playStorySequence([
@@ -4022,78 +3895,11 @@ SAR-04 · LIN / MARA CHEN`;
       }
 
       const info = currentObjectiveInfo();
-      const mainStoryOwns = isMainStoryActive();
-      const beaconTarget = customGpsTarget || (mainStoryOwns ? null : info.pos);
-      if (beaconTarget) {
-        skyBeacon.visible = true;
-        skyBeacon.position.set(beaconTarget.x, beaconTarget.y + 24, beaconTarget.z);
-        beaconMat.color.setHex(customGpsTarget ? 0xffd859 : 0x56cfe6);
-        skyBeacon.rotation.y += dt * 1.5;
-      } else {
-        skyBeacon.visible = false;
-      }
-
-      if (!photoMode && !mapOpen && world.camera && playerPos && typeof window !== 'undefined' && window.innerWidth) {
-        const w = window.innerWidth, h = window.innerHeight;
-        for (const p of landmarkPins) {
-          const dist = playerPos.distanceTo(p.anchor);
-          if (dist < 48 || dist > 360) { p.el.style.display = 'none'; continue; }
-          projTmp.copy(p.anchor).project(world.camera);
-          if (projTmp.z >= 1 || projTmp.z <= -1 || Math.abs(projTmp.x) > .94 || Math.abs(projTmp.y) > .85) {
-            p.el.style.display = 'none'; continue;
-          }
-          p.el.style.display = 'block';
-          p.el.style.left = `${((projTmp.x * .5 + .5) * w).toFixed(0)}px`;
-          p.el.style.top = `${((-projTmp.y * .5 + .5) * h).toFixed(0)}px`;
-          p.distEl.textContent = `${Math.round(dist)}m`;
-        }
-        // High-visibility 3D screen-clamped Mission Objective Waypoint (always shows exact direction even if behind you!)
-        if (beaconTarget) {
-          const objDist = Math.round(playerPos.distanceTo(beaconTarget));
-          projTmp.set(beaconTarget.x, beaconTarget.y + 3.0, beaconTarget.z).project(world.camera);
-          const behind = projTmp.z > 1;
-          let sx = behind ? -projTmp.x : projTmp.x;
-          let sy = behind ? -projTmp.y : projTmp.y;
-          const offEdge = behind || Math.abs(sx) > .88 || Math.abs(sy) > .82;
-          if (offEdge) {
-            const mag = Math.max(Math.abs(sx) / .88, Math.abs(sy) / .82, .001);
-            sx /= mag; sy /= mag;
-          }
-          const arrow = offEdge ? (sx < -.45 ? '‹ ' : (sx > .45 ? '› ' : (sy > 0 ? 'ˆ ' : 'ˇ '))) : '◆ ';
-          objPinEl.style.display = 'block';
-          objPinEl.style.left = `${((sx * .5 + .5) * w).toFixed(0)}px`;
-          objPinEl.style.top = `${((-sy * .5 + .5) * h).toFixed(0)}px`;
-          objPinEl.innerHTML = `${arrow}<b>${objDist}m</b>`;
-        } else {
-          objPinEl.style.display = 'none';
-        }
-      } else {
-        for (const p of landmarkPins) p.el.style.display = 'none';
-        objPinEl.style.display = 'none';
-      }
-
+      world.hud?.setObjective?.(local(info.en, info.zh));
+      const beaconTarget = customGpsTarget || info.pos;
       hudTimer += dt;
       if (hudTimer >= .25) {
         hudTimer = 0;
-        const zObj = detectZoneObj(playerPos);
-        zoneEl.textContent = local('Zone: ', '当前区域：') + local(zObj.nameEn, zObj.nameZh);
-        const calls = world.renderer?.info?.render?.calls;
-        const dcStr = Number.isFinite(calls) ? ` · DC ${calls}` : '';
-        perfEl.textContent = `${Math.round(fpsSmooth)} FPS${dcStr} · ${local('Streamed', '近景流式')} ${loadedCount}/${sectors.length}`;
-        const aliveEnemies = world.enemies?.aliveCount?.() ?? 0;
-        if (freeRoam) {
-          stealthEl.className = 'sl-stealth-pill';
-          stealthEl.textContent = '🌏 开放世界和平漫游 · 东海净空';
-        } else if (aliveEnemies > 0) {
-          stealthEl.className = 'sl-stealth-pill alert';
-          stealthEl.textContent = `🔴 战术交火态 · 敌军 ${aliveEnemies} · ⚡支援点 ${supportPoints}/${SUPPORT_MAX}`;
-        } else {
-          stealthEl.className = 'sl-stealth-pill';
-          stealthEl.textContent = `🟢 区域安全 · ⚡支援点 ${supportPoints}/${SUPPORT_MAX}`;
-        }
-        const distSuffix = beaconTarget && playerPos ? ` · ${Math.round(playerPos.distanceTo(beaconTarget))}m` : '';
-        const objText = local(info.en, info.zh) + distSuffix;
-        opEl.textContent = objText;
 
         if (playerPos) {
           const deg = -((world.player?.yaw ?? 0) * 180 / Math.PI);
@@ -4110,22 +3916,6 @@ SAR-04 · LIN / MARA CHEN`;
           }
         }
 
-        if (!mainStoryOwns) {
-          const leftObjEl = document.querySelector?.('.h-obj-t');
-          if (leftObjEl) leftObjEl.textContent = objText;
-        }
-        const stepHint = freeRoam ? '按 [G] 召唤四驱车 · [F] 上车 · [M] 打开全城地图传送'
-          : stage === 0 ? '沿金色🎯标记推进，瞄准红色旋转核心开火摧毁防空干扰塔'
-          : stage === 1 ? '按 [G] 召唤四驱车 → [F] 登车 → 沿大道向北撞碎路口路障'
-          : stage === 2 ? '沿西线大道南下冷雾库，开火击毁 2 台红色锁控箱'
-          : stage === 3 ? '北上西区铁路货场，摧毁 2 处编组信号闸截停专列'
-          : stage === 4 ? '沿盘山公路登顶 +14m 西岸山顶，击毁 3 个卫星散热芯'
-          : stage === 5 ? '留在 +14m 山顶高地躲避 12 米东海风暴海啸！'
-          : stage === 6 ? '南下旧船坞与南角灯塔，摧毁 2 座电源干扰器'
-          : stage === 7 ? '驱车全速冲进西北机场拱形机库完成最终撤离！'
-          : '全线通关！按 [M] 切换开放世界自由畅游全城';
-        guideStripEl.textContent = `▶ ${objText}  ｜  ${stepHint}`;
-        if (mapOpen) renderMapEntries(playerPos);
       }
     }
 
@@ -4136,7 +3926,6 @@ SAR-04 · LIN / MARA CHEN`;
         delete window.SALTLINE_INSPECT_VIEWS;
         delete window.SALTLINE_GET_STATS;
       }
-      if (actCardTimer) clearTimeout(actCardTimer);
       for (const it of interactables) it.cleanup?.();
       for (const sec of sectors) syncColliders(sec, false);
       for (const b of permanentColliders.splice(0)) physics?.removeBox?.(b);
@@ -4168,28 +3957,16 @@ SAR-04 · LIN / MARA CHEN`;
       root.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
       for (const geo of worldBoxCache.values()) geo.dispose();
       clearStoryTimers();
-      if (cinemaTimer) clearTimeout(cinemaTimer);
-      if (typewriterInterval) clearInterval(typewriterInterval);
-      if (typewriterHideTimer) clearTimeout(typewriterHideTimer);
       if (hitmarkerTimer) clearTimeout(hitmarkerTimer);
       root.removeFromParent();
-      hud.remove();
       minimap.remove();
-      pinLayer.remove();
-      actCard.remove();
-      cinemaTop.remove();
-      cinemaBot.remove();
-      storyBox.remove();
       finaleCard.remove();
-      codTypewriter.remove();
       codHitmarker.remove();
       photoPill.remove();
       if (legacySkyline) legacySkyline.visible = true;
       if (legacyLamps) legacyLamps.visible = true;
       interactPrompt.remove();
       mapOverlay.remove();
-      objPinEl.remove();
-      guideStripEl.remove();
       const uiRoot = document.getElementById('ui');
       if (uiRoot) uiRoot.style.opacity = '1';
     }

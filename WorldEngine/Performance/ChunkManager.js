@@ -17,7 +17,7 @@
 
   function createChunkManager({
     renderer, sectors = [], syncColliders, targetFps = 55, quality = 'high',
-    hysteresis = 22, dormantTtlSec = 12,
+    hysteresis = 22, dormantTtlSec = 12, manageResolution = true,
   } = {}) {
     const baseDpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
     let preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.high;
@@ -144,7 +144,7 @@
       currentQuality = qName;
       preset = QUALITY_PRESETS[qName];
       currentScale = Math.min(currentScale, preset.maxDprScale);
-      if (renderer?.setPixelRatio) {
+      if (manageResolution && renderer?.setPixelRatio) {
         try { renderer.setPixelRatio(Math.max(0.65, baseDpr * currentScale)); } catch {}
       }
       return currentQuality;
@@ -235,9 +235,11 @@
         }
       }
 
+      for (const ch of chunks) ch.sec.onLodChange?.(ch.sec.loaded, ch.sec.detailed, currentQuality);
+
       // Adaptive Dynamic Resolution Scaler (respects user quality preset bounds)
       evalClock += dt;
-      if (evalClock >= 2.2 && renderer?.setPixelRatio) {
+      if (manageResolution && evalClock >= 2.2 && renderer?.setPixelRatio) {
         evalClock = 0;
         let nextScale = currentScale;
         if (fpsEma < targetFps - 10 && currentScale > preset.minDprScale) {
@@ -286,7 +288,7 @@
     function dispose() {
       for (const ch of chunks) unloadChunk(ch);
       resourceRefs.clear();
-      if (renderer?.setPixelRatio) {
+      if (manageResolution && renderer?.setPixelRatio) {
         try { renderer.setPixelRatio(baseDpr); } catch {}
       }
     }

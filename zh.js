@@ -14,6 +14,9 @@
     'Every surface, machine and sound is generated in your browser. Nothing is downloaded.':
       '场景、机器和音效均由浏览器生成。',
     'Deploy': '部署',
+    'Free roam': '自由漫游',
+    'Game modes': '游戏模式',
+    'Host or join a local room.': '创建或加入局域网房间。',
     'Port Conquest': '港口征服',
     'Port Breakthrough': '港口突破',
     'Breakthrough': '突破',
@@ -94,6 +97,7 @@
     'Settings and controls': '设置与操作指南',
     'Close': '关闭',
     'Graphics quality': '画质',
+    'auto': '自动',
     'low': '低',
     'medium': '中',
     'high': '高',

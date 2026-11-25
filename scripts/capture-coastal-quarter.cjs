@@ -149,6 +149,7 @@ async function checkPlayerControls(cdp) {
   const readState = () => evalJs(cdp, `({
     state: __G.game.state, mapOpen: __G.openWorld.mapOpen,
     pos: __G.player.pos.toArray(), chunks: SALTLINE_GET_STATS().loadedCount,
+    mapFocus: document.activeElement?.hasAttribute('data-tp-btn'),
     errors: window.__errors
   })`);
   const press = async (code, key, virtualKey) => {
@@ -169,13 +170,20 @@ async function checkPlayerControls(cdp) {
   };
   const distance = (a, b) => Math.hypot(a.pos[0] - b.pos[0], a.pos[2] - b.pos[2]);
   await press('KeyM', 'm', 77);
+  const fitsViewport = await evalJs(cdp, `(() => {
+    const card = document.querySelector('.sl-map-overlay.open .sl-map-card');
+    if (!card) return false;
+    card.querySelector('[data-tp-btn]').focus();
+    const bounds = card.getBoundingClientRect();
+    return bounds.top >= 0 && bounds.bottom <= innerHeight;
+  })()`);
   const before = await readState();
   await walk();
   const mapped = await readState();
   await press('Escape', 'Escape', 27);
   await walk();
   const after = await readState();
-  if (!before.mapOpen || !mapped.mapOpen || distance(before, mapped) > 0.05 ||
+  if (!fitsViewport || !before.mapOpen || !mapped.mapOpen || !mapped.mapFocus || distance(before, mapped) > 0.05 ||
       after.mapOpen || after.state !== 'playing' || distance(mapped, after) < 0.3 ||
       !after.chunks || after.errors.length) {
     throw new Error('开放世界移动或地图回归: ' + JSON.stringify({ before, mapped, after }));
@@ -257,7 +265,25 @@ async function main() {
       await evalJs(cdp,`window.SALTLINE_INSPECT_VIEW(${presetView===5?5:0},{photoClean:false}); __G.openWorld.setPhotoMode(true); __G.player.invulnerable=true; __G.player.enabled=false; __G.player.pos.set(${pos}); __G.player.vel.set(0,0,0); __setShot({cam:"${[...pos,...look]}",fov:62}); __G.hud.show(false);__G.weapon.setVisible(false);document.body.classList.add('audit-clean');true`);
       await evalJs(cdp,`(()=>{if(!document.querySelector('#audit-clean')){const s=document.createElement('style');s.id='audit-clean';s.textContent='body.audit-clean > :not(#app):not(canvas),body.audit-clean #ui{visibility:hidden!important}';document.head.append(s)}return true})()`);
       await sleep(1500);
-      const stats=await evalJs(cdp,`new Promise(resolve=>{let start=performance.now(),n=0;function tick(now){if(++n<31)return requestAnimationFrame(tick);const ms=(now-start)/n;resolve({...SALTLINE_GET_STATS(),fps:1000/ms,frameTimeMs:ms,state:__G.game.state})}requestAnimationFrame(tick)})`);
+      const stats=await evalJs(cdp,`new Promise(resolve=>{
+        let start, frames=0, calls=0, triangles=0;
+        function tick(now){
+          if(start===undefined) start=now;
+          else {
+            const stats=SALTLINE_GET_STATS();
+            calls+=stats.drawCalls;
+            triangles+=stats.triangles;
+            if(++frames===30){
+              const ms=(now-start)/frames;
+              resolve({...stats,fps:1000/ms,frameTimeMs:ms,state:__G.game.state,
+                drawCalls:Math.round(calls/frames),triangles:Math.round(triangles/frames)});
+              return;
+            }
+          }
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      })`);
       if(stats.state!=='playing'||!stats.loadedCount)throw Error('Streaming inactive '+JSON.stringify(stats));
       const shot=await cdp.send('Page.captureScreenshot',{format:'jpeg',quality:87});
       const filename=id+'.jpg';

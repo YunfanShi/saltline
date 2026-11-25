@@ -4,9 +4,11 @@ A small browser first-person shooter set in a rainy industrial port. Recover evi
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.16.0
+## Saltline fork 0.17.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
+- Chapter titles appear briefly on entry. The task stays on the left until completion. Subtitle names show the speaker’s side while dialogue stays the same color.
+- **Free roam** opens the coastal city. Press **M** for the district map, GPS and fast travel.
 - **Multiplayer** opens a mode gallery with artwork captured in the game. Select a mode to reveal its setup and deployment action. Choose **Port Conquest** to capture objectives and drain opposing tickets, or **Port Breakthrough** to secure four sectors in order, beginning at West Dispatch. The LAN staging room is available when launched with the local server.
 - Set enemy pressure, starting tickets and the time limit before deploying. These settings apply only to port battles.
 - Choose Support, Medic, Recon or Engineer before entering an AI battle. Activate their abilities with **X** or the on-screen button.
@@ -15,6 +17,7 @@ A small browser first-person shooter set in a rainy industrial port. Recover evi
 - The AI side can announce a counterattack or incoming bombardment. Watch the tactical map for the affected objective and move to cover.
 - Hold **Tab** for the battle scoreboard. It shows time, tickets or remaining sectors, kills, deaths, captures and support points.
 - The interface defaults to Simplified Chinese, with English available in Settings.
+- Graphics quality defaults to **Auto**. Low and Medium reduce distant building detail and use the environment reflection instead of a second scene render. High and Ultra retain full reflections and distant building detail.
 - See the [operations report](docs/PORT_OPERATIONS_020.docx) for scope, controls and verification.
 
 The battle settings, requisition menu and scoreboard adapt systems from [IRONFRONT 0.21.0](https://github.com/YunfanShi/IRONFRONT/tree/1afb5fae0be9dc5770778d952b65d43875064ab9) for Saltline's port. Local port battles include squads, support vehicles, and heavy-vehicle requisitions. The LAN server hosts rooms and synchronizes match snapshots between players.
