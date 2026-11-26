@@ -349,9 +349,100 @@
     const lightingSys = WE?.createLightingSystem ? WE.createLightingSystem(THREE, world) : null;
     const industrialGen = WE?.createIndustrialGenerator && matLib ? WE.createIndustrialGenerator(THREE, matLib, M) : null;
     const atmosphereSys = WE?.createAtmosphereSystem ? WE.createAtmosphereSystem(THREE, root, updaters) : null;
+    function addPermanentCollider(min, max, opts = { surface: 'concrete' }) {
+      if (!physics?.addBox) return null;
+      const b = physics.addBox(min, max, opts);
+      if (b) permanentColliders.push(b);
+      return b;
+    }
+    function findOwnerSector(parent) {
+      for (let i = 0; i < sectors.length; i++) {
+        if (sectors[i].shell === parent || sectors[i].detail === parent) return sectors[i];
+      }
+      return null;
+    }
+    function addColliderForParent(parent, x0, y0, z0, x1, y1, z1, surface = 'concrete') {
+      const minV = new Vector3(Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1));
+      const maxV = new Vector3(Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1));
+      const sec = findOwnerSector(parent);
+      if (sec) sec.colliderSpecs.push({ min: minV, max: maxV, surface });
+      else addPermanentCollider(minV, maxV, { surface, noNav: true });
+    }
+    function addRotatedCollider(targetOrParent, cx, y0, cz, lx0, lx1, lz0, lz1, y1, yaw = 0, surface = 'metal') {
+      const c = Math.cos(yaw), sn = Math.sin(yaw);
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const lx of [lx0, lx1]) {
+        for (const lz of [lz0, lz1]) {
+          const wx = cx + lx * c + lz * sn;
+          const wz = cz - lx * sn + lz * c;
+          if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
+          if (wz < minZ) minZ = wz; if (wz > maxZ) maxZ = wz;
+        }
+      }
+      if (targetOrParent && Array.isArray(targetOrParent.colliderSpecs)) {
+        targetOrParent.colliderSpecs.push({ min: new Vector3(minX, y0, minZ), max: new Vector3(maxX, y1, maxZ), surface });
+      } else {
+        addColliderForParent(targetOrParent, minX, y0, minZ, maxX, y1, maxZ, surface);
+      }
+    }
+    function addDynamicCollider(min, max, opts = {}) {
+      return addPermanentCollider(min, max, { surface: 'metal', noNav: true, ...opts });
+    }
+    function updateDynamicBox(box, x0, y0, z0, x1, y1, z1) {
+      if (!box) return;
+      if (typeof physics?.updateBox === 'function') physics.updateBox(box, x0, y0, z0, x1, y1, z1);
+      else { box.min.set(x0, y0, z0); box.max.set(x1, y1, z1); }
+    }
+    function pushPlayerOutOfMovingBox(box) {
+      if (!box || box.disabled) return;
+      // Push drivable SAR 4x4 laterally if train or semi-truck hits it (driving OR parked!)
+      const veh = world.vehicle;
+      const vp = veh?.pos;
+      if (vp) {
+        const vx = 1.25, vz = 2.45;
+        if (vp.y + 2.0 > box.min.y && vp.y < box.max.y &&
+            vp.x + vx > box.min.x && vp.x - vx < box.max.x &&
+            vp.z + vz > box.min.z && vp.z - vz < box.max.z) {
+          const dL = Math.abs(vp.x - box.min.x), dR = Math.abs(box.max.x - vp.x);
+          const nextX = dL < dR ? box.min.x - vx - 0.35 : box.max.x + vx + 0.35;
+          veh.setPosition?.(new Vector3(nextX, vp.y, vp.z));
+          if (veh.isDriving?.() && world.player?.pos) world.player.pos.x = nextX;
+          world.player?.addShake?.(0.42);
+          fx?.sparks?.(new Vector3(nextX, vp.y + 0.9, vp.z), new Vector3(0, 1, 0), 14);
+        }
+      }
+      if (veh?.isDriving?.()) return;
+      const pp = world.player?.pos;
+      if (!pp) return;
+      const r = 0.42;
+      if (pp.y + 1.75 <= box.min.y || pp.y >= box.max.y) return;
+      if (pp.x + r > box.min.x && pp.x - r < box.max.x && pp.z + r > box.min.z && pp.z - r < box.max.z) {
+        const dL = Math.abs(pp.x - box.min.x), dR = Math.abs(box.max.x - pp.x);
+        pp.x = dL < dR ? box.min.x - r - 0.14 : box.max.x + r + 0.14;
+        world.player?.addShake?.(0.22);
+      }
+    }
+    const EXTERNAL_COLLIDER_SPECS = {
+      concrete_road_barrier: { hx: 1.15, hy: 0.96, hz: 0.34, surface: 'concrete' },
+      portable_generator: { hx: 0.56, hy: 0.78, hz: 0.42, surface: 'metal' },
+      utility_box_01: { hx: 0.54, hy: 1.48, hz: 0.36, surface: 'metal' },
+      modular_industrial_pipes_01: { hx: 1.35, hy: 1.35, hz: 0.62, surface: 'metal' },
+      modular_electricity_poles: { hx: 0.24, hy: 7.5, hz: 0.24, surface: 'wood' },
+      painted_wooden_chair_02: { hx: 0.28, hy: 0.86, hz: 0.28, surface: 'wood' },
+    };
     function placeExternal(parent, assetId, x, y, z, yaw = 0, scale = 1.0) {
       const prop = externalAssets?.place(parent, assetId, x, y, z, yaw, scale) ?? null;
       if (prop && assetId === 'modular_electricity_poles') utilityPoles.push(prop);
+      if (assetId === 'overhead_crane') {
+        for (const lx of [-3.6 * scale, 3.6 * scale]) {
+          addRotatedCollider(parent, x, y, z, lx - 0.45 * scale, lx + 0.45 * scale, -0.55 * scale, 0.55 * scale, y + 6.2 * scale, yaw, 'metal');
+        }
+      } else {
+        const spec = EXTERNAL_COLLIDER_SPECS[assetId];
+        if (spec) {
+          addRotatedCollider(parent, x, y, z, -spec.hx * scale, spec.hx * scale, -spec.hz * scale, spec.hz * scale, y + spec.hy * scale, yaw, spec.surface);
+        }
+      }
       return prop;
     }
     function streetDetailRange() {
@@ -624,6 +715,7 @@
       addBox(g, M.hazard, 1.14, .16, .68, 0, .25, 0);
       g.matrixAutoUpdate = false; g.updateMatrix();
       parent.add(g);
+      addColliderForParent(parent, x - 0.58, y, z - 0.36, x + 0.58, y + 1.38, z + 0.36, 'metal');
       const entry = {
         id, pos: new Vector3(x, y + 1.0, z), radius: 3.0,
         getPrompt: () => promptZh,
@@ -669,6 +761,8 @@
       addCyl(g, M.wood, .14, 4.85, .08, 2.42, 0, 0, -.035);
       g.add(new Mesh(crown, M.pineDark));
       parent.add(g);
+      const tr = Math.max(0.22, 0.24 * scale);
+      addColliderForParent(parent, x - tr, y, z - tr, x + tr, y + 4.6 * scale, z + tr, 'wood');
     }
 
     function addStreetLamp(parent, x, y, z, armDir = 1) {
@@ -679,6 +773,7 @@
       parent.add(pole);
       addBox(parent, M.steelDark, 1.7, .09, .11, x + armDir * .85, y + 6.1, z, false);
       addBox(parent, M.glassWarm, .52, .07, .20, x + armDir * 1.55, y + 6.02, z, false);
+      addColliderForParent(parent, x - 0.14, y, z - 0.14, x + 0.14, y + 6.2, z + 0.14, 'metal');
     }
 
     let sedanBodyGeo = null, sedanCabinGeo = null;
@@ -730,6 +825,7 @@
       }
       g.matrixAutoUpdate = false; g.updateMatrix();
       parent.add(g);
+      addRotatedCollider(parent, x, y, z, -0.96, 0.96, -2.18, 2.18, y + 1.44, yaw, 'metal');
     }
 
     function makeSignMat(topText, subText, bg = '#153b2f') {
@@ -758,6 +854,8 @@
       const half = span / 2;
       addBox(g, M.concrete, 1.1, .75, 1.1, -half, .375, 0);
       addBox(g, M.concrete, 1.1, .75, 1.1, half, .375, 0);
+      addRotatedCollider(horizonRoot, x, 0.16, z, -half - 0.58, -half + 0.58, -0.58, 0.58, 8.0, yaw, 'concrete');
+      addRotatedCollider(horizonRoot, x, 0.16, z, half - 0.58, half + 0.58, -0.58, 0.58, 8.0, yaw, 'concrete');
       addBox(g, M.steelGalv, .42, 7.8, .42, -half, 4.0, 0);
       addBox(g, M.steelGalv, .42, 7.8, .42, half, 4.0, 0);
       addBox(g, M.steelDark, span + .5, .28, .32, 0, 7.85, 0);
@@ -1241,6 +1339,10 @@
       }
       const chX = -ductDir * 5.8;
       addBox(g, M.concrete, 6.2, .35, 8.6, chX, .18, 0);
+      if (sec) {
+        sec.colliderSpecs.push({ min: new Vector3(x + chX - 3.1, 0, z - 4.35), max: new Vector3(x + chX + 3.1, 4.6, z + 4.35), surface: 'metal' });
+        sec.colliderSpecs.push({ min: new Vector3(x + chX - 1.5, 0, z - 7.7), max: new Vector3(x + chX + 1.5, 7.8, z - 4.7), surface: 'metal' });
+      }
       for (const cx of [chX - 2.6, chX + 2.6]) for (const cz of [-3.8, 0, 3.8]) addBox(g, M.steelGalv, .26, 3.6, .26, cx, 1.95, cz);
       addBox(g, M.steelWorn, 5.6, 1.25, 8.0, chX, 3.9, 0);
       const fans = [];
@@ -1361,14 +1463,7 @@
       }
       g.matrixAutoUpdate = false; g.updateMatrix();
       parent.add(g);
-      if (sec) {
-        const c = Math.cos(yaw), s = Math.sin(yaw);
-        const minX = Math.min(x - 1.4 * Math.abs(c) - 7.6 * Math.abs(s), x - 1.4);
-        const maxX = Math.max(x + 1.4 * Math.abs(c) + 7.6 * Math.abs(s), x + 1.4);
-        const minZ = Math.min(z - 7.6 * Math.abs(c) - 1.4 * Math.abs(s), z - 1.4);
-        const maxZ = Math.max(z + 7.6 * Math.abs(c) + 1.4 * Math.abs(s), z + 1.4);
-        sec.colliderSpecs.push({ min: new Vector3(minX, y, minZ), max: new Vector3(maxX, y + 3.9, maxZ), surface: 'metal' });
-      }
+      addRotatedCollider(sec || parent, x, y, z, -1.30, 1.30, -7.20, 7.60, y + 3.90, yaw, 'metal');
     }
 
     // =========================================================================
@@ -1409,6 +1504,7 @@
       }
       g.matrixAutoUpdate = false; g.updateMatrix();
       parent.add(g);
+      addPermanentCollider(new Vector3(x - 11.2, -2, z - 62), new Vector3(x + 11.2, 16, z + 55), { surface: 'metal', noNav: true });
     }
 
     function addContainerYardBlock(sec, parent, x0, z0, cols, rows, yaw = 0, reeferBias = false) {
@@ -1572,13 +1668,15 @@
         }
       }
       if (terrainGen) {
-        terrainGen.buildWindPineForest(horizonRoot, crown, cylGeo, M.wood, pinePositions, updaters);
+        terrainGen.buildWindPineForest(horizonRoot, crown, cylGeo, M.wood, pinePositions, updaters, {
+          onCollider: (minArr, maxArr, surf) => addPermanentCollider(new Vector3(...minArr), new Vector3(...maxArr), { surface: surf, noNav: true }),
+        });
       }
     }
 
     // LIVE PATROLLING PORT LOGISTICS TRUCKS (2 articulated semi-trucks continuously driving Coastal Blvd!)
     {
-      const makeLiveTruck = (laneX, startZ, dir, contMat) => {
+      const makeLiveTruck = (laneX, startZ, dir, contMat, minLoopZ, maxLoopZ) => {
         const tg = new Group(); tg.userData.noBatch = true;
         tg.position.set(laneX, .21, startZ);
         tg.rotation.y = dir > 0 ? 0 : Math.PI;
@@ -1596,14 +1694,27 @@
           for (const sx of [-1.14, 1.14]) addCyl(tg, M.steelDark, .50, .34, sx, .50, wz, 0, Math.PI / 2);
         }
         horizonRoot.add(tg);
+        const truckMinZ = dir > 0 ? -7.12 : -7.52;
+        const truckMaxZ = dir > 0 ? 7.52 : 7.12;
+        const truckBox = addDynamicCollider(
+          new Vector3(laneX - 1.28, 0.21, startZ + truckMinZ),
+          new Vector3(laneX + 1.28, 4.06, startZ + truckMaxZ),
+          { surface: 'metal', tag: 'live-truck', noNav: true }
+        );
         updaters.push(dt => {
           tg.position.z += dir * dt * 8.2;
-          if (dir > 0 && tg.position.z > 134) tg.position.z = -134;
-          else if (dir < 0 && tg.position.z < -134) tg.position.z = 134;
+          if (dir > 0 && tg.position.z > maxLoopZ) tg.position.z = minLoopZ;
+          else if (dir < 0 && tg.position.z < minLoopZ) tg.position.z = maxLoopZ;
+          if (truckBox) {
+            const zc = tg.position.z;
+            updateDynamicBox(truckBox, laneX - 1.28, 0.21, zc + truckMinZ, laneX + 1.28, 4.06, zc + truckMaxZ);
+            pushPlayerOutOfMovingBox(truckBox);
+          }
         });
       };
-      makeLiveTruck(-22.6, -90, -1, M.cargoTeal);
-      makeLiveTruck(-29.4, 58, 1, M.craneRed);
+      // Strictly stay on clear Coastal City Blvd (-134..-42) and South Harbor Blvd (+42..+132) — NEVER clip Berth 4 containers!
+      makeLiveTruck(-22.6, -90, -1, M.cargoTeal, -134, -42);
+      makeLiveTruck(-29.4, 58, 1, M.craneRed, 42, 132);
     }
 
     // 6 Readable Overhead Highway Gantry Signs at the REAL Inland Intersections!
@@ -1623,12 +1734,89 @@
         world.tactical?.notify?.('🔫 已在港区军械箱补满全部弹药！', '🔫 Ammunition refilled!', false, 2.8);
       },
     });
+    // =========================================================================
+    // BENCHMARK CHAPTER 1 INVESTIGATION SYSTEM (3 Environmental Clues + Branching Choice)
+    // =========================================================================
+    const ch1Clues = new Set();
+    let ch1Branch = null; // 'broadcast' | 'stealth'
+    function recordCh1Clue(clueId, titleZh, radioZh) {
+      const isNew = !ch1Clues.has(clueId);
+      ch1Clues.add(clueId);
+      world.hud?.radio?.(radioZh, 7.2);
+      world.tactical?.notify?.(
+        `📁 线索 ${ch1Clues.size}/3：${titleZh}${ch1Clues.size >= 3 && !ch1Branch ? '（已集齐！按 [E] 在警务室证物板做出战术抉择）' : ''}`,
+        `📁 Clue ${ch1Clues.size}/3: ${clueId}`,
+        isNew, 5.2
+      );
+      audio?.play?.('rail_touchdown', { pos: world.player?.pos || new Vector3(0, 1, 0), ref: 18, gain: .42, jitter: .04 });
+    }
+    function chooseCh1Branch(branch) {
+      ch1Branch = branch === 'stealth' ? 'stealth' : 'broadcast';
+      if (ch1Branch === 'broadcast') {
+        (world.weapon?.refill || world.weapon?.reset)?.call(world.weapon);
+        if (world.player && typeof world.player.hp === 'number') world.player.hp = Math.min(100, Math.max(world.player.hp, 100));
+        world.hud?.radio?.('玛拉：「全港民用频道已收到《失联名单》原始卷宗！码头工人为我们打开了补给通道，但铁砧正在全面封锁沿海大道！」', 7.5);
+        world.tactical?.notify?.('📡 分支锁定【公开广播真相】：弹药生命已补满，城区进入全面戒备！', '📡 Branch: Broadcast Truth (Full Resupply + High Alert)', true, 5.5);
+      } else {
+        world.hud?.radio?.('玛拉：「静默克隆密钥完成！铁砧尚未察觉我们已经拿到沃德的召回录音，可以趁敌方巡逻空隙突袭西区！」', 7.5);
+        world.tactical?.notify?.('🕵️ 分支锁定【静默截取密钥】：获得战术潜行窗口，后续巡逻警戒降低！', '🕵️ Branch: Silent Key Clone (Reduced Patrol Alert)', true, 5.5);
+      }
+      return ch1Branch;
+    }
+    window.SALTLINE_CH1_BENCHMARK = {
+      get cluesFound() { return [...ch1Clues]; },
+      get clueCount() { return ch1Clues.size; },
+      get branch() { return ch1Branch; },
+      chooseBranch: chooseCh1Branch,
+    };
+    window.SALTLINE_CAMPAIGN_MATRIX = [
+      { act: 1, id: 'ow-1', titleZh: '孤港迷雾 · 警务04号站调查', estMinutes: 20, coreLoop: ['环境探索', '多线索取证(3/3)', '分支抉择', '防空干扰破坏'], uniqueZone: '四号泊位 + 沿海警务04号站室内' },
+      { act: 2, id: 'ow-2', titleZh: '沿海大道突围', estMinutes: 18, coreLoop: ['四驱车高速追逐', '路障冲锋', '移动车队交火'], uniqueZone: '沿海城区主干道 + 过街天桥' },
+      { act: 3, id: 'ow-3', titleZh: '铁路货场截获', estMinutes: 22, coreLoop: ['动态货运列车规避', '频谱仪修复录音', '调度塔夺控'], uniqueZone: '西区铁路货场 + 隧道口' },
+      { act: 4, id: 'ow-4', titleZh: '西南冷雾库救援', estMinutes: 20, coreLoop: ['低温储罐工业区搜救', '战地分诊护卫', '停机坪压制'], uniqueZone: '西南冷雾库 + 战地医院' },
+      { act: 5, id: 'ow-5', titleZh: '西岸山脊卫星站', estMinutes: 24, coreLoop: ['+14m 盘山公路攀爬', '卫星频段校准解谜', '制高点防守'], uniqueZone: '西岸山地 + 海岸松林' },
+      { act: 6, id: 'ow-6', titleZh: '南港防潮闸风暴', estMinutes: 22, coreLoop: ['海啸灾难求生', '防潮闸结构爆破', '干船坞撤离'], uniqueZone: '南港旧船坞 + 防潮大闸' },
+      { act: 7, id: 'ow-7', titleZh: '南角灯塔夜间指引', estMinutes: 20, coreLoop: ['夜间炮击规避', '22m 灯塔透镜校准', '海上信号协同'], uniqueZone: '22m 岸角灯塔 + 礁石海岸' },
+      { act: 8, id: 'ow-8', titleZh: '海岸机场终局撤离', estMinutes: 25, coreLoop: ['机库防线死守', '运输机引擎启动演出', '跑道决战'], uniqueZone: '海岸应急机场 + 110m 跑道' },
+    ];
+
     addInteractiveTerminal(horizonRoot, {
-      id: 'berth-evidence', promptZh: '按 [E] 核验《失联名单》05:31 撤离回执（老霍克）', x: -85, y: 0, z: -11, colorMat: M.glassCyan,
+      id: 'berth-evidence', promptZh: '按 [E] 线索1/3：核验老霍克 05:34 手写值班交接单', x: -85, y: 0, z: -11, colorMat: M.glassCyan,
       onUse() {
-        world.hud?.radio?.('玛拉：「核对成功——老霍克在 05:34 还签了值班交接条，但里德的封港系统却篡改他 05:31 已撤离，且沃德在 05:50 召回了搜救艇！」', 7.5);
-        world.tactical?.notify?.('📁 证物链锁定：老霍克 05:31/05:34 时间矛盾 + 沃德 05:50 召回记录', '📁 Evidence verified: Old Hawke 05:31/05:34 & Ward 05:50 recall', false, 5.5);
+        recordCh1Clue('clue-berth-ledger', '老霍克 05:34 交接单', '玛拉：「核对成功——老霍克在 05:34 还签了值班交接条，但里德的封港系统却篡改他 05:31 已撤离！」');
       },
+    });
+    interactables.push({
+      id: 'precinct-caseboard-clue', pos: new Vector3(-6.8, 1.4, -52.2), radius: 3.4,
+      getPrompt: () => {
+        if (!ch1Clues.has('clue-precinct-board')) return '按 [E] 线索2/3：检视警务04号站《失联名单》专案证物板';
+        if (!ch1Branch) return '按 [E] 战术抉择：向全港广播《失联名单》真相（公开突围）';
+        return `已执行战术分支：${ch1Branch === 'broadcast' ? '公开广播真相' : '静默截取密钥'}`;
+      },
+      use() {
+        if (!ch1Clues.has('clue-precinct-board')) {
+          recordCh1Clue('clue-precinct-board', '警务室《失联名单》原件', '玛拉：「名单上有 14 名泊位工人的名字被红笔划掉——这不是撤离失败，是蓄意封口！」');
+        } else if (!ch1Branch) {
+          chooseCh1Branch('broadcast');
+        }
+      },
+      cleanup() {},
+    });
+    interactables.push({
+      id: 'precinct-radio-clue', pos: new Vector3(-7.4, 1.2, -56.2), radius: 3.2,
+      getPrompt: () => {
+        if (!ch1Clues.has('clue-radio-tape')) return '按 [E] 线索3/3：回放调度台无线电加密录音（沃德 05:50）';
+        if (!ch1Branch) return '按 [E] 战术抉择：静默克隆铁砧封锁密钥（潜行突袭）';
+        return '加密录音已归档至任务卷宗';
+      },
+      use() {
+        if (!ch1Clues.has('clue-radio-tape')) {
+          recordCh1Clue('clue-radio-tape', '沃德 05:50 召回录音', '玛拉：「听见了吗？沃德在 05:50 亲自下令召回搜救艇——这下铁证如山。去证物板公开广播，或在电台静默克隆密钥！」');
+        } else if (!ch1Branch) {
+          chooseCh1Branch('stealth');
+        }
+      },
+      cleanup() {},
     });
 
     // Armored Multi-HP Tactical Objective Builder
@@ -1659,8 +1847,13 @@
       }
       parent.add(g);
       updaters.push(dt => { if (g.visible) rotor.rotation.y += dt * 2.6; });
+      const tBox = addDynamicCollider(
+        new Vector3(pos.x - 0.72, pos.y, pos.z - 0.72),
+        new Vector3(pos.x + 0.72, pos.y + (tall ? 3.7 : 2.3), pos.z + 0.72),
+        { surface: 'metal', tag: 'shoot-target', noNav: true }
+      );
       shootTargets.push({
-        id, stage, labelZh, group: g, rotor,
+        id, stage, labelZh, group: g, rotor, collider: tBox,
         pos: pos.clone().add(new Vector3(0, tall ? 2.5 : 1.4, 0)),
         radius, maxHp, hp: maxHp, alive: true,
       });
@@ -1748,20 +1941,24 @@
         addBox(city.detail, M.glassWarm, 1.05, .95, 1.42, pcx, 6.15, pcz);
         addBox(city.detail, M.glassWarm, 1.42, .95, 1.05, pcx, 6.15, pcz);
         addBox(city.detail, M.steelDark, 1.65, .28, 1.65, pcx, 6.76, pcz);
+        city.colliderSpecs.push({ min: new Vector3(pcx - 2.2, 0.16, pcz - 2.2), max: new Vector3(pcx + 2.2, 7.0, pcz + 2.2), surface: 'concrete' });
         for (const bx of [pcx - 6.2, pcx + 6.2]) {
           addBox(city.detail, curbStoneMat, 3.4, .44, .78, bx, .50, pcz);
           addBox(city.detail, M.wood, 3.2, .08, .60, bx, .76, pcz);
+          city.colliderSpecs.push({ min: new Vector3(bx - 1.7, 0.16, pcz - 0.40), max: new Vector3(bx + 1.7, 0.85, pcz + 0.40), surface: 'concrete' });
         }
       } else if (plaza.kind === 'waterfront_promenade') {
         // Continuous coastal boardwalk: timber deck inlay, seawall steel railing & overlook benches
         addBox(city.detail, M.wood, pw - 1.2, .05, pd - 2.0, pcx, .30, pcz);
         addBox(city.detail, M.steelDark, .12, .10, pd - 1.0, plaza.x1 - .25, 1.24, pcz);
         addBox(city.detail, M.steelDark, .08, .06, pd - 1.0, plaza.x1 - .25, .78, pcz);
+        city.colliderSpecs.push({ min: new Vector3(plaza.x1 - 0.36, 0.16, plaza.z0 + 0.5), max: new Vector3(plaza.x1 - 0.14, 1.32, plaza.z1 - 0.5), surface: 'metal' });
         for (let bz = plaza.z0 + 4; bz <= plaza.z1 - 4; bz += 8) {
           addCyl(city.detail, M.steelDark, .07, 1.02, plaza.x1 - .25, .74, bz);
           if (Math.round(bz) % 16 === 0) {
             addBox(city.detail, curbStoneMat, .72, .44, 2.8, pcx - .8, .50, bz);
             addBox(city.detail, M.wood, .56, .08, 2.6, pcx - .8, .76, bz);
+            city.colliderSpecs.push({ min: new Vector3(pcx - 1.18, 0.16, bz - 1.42), max: new Vector3(pcx - 0.42, 0.85, bz + 1.42), surface: 'concrete' });
           }
         }
       }
@@ -1945,11 +2142,40 @@
         placeExternal(city.detail, 'desk_lamp_arm_01', secondX + .68, .993, secondZ + .08, 2.64);
         externalAssets.place(city.detail, 'office_notepads', secondX - .38, .993, secondZ + .05, .17, 1, 'office_notepads_yellow_pad');
         city.colliderSpecs.push({ min: new Vector3(secondX - 1, .205, secondZ - .46), max: new Vector3(secondX + 1, .993, secondZ + .46), surface: 'metal' });
-        const workLight = new THREE.PointLight(0xffdcad, 11, 12, 1.8);
+        // Grounded woven dispatch runner rug + warm desk contact pools
+        addBox(city.detail, M.cargoNavy, 7.6, .016, 2.35, bx0 + 6.2, .213, entZ + .15);
+        addBox(city.detail, M.hazard, 7.66, .014, .06, bx0 + 6.2, .214, entZ - 1.04);
+        addBox(city.detail, M.hazard, 7.66, .014, .06, bx0 + 6.2, .214, entZ + 1.34);
+        // 《失联名单》 Evidence Caseboard on south interior wall (cork frame + pinned manifests + red investigation pins)
+        addBox(city.detail, M.wood, 2.68, 1.34, .07, bx0 + 6.0, 2.18, entZ + 3.34);
+        addBox(city.detail, M.concreteDirty, 2.52, 1.18, .05, bx0 + 6.0, 2.18, entZ + 3.31);
+        for (const [px, py, pw, ph, matP] of [
+          [-0.78, 0.24, 0.44, 0.56, M.craneWhite], [-0.12, 0.18, 0.52, 0.38, M.glassWarm],
+          [0.58, 0.26, 0.46, 0.50, M.craneWhite], [-0.45, -0.26, 0.48, 0.34, M.craneWhite],
+          [0.24, -0.24, 0.54, 0.36, M.craneWhite], [0.88, -0.22, 0.34, 0.42, M.glassCyan],
+        ]) {
+          addBox(city.detail, matP, pw, ph, .025, bx0 + 6.0 + px, 2.18 + py, entZ + 3.28);
+          addBox(city.detail, M.redCore, .04, .04, .035, bx0 + 6.0 + px, 2.18 + py + ph * 0.42, entZ + 3.26);
+        }
+        // Evidence locker bank & water dispenser along east return wall
+        for (let lk = 0; lk < 3; lk++) {
+          const lz = entZ + 1.15 + lk * 0.62;
+          addBox(city.detail, M.steelDark, .58, 1.92, .56, bx0 + 11.45, 1.16, lz);
+          addBox(city.detail, M.steelGalv, .04, .18, .38, bx0 + 11.15, 1.72, lz);
+          addBox(city.detail, M.steelGalv, .04, .05, .14, bx0 + 11.15, 1.18, lz);
+        }
+        city.colliderSpecs.push({ min: new Vector3(bx0 + 11.1, .2, entZ + 0.8), max: new Vector3(bx0 + 11.8, 2.1, entZ + 2.75), surface: 'metal' });
+        addBox(city.detail, M.craneWhite, .42, .96, .42, bx0 + 3.65, .68, entZ - 3.15);
+        addCyl(city.detail, M.glassCyan, .15, .44, bx0 + 3.65, 1.38, entZ - 3.15);
+        // Calibrated warm practical task lighting + warm-neutral overhead bounce (eliminates cold grey flatness!)
+        const workLight = new THREE.PointLight(0xffd299, 15.5, 14, 1.65);
         workLight.position.set(stationX + .19, 2.15, stationZ + .56);
         city.detail.add(workLight);
-        const lobbyFill = new THREE.PointLight(0xeef5ff, 6.5, 14, 1.6);
-        lobbyFill.position.set(bx0 + 6.5, 3.35, entZ + .6);
+        const desk2Light = new THREE.PointLight(0xffcf94, 10.5, 11, 1.75);
+        desk2Light.position.set(secondX + .55, 2.05, secondZ + .05);
+        city.detail.add(desk2Light);
+        const lobbyFill = new THREE.PointLight(0xfff0dc, 9.5, 16, 1.5);
+        lobbyFill.position.set(bx0 + 6.2, 3.25, entZ + .2);
         city.detail.add(lobbyFill);
         const board = new Mesh(boxGeo, makeSignMat('HARBOR DISPATCH', 'WATCH 04    /    COASTAL RADIO', '#243d3d'));
         board.position.set(bx0 + 12.05, 2.25, entZ);
@@ -1974,6 +2200,12 @@
       } else {
         const lot = makeParcel(blk.style, blk.cx, blk.cz, 172, 95);
         const skyline = buildingGen.buildDistantBuilding(root, blk);
+        // Permanent fallback building footprint collider active whenever detailed multi-volume colliders aren't loaded yet!
+        const fallbackBox = addPermanentCollider(
+          new Vector3(blk.cx - blk.width / 2, 0.16, blk.cz - blk.depth / 2),
+          new Vector3(blk.cx + blk.width / 2, 0.16 + blk.height, blk.cz + blk.depth / 2),
+          { surface: 'concrete', tag: 'building-footprint' }
+        );
         lot.onLodChange = (loaded, detailed, quality) => {
           const showFull = loaded && (detailed || (quality !== 'low' && quality !== 'medium'));
           lot.shell.visible = showFull;
@@ -1986,7 +2218,10 @@
             buildTask = buildingGen.createCoastalBuildingTask(lot.shell, blk, { colliderTarget: lot.colliderSpecs });
           }
           const done = buildTask.step();
-          if (done) skyline.visible = false;
+          if (done) {
+            skyline.visible = false;
+            if (fallbackBox && lot.colliderSpecs.length > 0) fallbackBox.disabled = true;
+          }
           return done;
         };
         lot.onUnload = () => {
@@ -1996,6 +2231,7 @@
           lot.shell.clear();
           lot.colliderSpecs.length = 0;
           skyline.visible = true;
+          if (fallbackBox) fallbackBox.disabled = false;
         };
       }
     }
@@ -2032,6 +2268,11 @@
     // Articulated Steel-Truss & Mullioned Glass Pedestrian Skybridge at z = -104 & Off-Lane Transit Shelter
     addBox(horizonRoot, M.steelDark, 24.5, .42, 3.8, -26, 6.2, -104);
     addBox(horizonRoot, M.steelDark, 24.5, .36, 4.1, -26, 9.25, -104);
+    // Full bridge span colliders (deck, roof & side glass walls — leaves 0..5.9m roadway underneath 100% clear!)
+    addPermanentCollider(new Vector3(-38.25, 5.95, -105.95), new Vector3(-13.75, 6.45, -102.05), { surface: 'metal', tag: 'skybridge-deck', noNav: true });
+    addPermanentCollider(new Vector3(-38.35, 9.05, -106.10), new Vector3(-13.65, 9.60, -101.90), { surface: 'metal', tag: 'skybridge-roof', noNav: true });
+    addPermanentCollider(new Vector3(-37.80, 6.40, -105.85), new Vector3(-14.20, 9.10, -105.55), { surface: 'glass', tag: 'skybridge-wall', noNav: true });
+    addPermanentCollider(new Vector3(-37.80, 6.40, -102.45), new Vector3(-14.20, 9.10, -102.15), { surface: 'glass', tag: 'skybridge-wall', noNav: true });
     addBox(horizonRoot, curbStoneMat, 24.8, .16, 4.25, -26, 9.48, -104);
     for (const sz of [-105.7, -102.3]) {
       addBox(horizonRoot, smokedPane, 23.6, 2.65, .14, -26, 7.7, sz);
@@ -2040,13 +2281,40 @@
     for (const sx of [-37.8, -14.2]) {
       addBox(horizonRoot, curbStoneMat, 1.8, 6.2, 4.0, sx, 3.1, -104);
       addBox(city.detail, M.steelGalv, 2.2, .18, 4.3, sx, 6.2, -104);
+      addPermanentCollider(new Vector3(sx - 0.95, 0, -106.05), new Vector3(sx + 0.95, 6.3, -101.95), { surface: 'concrete' });
     }
     addBox(city.detail, M.steelDark, 1.8, .12, 5.6, -15.2, 2.82, -44);
     for (const z of [-46.5, -41.5]) addBox(city.detail, M.steelGalv, .09, 2.58, .09, -14.45, 1.57, z);
     addBox(city.detail, smokedPane, .10, 2.2, 5.2, -14.4, 1.56, -44);
     addBox(city.detail, M.wood, .55, .48, 3.8, -15.0, .50, -44);
+    city.colliderSpecs.push({ min: new Vector3(-15.32, 0.16, -46.75), max: new Vector3(-14.30, 2.90, -41.25), surface: 'metal' });
     addParkedSedan(city.detail, 17.5, .18, -110, Math.PI, M.sedanDark);
     addParkedSedan(city.detail, -38.4, .18, -40, 0, M.sedanGrey);
+    // Street-level urban life: fire hydrants, municipal litter bins, crosswalk stop bars & coastal bike rack
+    for (const [hx, hz] of [[-15.4, -49.5], [-36.6, -63.5], [-15.4, -84.5], [-36.6, -98.5]]) {
+      addCyl(city.detail, M.craneRed, .14, .72, hx, .54, hz);
+      addCyl(city.detail, M.steelGalv, .16, .10, hx, .92, hz);
+      addBox(city.detail, M.craneRed, .38, .12, .12, hx, .72, hz);
+      city.colliderSpecs.push({ min: new Vector3(hx - .2, .16, hz - .2), max: new Vector3(hx + .2, 1.0, hz + .2), surface: 'metal' });
+    }
+    for (const [tx, tz] of [[-15.5, -59.5], [-36.5, -51.5], [-15.5, -94.5], [-36.5, -78.5], [14.6, -54.0], [14.6, -86.0]]) {
+      addBox(city.detail, M.steelDark, .48, .88, .48, tx, .62, tz);
+      addBox(city.detail, M.steelGalv, .52, .10, .52, tx, 1.08, tz);
+      addBox(city.detail, M.hazard, .50, .08, .50, tx, .86, tz);
+      city.colliderSpecs.push({ min: new Vector3(tx - .26, .16, tz - .26), max: new Vector3(tx + .26, 1.12, tz + .26), surface: 'metal' });
+    }
+    for (const cz of [-56, -96]) {
+      addBox(city.detail, M.whitePaint, 13.5, .025, .42, -26, .205, cz - 3.2);
+      addBox(city.detail, M.whitePaint, 13.5, .025, .42, -26, .205, cz + 3.2);
+    }
+    // Municipal steel bike rack outside Maritime Exchange (-36.4, -67)
+    for (let bi = 0; bi < 4; bi++) {
+      const bz = -68.6 + bi * 0.95;
+      addBox(city.detail, M.steelGalv, .05, .72, .05, -36.5, .54, bz);
+      addBox(city.detail, M.steelGalv, .05, .72, .05, -35.8, .54, bz);
+      addBox(city.detail, M.steelGalv, .75, .05, .05, -36.15, .90, bz);
+    }
+    city.colliderSpecs.push({ min: new Vector3(-36.6, .16, -69.0), max: new Vector3(-35.7, .95, -65.4), surface: 'metal' });
     // Cleanly placed street utilities & AC units mounted on solid rear/side walls (ZERO glass window clipping!)
     placeExternal(city.detail, 'utility_box_01', -15.6, .31, -66.8, -Math.PI / 2, 1.0);
     placeExternal(city.detail, 'utility_box_01', -35.8, .16, -91.5, Math.PI / 2, 1.0);
@@ -2355,6 +2623,23 @@
         chock.updateMatrix();
       }
     });
+    const planeColliders = [];
+    {
+      const cA = Math.cos(planeBaseYaw), sA = Math.sin(planeBaseYaw);
+      const makePlaneBox = (lx0, lx1, lz0, lz1, y0, y1) => {
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        for (const lx of [lx0, lx1]) for (const lz of [lz0, lz1]) {
+          const wx = planeBasePos.x + lx * cA + lz * sA;
+          const wz = planeBasePos.z - lx * sA + lz * cA;
+          if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
+          if (wz < minZ) minZ = wz; if (wz > maxZ) maxZ = wz;
+        }
+        const b = addDynamicCollider(new Vector3(minX, y0, minZ), new Vector3(maxX, y1, maxZ), { surface: 'metal', tag: 'parked-aircraft', noNav: true });
+        if (b) planeColliders.push(b);
+      };
+      makePlaneBox(-2.1, 2.1, -9.8, 9.8, 0.2, 4.6); // Fuselage
+      makePlaneBox(-10.8, 10.8, -2.3, 2.3, 1.2, 4.2); // Main wing + engine nacelles
+    }
     let finaleClock = 0;
     function resetParkedAircraft() {
       finaleSpinActive = false;
@@ -2365,6 +2650,7 @@
       shadow.material.opacity = 1;
       for (const b of planeBlades) b.visible = true;
       for (const d of planeDiscs) d.visible = false;
+      for (const b of planeColliders) b.disabled = false;
     }
     updaters.push(dt => {
       if (!finaleSpinActive) return;
@@ -2375,6 +2661,7 @@
       for (const b of planeBlades) b.visible = !blurred;
       for (const d of planeDiscs) d.visible = blurred;
       if (finaleClock > 2.0) {
+        for (const b of planeColliders) b.disabled = true;
         const tRoll = finaleClock - 2.0;
         const fwd = Math.min(26, tRoll * 11);
         plane.position.x -= Math.sin(planeBaseYaw) * fwd * dt;
@@ -2549,7 +2836,10 @@
     const trainUnits = [];
     const locoUnit = buildTrainLoco();
     liveTrain.add(locoUnit);
-    trainUnits.push({ group: locoUnit, offsetZ: 0 });
+    trainUnits.push({
+      group: locoUnit, offsetZ: 0, halfX: 1.54, halfZ: 7.48, maxY: 4.22,
+      collider: addDynamicCollider(new Vector3(-133 - 1.54, 0.16, -32 - 7.48), new Vector3(-133 + 1.54, 4.22, -32 + 7.48), { surface: 'metal', tag: 'live-train', noNav: true }),
+    });
     const trainCarMats = [M.cargoTeal, M.cargoNavy, M.safetyOrange, M.craneWhite];
     for (let i = 0; i < trainCarMats.length; i++) {
       const cz = -(i + 1) * 15.4;
@@ -2566,7 +2856,10 @@
       addBox(carG, M.steelGalv, .36, .28, 1.8, 0, .86, 7.6);
       for (const az of [-5.2, -3.8, 3.8, 5.2]) addCyl(carG, M.steelDark, .38, 2.2, 0, .42, az, 0, Math.PI / 2);
       liveTrain.add(carG);
-      trainUnits.push({ group: carG, offsetZ: cz });
+      trainUnits.push({
+        group: carG, offsetZ: cz, halfX: 1.44, halfZ: 6.96, maxY: 3.92,
+        collider: addDynamicCollider(new Vector3(-133 - 1.44, 0.16, -32 + cz - 6.96), new Vector3(-133 + 1.44, 3.92, -32 + cz + 6.96), { surface: 'metal', tag: 'live-train', noNav: true }),
+      });
     }
     horizonRoot.add(liveTrain);
     let trainZ = -32, gateAngle = 0, crossBlink = 0;
@@ -2576,7 +2869,15 @@
       liveTrain.position.z = trainZ;
       for (const u of trainUnits) {
         const wz = trainZ + u.offsetZ;
-        u.group.visible = (wz >= -114.5 && wz <= 143.5);
+        const vis = (wz >= -114.5 && wz <= 143.5);
+        u.group.visible = vis;
+        if (u.collider) {
+          u.collider.disabled = !vis;
+          if (vis) {
+            updateDynamicBox(u.collider, -133 - u.halfX, 0.16, wz - u.halfZ, -133 + u.halfX, u.maxY, wz + u.halfZ);
+            pushPlayerOutOfMovingBox(u.collider);
+          }
+        }
       }
       const trainNearCrossing = trainZ > 76 && trainZ < 196;
       const targetAngle = trainNearCrossing ? 0 : 1.32;
@@ -2689,12 +2990,14 @@
     // Area-1-Grade Hydraulic Tide Gate Arch spanning Coastal Blvd at z = 96 (suspended steel floodgate, catwalk, handrails & operator booth!)
     for (const px of [-37.5, -14.5]) {
       addBox(horizonRoot, M.concreteDirty, 4.8, 1.6, 5.0, px, .96, 96);
+      addPermanentCollider(new Vector3(px - 2.45, 0, 93.4), new Vector3(px + 2.45, 14.2, 98.6), { surface: 'concrete' });
       addBox(horizonRoot, M.concrete, 4.0, 11.6, 4.0, px, 6.8, 96);
       for (const rz of [93.9, 98.1]) addBox(horizonRoot, M.steelDark, .34, 11.4, .28, px, 6.7, rz);
       addCyl(southHarbor.detail, M.steelGalv, .36, 9.2, px + (px < -26 ? 2.2 : -2.2), 7.6, 96);
       addBox(southHarbor.detail, M.redCore, .40, .42, .40, px, 14.6, 96);
     }
     addBox(horizonRoot, M.concrete, 27.6, 2.4, 3.4, -26, 12.1, 96);
+    addPermanentCollider(new Vector3(-39.8, 7.6, 94.2), new Vector3(-12.2, 13.8, 97.8), { surface: 'concrete', tag: 'tidegate-span', noNav: true });
     addBox(horizonRoot, M.concreteDirty, 28.8, .55, 4.0, -26, 13.5, 96);
     addBox(horizonRoot, M.corrugated, 19.2, 3.1, .52, -26, 9.45, 96);
     addBox(horizonRoot, M.hazard, 19.4, .42, .62, -26, 7.85, 96);
@@ -2749,6 +3052,7 @@
       boulder.position.set(rx, .4, rz); boulder.scale.set(sx, sy, 3.2);
       boulder.rotation.set(.15, rx * .17, .2); boulder.matrixAutoUpdate = false; boulder.updateMatrix();
       horizonRoot.add(boulder);
+      addPermanentCollider(new Vector3(rx - sx * 0.78, 0, rz - 2.5), new Vector3(rx + sx * 0.78, sy + 0.6, rz + 2.5), { surface: 'stone', noNav: true });
       addPineTree(southHarbor.detail, rx - 2.5, .16, rz - 4.5, 1.05);
     }
     southHarbor.colliderSpecs.push({ min: new Vector3(10, 0, 130), max: new Vector3(18, 22, 138), surface: 'concrete' });
@@ -2787,9 +3091,12 @@
     addIndustrialExhaustTower(swClinic, swClinic.shell, -162, 60, -1);
     addSubstationYard(swClinic, swClinic.shell, -204, 38);
     if (industrialGen) {
-      industrialGen.buildCryoTankCluster(swClinic.shell, -204, 78, 3, 5.2);
-      industrialGen.buildOverheadPipeline(horizonRoot, [[-194, 5.2, 62], [-184, 7.6, 68], [-174, 7.6, 82], [-182, 5.6, 89]], { radius: 0.28, pipeCount: 2, spacing: 0.72 });
-      industrialGen.buildOverheadPipeline(horizonRoot, [[-94, 5.4, 65], [-74, 8.2, 65], [-52, 6.2, 65]], { radius: 0.26, pipeCount: 2, spacing: 0.68 });
+      industrialGen.buildCryoTankCluster(swClinic.shell, -204, 78, 3, 5.2, {
+        onCollider: (minArr, maxArr, surf) => swClinic.colliderSpecs.push({ min: new Vector3(...minArr), max: new Vector3(...maxArr), surface: surf }),
+      });
+      const pipeCol = (minArr, maxArr, surf) => addPermanentCollider(new Vector3(...minArr), new Vector3(...maxArr), { surface: surf, noNav: true });
+      industrialGen.buildOverheadPipeline(horizonRoot, [[-194, 5.2, 62], [-184, 7.6, 68], [-174, 7.6, 82], [-182, 5.6, 89]], { radius: 0.28, pipeCount: 2, spacing: 0.72, onCollider: pipeCol });
+      industrialGen.buildOverheadPipeline(horizonRoot, [[-94, 5.4, 65], [-74, 8.2, 65], [-52, 6.2, 65]], { radius: 0.26, pipeCount: 2, spacing: 0.68, onCollider: pipeCol });
       industrialGen.buildReflectivePuddles(horizonRoot, [
         [-25.5, 0.214, -46, 3.2, 1.9, 0.25], [-27.2, 0.214, -70, 2.8, 1.6, -0.3],
         [-24.4, 0.214, -98, 3.6, 2.1, 0.15], [-26.8, 0.214, 44, 3.4, 1.8, 0.4],
@@ -2870,6 +3177,12 @@
         h._baseX = sp.pos[0]; h._baseZ = sp.pos[2];
         h._patrol = sp.patrol || null;
         h._phase = idx * 1.7;
+        h._parent = sp.parent;
+        h._collider = addDynamicCollider(
+          new Vector3(sp.pos[0] - 0.34, sp.pos[1], sp.pos[2] - 0.34),
+          new Vector3(sp.pos[0] + 0.34, sp.pos[1] + 1.75, sp.pos[2] + 0.34),
+          { surface: 'concrete', tag: 'city-npc', noNav: true }
+        );
         sp.parent.add(h.actor);
         return h;
       });
@@ -2889,7 +3202,9 @@
         for (let i = 0; i < cityNpcs.length; i++) {
           const npc = cityNpcs[i];
           if (checkVis) npc.actor.visible = !position || position.distanceToSquared(npc.actor.position) <= rSq;
-          if (!npc.actor.visible) continue;
+          const activeNpc = npc.actor.visible && npc._parent.visible;
+          if (npc._collider) npc._collider.disabled = !activeNpc;
+          if (!activeNpc) continue;
           if (npc._patrol) {
             const [dx, dz] = npc._patrol;
             const dist = Math.max(1, Math.hypot(dx, dz));
@@ -2899,6 +3214,7 @@
               npc.actor.position.z = npc._baseZ + dz * cycle;
               npc.actor.rotation.y = Math.atan2(dx, dz);
               npc.pose('walk', 1.15, npcAge + i * 1.1, false);
+              if (npc._collider) updateDynamicBox(npc._collider, npc.actor.position.x - 0.34, npc.actor.position.y, npc.actor.position.z - 0.34, npc.actor.position.x + 0.34, npc.actor.position.y + 1.75, npc.actor.position.z + 0.34);
             } else if (cycle < 1.2) {
               npc.pose('stand', 0, npcAge + i * 1.1, false);
             } else if (cycle < 2.2) {
@@ -2907,6 +3223,7 @@
               npc.actor.position.z = npc._baseZ + dz * back;
               npc.actor.rotation.y = Math.atan2(-dx, -dz);
               npc.pose('walk', 1.15, npcAge + i * 1.1, false);
+              if (npc._collider) updateDynamicBox(npc._collider, npc.actor.position.x - 0.34, npc.actor.position.y, npc.actor.position.z - 0.34, npc.actor.position.x + 0.34, npc.actor.position.y + 1.75, npc.actor.position.z + 0.34);
             } else {
               npc.pose('stand', 0, npcAge + i * 1.1, false);
             }
@@ -3139,7 +3456,10 @@
       if (!force && showProps === lastMissionPropsVisible) return;
       lastMissionPropsVisible = showProps;
       jammerRoot.visible = showProps;
-      for (const t of shootTargets) t.group.visible = showProps && t.alive;
+      for (const t of shootTargets) {
+        t.group.visible = showProps && t.alive;
+        if (t.collider) t.collider.disabled = !t.group.visible;
+      }
       for (const rb of roadblockProps) rb.mesh.visible = showProps && rb.intact;
     }
     syncOpenWorldMissionProps(true);
@@ -3665,6 +3985,7 @@
         t.alive = t.stage >= idx;
         t.hp = t.maxHp;
         t.group.visible = t.alive;
+        if (t.collider) t.collider.disabled = !t.alive;
       }
       for (const rb of roadblockProps) {
         rb.intact = idx <= 1;
@@ -3710,6 +4031,7 @@
       }
       t.alive = false;
       t.group.visible = false;
+      if (t.collider) t.collider.disabled = true;
       fx?.smoke?.(t.pos, { size: 4.6, life: 5.5, color: 0x26211d, alpha: .74, rise: 1.3, count: 10 });
       fx?.sparks?.(t.pos, up, 42);
       fx?.debris?.(t.pos, { count: 18 });
@@ -4027,10 +4349,105 @@
         container.add(inst);
       }
     }
-    batchStaticGroup(horizonRoot, 64);
+    // Merge remaining single-instance static meshes (e.g. unique-size worldBoxGeo walls/slabs) per material & cell
+    function mergeStaticByMaterial(container, cellSize = 128) {
+      if (!container || typeof THREE.BufferGeometry !== 'function' || typeof THREE.Float32BufferAttribute !== 'function' || typeof THREE.Matrix3 !== 'function') return;
+      container.updateMatrixWorld(true);
+      const invContainer = new THREE.Matrix4().copy(container.matrixWorld).invert();
+      const matIds = new WeakMap();
+      let nextMatId = 1;
+      const groups = new Map();
+      const collect = node => {
+        if (!node || node.userData?.noBatch === true || node.isInstancedMesh) return;
+        if (node.isMesh && node.userData?.staticBatchable === true && node.geometry && node.material && !Array.isArray(node.material)) {
+          const g = node.geometry;
+          const posAttr = g.attributes?.position;
+          const normAttr = g.attributes?.normal;
+          const uvAttr = g.attributes?.uv;
+          if (!posAttr || !normAttr || !uvAttr || g.attributes?.color) return;
+          let mId = matIds.get(node.material);
+          if (!mId) { mId = nextMatId++; matIds.set(node.material, mId); }
+          const localMat = new THREE.Matrix4().multiplyMatrices(invContainer, node.matrixWorld);
+          const cx = Math.floor(localMat.elements[12] / cellSize);
+          const cz = Math.floor(localMat.elements[14] / cellSize);
+          const key = `${mId}|${node.castShadow ? 1 : 0}|${node.receiveShadow ? 1 : 0}|${cx}|${cz}`;
+          let entry = groups.get(key);
+          if (!entry) {
+            entry = { mat: node.material, castShadow: !!node.castShadow, receiveShadow: !!node.receiveShadow, items: [] };
+            groups.set(key, entry);
+          }
+          entry.items.push({ mesh: node, matrix: localMat });
+          return;
+        }
+        const ch = node.children;
+        if (ch && ch.length) for (let i = 0; i < ch.length; i++) collect(ch[i]);
+      };
+      collect(container);
+      const vTmp = new Vector3();
+      const nTmp = new Vector3();
+      const nMat = new THREE.Matrix3();
+      for (const grp of groups.values()) {
+        if (grp.items.length < 2) continue;
+        let totalVerts = 0, totalIdx = 0;
+        for (const it of grp.items) {
+          const g = it.mesh.geometry;
+          totalVerts += g.attributes.position.count;
+          totalIdx += g.index ? g.index.count : g.attributes.position.count;
+        }
+        if (totalVerts === 0 || totalVerts > 65000) continue;
+        const positions = new Float32Array(totalVerts * 3);
+        const normals = new Float32Array(totalVerts * 3);
+        const uvs = new Float32Array(totalVerts * 2);
+        const indices = new Uint32Array(totalIdx);
+        let vOff = 0, iOff = 0;
+        for (const it of grp.items) {
+          const g = it.mesh.geometry;
+          const pA = g.attributes.position, nA = g.attributes.normal, uA = g.attributes.uv;
+          const cnt = pA.count;
+          nMat.getNormalMatrix(it.matrix);
+          for (let v = 0; v < cnt; v++) {
+            vTmp.set(pA.getX(v), pA.getY(v), pA.getZ(v)).applyMatrix4(it.matrix);
+            positions[(vOff + v) * 3] = vTmp.x;
+            positions[(vOff + v) * 3 + 1] = vTmp.y;
+            positions[(vOff + v) * 3 + 2] = vTmp.z;
+            nTmp.set(nA.getX(v), nA.getY(v), nA.getZ(v)).applyMatrix3(nMat).normalize();
+            normals[(vOff + v) * 3] = nTmp.x;
+            normals[(vOff + v) * 3 + 1] = nTmp.y;
+            normals[(vOff + v) * 3 + 2] = nTmp.z;
+            uvs[(vOff + v) * 2] = uA.getX(v);
+            uvs[(vOff + v) * 2 + 1] = uA.getY(v);
+          }
+          if (g.index) {
+            const idxArr = g.index.array;
+            for (let k = 0; k < idxArr.length; k++) indices[iOff++] = idxArr[k] + vOff;
+          } else {
+            for (let k = 0; k < cnt; k++) indices[iOff++] = k + vOff;
+          }
+          vOff += cnt;
+          if (it.mesh.parent) it.mesh.parent.remove(it.mesh);
+        }
+        const merged = new THREE.BufferGeometry();
+        merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        merged.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+        merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        merged.setIndex(new THREE.BufferAttribute(indices, 1));
+        merged.computeBoundingSphere();
+        customGeos.push(merged);
+        const m = new Mesh(merged, grp.mat);
+        m.castShadow = grp.castShadow;
+        m.receiveShadow = grp.receiveShadow;
+        m.matrixAutoUpdate = false;
+        m.updateMatrix();
+        container.add(m);
+      }
+    }
+    batchStaticGroup(horizonRoot, 140);
+    mergeStaticByMaterial(horizonRoot, 140);
     for (const sec of sectors) {
-      batchStaticGroup(sec.shell, 64);
-      batchStaticGroup(sec.detail, 64);
+      batchStaticGroup(sec.shell, 110);
+      mergeStaticByMaterial(sec.shell, 110);
+      batchStaticGroup(sec.detail, 110);
+      mergeStaticByMaterial(sec.detail, 110);
     }
 
     const chunkMgr = WE?.createChunkManager ? WE.createChunkManager({ renderer: world.renderer, sectors: [...sectors, ...parcels], quality: world.quality?.name || world.params?.q || 'high', syncColliders, targetFps: 55, manageResolution: false }) : null;
@@ -4121,6 +4538,10 @@
         return;
       }
       atmosphereSys?.syncDaylight(lightingSys?.advance(dt));
+      if (lightingSys?.setInteriorFactor && playerPos) {
+        const inPrecinct = playerPos.x > -13.2 && playerPos.x < 1.5 && playerPos.z > -63.5 && playerPos.z < -47.0 && playerPos.y < 4.2;
+        lightingSys.setInteriorFactor(inPrecinct ? 1 : 0);
+      }
       aliveClock += dt;
       for (const fn of updaters) fn(dt);
       storyDirector?.update?.(dt);
@@ -4448,6 +4869,7 @@
       }
       for (const it of interactables) it.cleanup?.();
       for (const sec of sectors) syncColliders(sec, false);
+      for (const parcel of parcels) syncColliders(parcel, false);
       for (const b of permanentColliders.splice(0)) physics?.removeBox?.(b);
       parkedAircraft.dispose();
       crown.dispose();

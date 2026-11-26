@@ -91,16 +91,23 @@ test('LAN RFC 6455 WebSocket frame encoder and masked client parser round-trip J
   assert.deepEqual(received, [sample]);
 });
 
-test('LAN room settings normalization supports IRONFRONT modes, teams, tickets and AI toggle', () => {
-  const s = normalizeSettings({ mode: 'breakthrough', difficulty: 'hard', startingTickets: 70, duration: 360, aiEnabled: false, joinTeam: 'alternate' });
+test('LAN room settings normalization supports IRONFRONT modes, maps, teams, tickets, mid-join and AI toggle', () => {
+  const s = normalizeSettings({ mode: 'breakthrough', mapId: 'port_rail', difficulty: 'hard', startingTickets: 70, duration: 360, aiEnabled: false, joinTeam: 'alternate', allowMidJoin: false });
   assert.deepEqual(s, {
     mode: 'breakthrough',
+    mapId: 'port_rail',
     difficulty: 'hard',
     startingTickets: 70,
     duration: 360,
     aiEnabled: false,
     joinTeam: 'alternate',
+    allowMidJoin: false,
   });
+  const coop = normalizeSettings({ mode: 'coop_rescue', mapId: 'mountain_forest', aiEnabled: false, joinTeam: 'red' });
+  assert.equal(coop.mode, 'coop_rescue');
+  assert.equal(coop.mapId, 'mountain_forest');
+  assert.equal(coop.aiEnabled, true);
+  assert.equal(coop.joinTeam, 'blue');
 });
 
 test('Port Conquest supports IRONFRONT heavy vehicle airdrop requisitions', () => {

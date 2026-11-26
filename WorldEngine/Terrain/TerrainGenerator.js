@@ -166,7 +166,7 @@
     }
 
     // Multi-Species Ecological Wind-Animated Forest (Coastal Pine + Tapered Cypress + Broadleaf Shrubs!)
-    function buildWindPineForest(parent, crownGeo, trunkGeo, trunkMat, positions, updaters) {
+    function buildWindPineForest(parent, crownGeo, trunkGeo, trunkMat, positions, updaters, { onCollider } = {}) {
       if (!positions.length || typeof InstancedMesh !== 'function' || typeof Object3D !== 'function') return null;
       const windUniform = { value: 0 };
       const makeWindMat = (hex, swayFactor = 0.055) => {
@@ -244,6 +244,8 @@
             dummy.scale.set(0.14 * sc, 4.6 * sc * scaleY, 0.14 * sc);
             dummy.updateMatrix();
             tInst.setMatrixAt(i, dummy.matrix);
+            const tr = Math.max(0.22, 0.24 * sc);
+            onCollider?.([px - tr, py, pz - tr], [px + tr, py + 4.4 * sc * scaleY, pz + tr], 'wood');
           }
         }
         cInst.receiveShadow = true;
@@ -294,6 +296,7 @@
             dummy.scale.set(sx, sy, sz);
             dummy.updateMatrix();
             rockInst.setMatrixAt(i, dummy.matrix);
+            onCollider?.([rx - sx * 0.72, ry - sy * 0.4, rz - sz * 0.72], [rx + sx * 0.72, ry + sy * 0.75, rz + sz * 0.72], 'stone');
           }
           rockInst.receiveShadow = true;
           parent.add(rockInst);

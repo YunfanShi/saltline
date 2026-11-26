@@ -81,33 +81,108 @@
       roughness: .66, metalness: .08, transparent: true, opacity: .86, side: DoubleSide,
     });
 
-    // Full-Coastline 340m Tsunami Wall covering North Coastal City, Berth 4 & South Drydock/Lighthouse
+    // Real Continuous Curved Breaking-Wave Mesh + Custom GLSL Gerstner Wave / Fresnel / Foam Shader!
     const waveWidth = 340;
-    const waveProfile = [
-      [8.4, 0.0], [5.4, 2.3], [2.4, 5.6], [0.3, 8.8], [-1.4, 11.1], [-3.0, 11.9], [-4.4, 10.6], [-4.8, 8.3],
-    ];
-    for (let i = 0; i < waveProfile.length - 1; i++) {
-      const [x0, y0] = waveProfile[i], [x1, y1] = waveProfile[i + 1];
-      const segLen = Math.hypot(x1 - x0, y1 - y0);
-      const seg = new Mesh(new BoxGeometry(segLen + .16, .60, waveWidth), i >= 4 ? foamMat : waveWaterMat);
-      seg.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0);
-      seg.rotation.z = Math.atan2(y1 - y0, x1 - x0);
-      waveGroup.add(seg);
-    }
-    const crestPivot = new Group();
-    crestPivot.position.set(-3.5, 10.5, 0);
-    crestPivot.rotation.x = Math.PI / 2;
-    const crestRoll = new Mesh(new CylinderGeometry(1.35, 1.35, waveWidth, 16), foamMat);
-    crestPivot.add(crestRoll);
-    waveGroup.add(crestPivot);
+    const oceanUniforms = {
+      uTime: { value: 0 },
+      uDeepColor: { value: new THREE.Color(0x051822) },
+      uShallowColor: { value: new THREE.Color(0x134a5c) },
+      uFoamColor: { value: new THREE.Color(0xdcebf0) },
+      uSkyColor: { value: new THREE.Color(0x6d8ea6) },
+    };
+    const makeWaveShaderMat = (isWall) => (typeof THREE.ShaderMaterial === 'function' ? new THREE.ShaderMaterial({
+      uniforms: oceanUniforms,
+      transparent: true,
+      side: DoubleSide,
+      vertexShader: `
+        uniform float uTime;
+        varying vec2 vUv;
+        varying float vFoam;
+        varying vec3 vWorldPos;
+        varying vec3 vNormalW;
+        void main() {
+          vUv = uv;
+          vec3 p = position;
+          float w1 = sin(p.z * 0.085 + uTime * 3.1 + p.x * 0.14) * 0.55;
+          float w2 = cos(p.z * 0.19 - uTime * 4.4 + p.x * 0.28) * 0.28;
+          float w3 = sin((p.z + p.x) * 0.37 + uTime * 5.8) * 0.12;
+          ${isWall
+            ? 'p.x += (w1 + w2) * (0.4 + uv.y * 0.9); p.y += (w2 + w3) * 0.65; vFoam = smoothstep(0.52, 0.92, uv.y) + smoothstep(0.35, 0.85, w1 + w2) * 0.38;'
+            : 'p.z += (w1 * 0.42 + w2 * 0.32 + w3 * 0.22); vFoam = smoothstep(0.18, 0.72, w1 + w2) * 0.55;'
+          }
+          vec4 wp = modelMatrix * vec4(p, 1.0);
+          vWorldPos = wp.xyz;
+          vNormalW = normalize(mat3(modelMatrix) * normal);
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform vec3 uDeepColor;
+        uniform vec3 uShallowColor;
+        uniform vec3 uFoamColor;
+        uniform vec3 uSkyColor;
+        varying vec2 vUv;
+        varying float vFoam;
+        varying vec3 vWorldPos;
+        varying vec3 vNormalW;
+        void main() {
+          vec3 V = normalize(cameraPosition - vWorldPos);
+          float ripple = sin(vWorldPos.z * 0.9 + uTime * 4.2) * cos(vWorldPos.x * 0.7 - uTime * 3.5);
+          vec3 N = normalize(vNormalW + vec3(ripple * 0.12, 0.0, ripple * 0.09));
+          float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+          float crestMix = clamp(vFoam + ripple * 0.16, 0.0, 1.0);
+          vec3 waterCol = mix(uDeepColor, uShallowColor, clamp(vUv.y * 0.85 + 0.15, 0.0, 1.0));
+          waterCol = mix(waterCol, uSkyColor, fresnel * 0.58);
+          float foamNoise = smoothstep(0.25, 0.85, sin(vWorldPos.z * 1.4 - uTime * 5.0) * 0.5 + 0.5);
+          vec3 col = mix(waterCol, uFoamColor, clamp(crestMix * (0.65 + 0.35 * foamNoise), 0.0, 0.95));
+          float spec = pow(max(dot(reflect(-normalize(vec3(0.4, 0.75, 0.35)), N), V), 0.0), 36.0);
+          col += vec3(0.85, 0.93, 1.0) * spec * 0.45;
+          gl_FragColor = vec4(col, ${isWall ? '0.94' : '0.88'});
+        }
+      `,
+    }) : waveWaterMat);
 
-    const floodPlane = new Mesh(
-      new PlaneGeometry(280, 340, 16, 12),
-      new MeshStandardMaterial({
-        color: 0x0d2d3b, map: seaTex, bumpMap: seaTex, bumpScale: .15,
-        roughness: .18, metalness: .45, transparent: true, opacity: .88, side: DoubleSide,
-      }),
-    );
+    const wallMat = makeWaveShaderMat(true);
+    const floodShaderMat = makeWaveShaderMat(false);
+    // Smooth 14-point breaking-curl cross-section extruded across 340m coastline (48 Z segments)
+    const curlPts = [
+      [11.0, 0.0], [8.2, 1.4], [5.4, 3.2], [3.0, 5.4], [1.1, 7.8],
+      [-0.5, 10.1], [-2.1, 11.7], [-3.8, 12.1], [-5.2, 11.1], [-5.8, 9.2], [-5.3, 7.2],
+    ];
+    const zSegs = 48;
+    const pSegs = curlPts.length - 1;
+    const wPos = [], wNorm = [], wUv = [], wIdx = [];
+    for (let zi = 0; zi <= zSegs; zi++) {
+      const zf = zi / zSegs;
+      const z = (zf - 0.5) * waveWidth;
+      for (let pi = 0; pi <= pSegs; pi++) {
+        const [px, py] = curlPts[pi];
+        wPos.push(px, py, z);
+        wNorm.push(-0.6, 0.8, 0);
+        wUv.push(zf * 10, pi / pSegs);
+      }
+    }
+    for (let zi = 0; zi < zSegs; zi++) {
+      for (let pi = 0; pi < pSegs; pi++) {
+        const a = zi * (pSegs + 1) + pi;
+        const b = a + 1;
+        const c = (zi + 1) * (pSegs + 1) + pi;
+        const d = c + 1;
+        wIdx.push(a, c, b, b, c, d);
+      }
+    }
+    const waveWallGeo = new THREE.BufferGeometry();
+    waveWallGeo.setAttribute('position', new THREE.Float32BufferAttribute(wPos, 3));
+    waveWallGeo.setAttribute('normal', new THREE.Float32BufferAttribute(wNorm, 3));
+    waveWallGeo.setAttribute('uv', new THREE.Float32BufferAttribute(wUv, 2));
+    waveWallGeo.setIndex(wIdx);
+    waveWallGeo.computeVertexNormals();
+    const waveWallMesh = new Mesh(waveWallGeo, wallMat);
+    waveGroup.add(waveWallMesh);
+    const crestRoll = { rotation: { y: 0 } };
+
+    const floodPlane = new Mesh(new PlaneGeometry(280, 340, 56, 48), floodShaderMat);
     floodPlane.rotation.x = -Math.PI / 2;
     floodPlane.position.set(-35, -1, 0);
     tsunamiRoot.add(floodPlane);
@@ -138,6 +213,96 @@
     const fxRoot = new Group();
     fxRoot.name = 'disaster-fx-root';
     root.add(fxRoot);
+
+    // =========================================================================
+    // 1B. PERSISTENT ENVIRONMENTAL AFTERMATH (Building Collapse + Wrecked Cars + Flood Debris)
+    // =========================================================================
+    const aftermathRoot = new Group();
+    aftermathRoot.name = 'disaster-aftermath-root';
+    root.add(aftermathRoot);
+    const aftermathColliders = [];
+    const smokingWrecks = [];
+    let buildingCollapsed = false;
+    let vehiclesDamaged = false;
+    let aftermathSmokeTick = 0;
+
+    // Collapsible 4-Story Harbor Annex Tower at (-44, 0.16, 46) — intact until artillery/tsunami/demolition strikes!
+    const collapseTower = new Group();
+    collapseTower.position.set(-44, 0.16, 46);
+    const towerConcreteMat = new MeshStandardMaterial({ color: 0x6f7476, roughness: .88, metalness: .08 });
+    const towerCharredMat = new MeshStandardMaterial({ color: 0x262422, roughness: .94, metalness: .12 });
+    const towerRebarMat = new MeshStandardMaterial({ color: 0x5c3626, roughness: .72, metalness: .65 });
+    const tBody = new Mesh(new BoxGeometry(11.5, 14.0, 9.5), towerConcreteMat);
+    tBody.position.set(0, 7.0, 0);
+    const tRoof = new Mesh(new BoxGeometry(12.0, 0.8, 10.0), towerCharredMat);
+    tRoof.position.set(0, 14.3, 0);
+    collapseTower.add(tBody, tRoof);
+    aftermathRoot.add(collapseTower);
+    let collapseAnim = null;
+    const towerCollider = world.physics?.addBox ? world.physics.addBox([-50, 0.16, 41], [-38, 14.8, 51], { surface: 'concrete', tag: 'collapsible-tower', noNav: true }) : null;
+    if (towerCollider) aftermathColliders.push(towerCollider);
+
+    function spawnWreckedVehicle(x, z, yaw, tiltZ = 0.55) {
+      const wg = new Group();
+      wg.position.set(x, 0.35, z);
+      wg.rotation.set(0.18, yaw, tiltZ);
+      const hull = new Mesh(new BoxGeometry(1.9, 0.95, 4.2), towerCharredMat);
+      const cab = new Mesh(new BoxGeometry(1.65, 0.65, 2.1), towerCharredMat);
+      cab.position.set(0, 0.72, -0.15);
+      wg.add(hull, cab);
+      aftermathRoot.add(wg);
+      const b = world.physics?.addBox ? world.physics.addBox([x - 1.6, 0.16, z - 2.1], [x + 1.6, 1.75, z + 2.1], { surface: 'metal', tag: 'wrecked-vehicle', noNav: true }) : null;
+      if (b) aftermathColliders.push(b);
+      smokingWrecks.push(new Vector3(x, 1.1, z));
+    }
+
+    function triggerBuildingCollapse(reason = 'blast') {
+      if (buildingCollapsed) return false;
+      buildingCollapsed = true;
+      collapseAnim = { age: 0, dur: 2.6 };
+      // Spawn concrete rubble chunks + protruding rebar around tower base
+      for (let i = 0; i < 16; i++) {
+        const ang = (i / 16) * Math.PI * 2;
+        const rad = 3.2 + (i % 4) * 1.9;
+        const rx = -44 + Math.cos(ang) * rad, rz = 46 + Math.sin(ang) * rad;
+        const chunk = new Mesh(new BoxGeometry(1.8 + (i % 3) * 0.9, 0.9 + (i % 2) * 0.8, 1.6 + (i % 3) * 0.7), i % 3 === 0 ? towerCharredMat : towerConcreteMat);
+        chunk.position.set(rx, 0.55, rz);
+        chunk.rotation.set(i * 0.4, ang, i * 0.3);
+        aftermathRoot.add(chunk);
+        if (i % 2 === 0) {
+          const bar = new Mesh(new BoxGeometry(0.08, 2.4, 0.08), towerRebarMat);
+          bar.position.set(rx, 1.4, rz);
+          bar.rotation.set(0.5, ang, -0.4);
+          aftermathRoot.add(bar);
+        }
+      }
+      if (towerCollider && typeof world.physics?.updateBox === 'function') {
+        world.physics.updateBox(towerCollider, -52.5, 0.16, 38.5, -35.5, 4.4, 53.5);
+      }
+      smokingWrecks.push(new Vector3(-44, 2.8, 46));
+      spawnFireballExplosion(new Vector3(-44, 5.5, 46), 2.4);
+      fx?.smoke?.(new Vector3(-44, 4.0, 46), { size: 11, life: 10, color: 0x3a3733, alpha: .85, rise: 2.0, count: 16 });
+      fx?.debris?.(new Vector3(-44, 5.0, 46), { count: 32 });
+      world.player?.addShake?.(0.72);
+      announce(
+        '🏚️ 灾难破坏！南港滨海仓库大楼结构失稳坍塌，周边道路已被废墟阻断！',
+        '🏚️ STRUCTURAL COLLAPSE! South Harbor Annex Tower has collapsed into rubble!',
+        true
+      );
+      return true;
+    }
+
+    function applyVehicleAndStreetDamage(mode = 'tsunami') {
+      if (vehiclesDamaged) return;
+      vehiclesDamaged = true;
+      // Overturned & scorched vehicles along coastal boulevard / south quay + washed-up debris
+      spawnWreckedVehicle(-34.2, -48.5, 0.65, 0.85);
+      spawnWreckedVehicle(-17.8, -82.0, -0.45, -0.52);
+      spawnWreckedVehicle(-33.5, 62.0, 1.15, 2.75); // Upside-down car after storm surge!
+      if (world.ground && typeof world.ground.rainLevel === 'number') {
+        world.ground.rainLevel = Math.max(world.ground.rainLevel, mode === 'tsunami' ? 0.95 : 0.65);
+      }
+    }
 
     const boltMat = new MeshBasicMaterial({ color: 0xe6f6ff });
     const boltGeo = new BoxGeometry(.22, 1, .22);
@@ -345,6 +510,8 @@
         'TSUNAMI WARNING! 12m East Sea storm surge inbound! Climb to high ground NOW!',
         true,
       );
+      blastTimers.push(setTimeout(() => { applyVehicleAndStreetDamage('tsunami'); }, 5200));
+      blastTimers.push(setTimeout(() => { triggerBuildingCollapse('tsunami'); }, 7500));
       return true;
     }
 
@@ -373,6 +540,7 @@
         '💥 INCOMING ARTILLERY BARRAGE! Evade the red impact zones!',
         true,
       );
+      blastTimers.push(setTimeout(() => { triggerBuildingCollapse('artillery'); applyVehicleAndStreetDamage('artillery'); }, 4500));
       return true;
     }
 
@@ -556,6 +724,24 @@
 
     function update(dt, player) {
       if (!(dt > 0)) return;
+      oceanUniforms.uTime.value += dt;
+      if (collapseAnim) {
+        collapseAnim.age += dt;
+        const f = Math.min(1, collapseAnim.age / collapseAnim.dur);
+        const ease = f * f;
+        collapseTower.rotation.z = ease * 0.48;
+        collapseTower.rotation.x = ease * 0.22;
+        collapseTower.position.y = 0.16 - ease * 10.2;
+        if (f >= 1) collapseAnim = null;
+      }
+      if (smokingWrecks.length) {
+        aftermathSmokeTick += dt;
+        if (aftermathSmokeTick >= 0.85) {
+          aftermathSmokeTick = 0;
+          const pt = smokingWrecks[Math.floor(Math.random() * smokingWrecks.length)];
+          fx?.smoke?.(pt, { size: 3.4, life: 3.8, color: 0x22201e, alpha: .52, rise: 1.35, count: 2 });
+        }
+      }
 
       for (let i = activeFlyovers.length - 1; i >= 0; i--) {
         const j = activeFlyovers[i];
@@ -831,6 +1017,7 @@
       surfaces.forEach(value => value.dispose());
       seaTex?.dispose();
       foamTex?.dispose();
+      for (const b of aftermathColliders.splice(0)) world.physics?.removeBox?.(b);
       root.removeFromParent();
       vignette.remove();
       stormVignette.remove();
@@ -845,6 +1032,7 @@
       triggerArtilleryBarrage,
       triggerFuelChainBlast,
       triggerTideGateDemolition,
+      triggerBuildingCollapse,
       triggerHighwayAmbush,
       triggerVictoryFlareBarrage,
       triggerSkyBattlePass,

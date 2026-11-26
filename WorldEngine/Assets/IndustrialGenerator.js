@@ -12,7 +12,7 @@
 
     // 1. Overhead Multi-Pipe Industrial Bridge (CatmullRomCurve3 + TubeGeometry + steel support trestles)
     function buildOverheadPipeline(parent, points, {
-      radius = 0.28, pipeCount = 2, spacing = 0.72, pipeMat, supportMat, hazardMat,
+      radius = 0.28, pipeCount = 2, spacing = 0.72, pipeMat, supportMat, hazardMat, onCollider,
     } = {}) {
       if (!points || points.length < 2) return null;
       const g = new Group();
@@ -52,11 +52,13 @@
         const legH = v.y - 0.16;
         const span = Math.max(1.4, pipeCount * spacing + 0.8);
         for (const sgn of [-0.5, 0.5]) {
+          const lx = v.x + sgn * span;
           const leg = new Mesh(boxG, sMat);
           leg.scale.set(0.24, legH, 0.24);
-          leg.position.set(v.x + sgn * span, 0.16 + legH / 2, v.z);
+          leg.position.set(lx, 0.16 + legH / 2, v.z);
           leg.matrixAutoUpdate = false; leg.updateMatrix();
           g.add(leg);
+          onCollider?.([lx - 0.18, 0.16, v.z - 0.18], [lx + 0.18, v.y, v.z + 0.18], 'metal');
         }
         const beam = new Mesh(boxG, hMat);
         beam.scale.set(span + 0.5, 0.28, 0.32);
@@ -70,7 +72,7 @@
     }
 
     // 2. LatheGeometry Domed Cryogenic / Pressurized Chemical Tank Cluster (weathered riveted PBR + valves + safety catwalk)
-    function buildCryoTankCluster(parent, x, z, count = 3, spacing = 5.4) {
+    function buildCryoTankCluster(parent, x, z, count = 3, spacing = 5.4, { onCollider } = {}) {
       const g = new Group();
       g.position.set(x, 0.16, z);
       const tankMat = matLib.get('tank_industrial');
@@ -125,6 +127,7 @@
         body.position.set(tx, tankGeo ? 0.35 : 5.2, 0);
         body.receiveShadow = true; body.matrixAutoUpdate = false; body.updateMatrix();
         g.add(body);
+        onCollider?.([x + tx - 1.98, 0.16, z - 1.98], [x + tx + 1.98, 11.1, z + 1.98], 'metal');
         for (const ry of [2.6, 5.4, 8.1]) {
           const ring = new Mesh(ringGeo, ry === 5.4 ? bandMat : darkMat);
           ring.position.set(tx, ry, 0);

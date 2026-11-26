@@ -41,12 +41,22 @@
         const skyMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide });
         envScene.add(new THREE.Mesh(skyGeo, skyMat));
 
-        // Glowing solar/lunar disc in PMREM so glass & water catch crisp specular sun glints!
+        // Glowing solar/lunar disc + soft atmospheric corona + sunlit coastal cloud deck in PMREM
         const sunGeo = new THREE.SphereGeometry(2.1, 10, 8);
         const sunMat = new THREE.MeshBasicMaterial({ color: sunHex });
         const sunMesh = new THREE.Mesh(sunGeo, sunMat);
         sunMesh.position.copy(direction).multiplyScalar(18);
         envScene.add(sunMesh);
+        const haloGeo = new THREE.SphereGeometry(4.8, 12, 8);
+        const haloMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(sunHex).lerp(cHor, 0.45), transparent: true, opacity: 0.42, depthWrite: false });
+        const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+        haloMesh.position.copy(direction).multiplyScalar(17.5);
+        envScene.add(haloMesh);
+        const cloudBandGeo = new THREE.CylinderGeometry(20, 21.5, 4.2, 20, 1, true);
+        const cloudBandMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(horizonHex).lerp(new THREE.Color(sunHex), 0.28), side: THREE.BackSide, transparent: true, opacity: 0.36, depthWrite: false });
+        const cloudBand = new THREE.Mesh(cloudBandGeo, cloudBandMat);
+        cloudBand.position.y = 4.2;
+        envScene.add(cloudBand);
 
         // Distant coastal city silhouette ring along western horizon of reflection probe
         const bGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -65,6 +75,8 @@
         if (scene) scene.environment = envRT.texture;
         skyGeo.dispose(); skyMat.dispose();
         sunGeo.dispose(); sunMat.dispose();
+        haloGeo.dispose(); haloMat.dispose();
+        cloudBandGeo.dispose(); cloudBandMat.dispose();
         bGeo.dispose(); bMat.dispose();
         pmrem.dispose();
       } catch {}
@@ -76,9 +88,9 @@
     const presets = [
       {
         id: 'native', zh: '🌊 原版海港光影', en: 'Native Harbor', hour: 9.5,
-        fog: origFogColor, density: Math.min(0.00078, origFogDensity),
-        sun: 0xffe2c2, sunInt: 2.55, hemiSky: 0xa8cde6, hemiGnd: 0x4a5459, hemiInt: 1.18,
-        envTop: 0x3b6588, envHor: 0x8eaec2, envSea: 0x162d3c, sunElev: 0.48, exposure: 1.05,
+        fog: origFogColor, density: Math.min(0.00056, origFogDensity),
+        sun: 0xffe8cc, sunInt: 2.75, hemiSky: 0xb6d8ee, hemiGnd: 0x4f5a5f, hemiInt: 1.24,
+        envTop: 0x386a94, envHor: 0x9abbd0, envSea: 0x152f40, sunElev: 0.52, exposure: 1.08,
       },
       {
         id: 'noon', zh: '☀️ 晴朗海湾（高细节无雾）', en: 'Clear Daylight', hour: 13.0,
@@ -102,6 +114,7 @@
 
     let currentIdx = 0;
     let timeOfDay = presets[0].hour;
+    let interiorFactor = 0;
 
     const dayKeys = [{ ...presets[3], hour: 4.3 }, ...presets];
     const previousEnvironment = scene?.environment;
@@ -213,11 +226,12 @@
         u.uZen.value.setHex(p.envTop); u.uHor.value.setHex(p.envHor);
         u.uHorAway?.value.setHex(p.fog); u.uSunDir?.value.copy(sunDir); u.uSunCol?.value.setHex(p.sun);
       }
+      const baseDensity = p.density * (1 - interiorFactor * 0.65);
       if (scene?.fog) {
         scene.fog.color.setHex(p.fog);
-        if ('density' in scene.fog) scene.fog.density = p.density;
+        if ('density' in scene.fog) scene.fog.density = baseDensity;
       }
-      if (renderer) renderer.toneMappingExposure = p.exposure;
+      if (renderer) renderer.toneMappingExposure = p.exposure + interiorFactor * 0.08;
       // Coarse 4-band cached PMREM (dawn/day/sunset/night) eliminates periodic 75s GPU cubemap stalls!
       const slot = timeOfDay < 6.5 || timeOfDay >= 20.5 ? 3 : (timeOfDay < 11.5 ? 0 : (timeOfDay < 16.5 ? 1 : 2));
       if (reflectionSlot !== slot) {
@@ -260,11 +274,20 @@
       envCache.clear();
     }
 
+    function setInteriorFactor(factor) {
+      const clamped = Math.max(0, Math.min(1, Number(factor) || 0));
+      if (Math.abs(clamped - interiorFactor) < 0.01) return;
+      interiorFactor = clamped;
+      setTimeOfDay(timeOfDay);
+    }
+
     return {
       presets,
       applyPreset,
       cycle: () => applyPreset(currentIdx + 1),
       setTimeOfDay, advance,
+      setInteriorFactor,
+      get interiorFactor() { return interiorFactor; },
       invalidateLightCache,
       registerDynamicLight,
       registerEmissiveMaterial,

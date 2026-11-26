@@ -47,8 +47,11 @@ const CONTENT_TYPES = {
   '.bin': 'application/octet-stream',
 };
 
+const PROTOCOL_VERSION = 2;
 const VALID_ROLES = new Set(['medic', 'support', 'recon', 'engineer', 'assault']);
 const VALID_TEAMS = new Set(['blue', 'red']);
+const VALID_MAPS = new Set(['coastal_quarter', 'port_rail', 'mountain_forest', 'old_harbor', 'coastal_industrial']);
+const VALID_MODES = new Set(['conquest', 'breakthrough', 'coop_rescue']);
 
 class RequestError extends Error {
   constructor(status, code) {
@@ -102,13 +105,17 @@ function playerName(value) {
 }
 
 function normalizeSettings(body = {}) {
+  const mode = VALID_MODES.has(body.mode) ? body.mode : 'conquest';
+  const mapId = VALID_MAPS.has(body.mapId) ? body.mapId : 'coastal_quarter';
   return {
-    mode: body.mode === 'breakthrough' ? 'breakthrough' : 'conquest',
+    mode,
+    mapId,
     difficulty: ['easy', 'normal', 'hard'].includes(body.difficulty) ? body.difficulty : 'normal',
     startingTickets: [25, 40, 70].includes(Number(body.startingTickets)) ? Number(body.startingTickets) : 40,
     duration: [180, 240, 360].includes(Number(body.duration)) ? Number(body.duration) : 240,
-    aiEnabled: body.aiEnabled !== false,
-    joinTeam: ['blue', 'red', 'alternate'].includes(body.joinTeam) ? body.joinTeam : 'blue',
+    aiEnabled: mode === 'coop_rescue' ? true : body.aiEnabled !== false,
+    joinTeam: mode === 'coop_rescue' ? 'blue' : (['blue', 'red', 'alternate'].includes(body.joinTeam) ? body.joinTeam : 'blue'),
+    allowMidJoin: body.allowMidJoin !== false,
   };
 }
 
@@ -128,7 +135,7 @@ function assignTeam(room, isHost) {
 }
 
 function normalizeConquest(state) {
-  if (!state || !['conquest', 'breakthrough'].includes(state.mode) ||
+  if (!state || !VALID_MODES.has(state.mode) ||
     !Number.isFinite(state.elapsed) || state.elapsed < 0 || state.elapsed > 360 ||
     ![null, 'blue', 'red', 'draw'].includes(state.winner) ||
     !Array.isArray(state.points) || state.points.length < 1 || state.points.length > 32 ||
@@ -204,6 +211,7 @@ function advanceCountdown(room, now) {
 
 function snapshot(room, player, now) {
   return {
+    protocolVersion: PROTOCOL_VERSION,
     code: room.code,
     phase: room.phase,
     countdownMs: room.phase === 'countdown' ? room.lockAt - now : null,
@@ -485,14 +493,17 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
       const port = Number(process.env.PORT ?? 7878);
       return json(response, 200, {
         version: '0.20.0-port',
+        protocolVersion: PROTOCOL_VERSION,
+        maps: [...VALID_MAPS],
+        modes: [...VALID_MODES],
         port,
         addresses: lanAddresses(port),
-        rooms: [...rooms.values()].map(r => ({ code: r.code, players: r.players.size, maxPlayers: r.maxPlayers, phase: r.phase })),
+        rooms: [...rooms.values()].map(r => ({ code: r.code, mapId: r.settings.mapId, mode: r.settings.mode, players: r.players.size, maxPlayers: r.maxPlayers, phase: r.phase })),
       });
     }
 
     const root = pathname === '/api/lan/rooms';
-    const match = pathname.match(/^\/api\/lan\/rooms\/([a-fA-F0-9]{6})(?:\/(join|ready|start|leave|team|loadout))?$/);
+    const match = pathname.match(/^\/api\/lan\/rooms\/([a-fA-F0-9]{6})(?:\/(join|ready|start|leave|team|loadout|rematch|settings))?$/);
     if (!root && !match) throw new RequestError(404, 'not_found');
     const [, rawCode, action] = match ?? [];
     const expected = root || action ? 'POST' : 'GET';
@@ -505,6 +516,9 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
     sweep(now);
 
     if (root) {
+      if (body.protocolVersion !== undefined && Number(body.protocolVersion) !== PROTOCOL_VERSION) {
+        throw new RequestError(426, 'protocol_mismatch');
+      }
       if (rooms.size >= MAX_ROOMS) throw new RequestError(503, 'room_limit');
       const name = playerName(body.name);
       let code;
@@ -532,10 +546,14 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
     const room = rooms.get(rawCode.toUpperCase());
     if (!room) throw new RequestError(404, 'room_not_found');
     if (action === 'join') {
+      if (body.protocolVersion !== undefined && Number(body.protocolVersion) !== PROTOCOL_VERSION) {
+        throw new RequestError(426, 'protocol_mismatch');
+      }
       if (room.phase === 'countdown') throw new RequestError(409, 'room_countdown');
-      if (room.phase !== 'lobby') throw new RequestError(409, 'room_started');
+      if (room.phase !== 'lobby' && !room.settings.allowMidJoin) throw new RequestError(409, 'room_started');
       if (room.players.size >= room.maxPlayers) throw new RequestError(409, 'room_full');
       const { token, player } = addPlayer(room, playerName(body.name), now, body.role);
+      if (room.phase === 'started') player.ready = true;
       return json(response, 201, { token, room: snapshot(room, player, now) });
     }
 
@@ -558,7 +576,27 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
       else migrateHost(room, now);
       return json(response, 200, { ok: true });
     }
+    if (action === 'rematch') {
+      if (player.id !== room.hostId) throw new RequestError(403, 'host_only');
+      room.phase = 'lobby';
+      room.lockAt = null;
+      room.conquest = null;
+      room.enemies = null;
+      room.vehicles = null;
+      room.pendingEvents.length = 0;
+      for (const m of room.players.values()) m.ready = false;
+      return json(response, 200, { room: snapshot(room, player, now) });
+    }
     if (action && action !== 'loadout' && room.phase === 'started') throw new RequestError(409, 'room_started');
+    if (action === 'settings') {
+      if (player.id !== room.hostId) throw new RequestError(403, 'host_only');
+      room.settings = normalizeSettings({ ...room.settings, ...body });
+      for (const m of room.players.values()) {
+        if (room.settings.mode === 'coop_rescue') m.team = 'blue';
+        m.ready = false;
+      }
+      return json(response, 200, { room: snapshot(room, player, now) });
+    }
     if (action === 'ready') {
       if (typeof body.ready !== 'boolean') throw new RequestError(400, 'invalid_ready');
       player.ready = body.ready;

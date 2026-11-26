@@ -251,11 +251,15 @@ async function main() {
     const views = [
       ['street',[-26,2.8,-42],[-26,4.8,-108],1],
       ['facade',[-24,2.4,-49],[-13,2.7,-56],1],
-      ['alley',[-66,2.3,-42],[-66,5.2,-96],1],
-      ['rooftop',[-44,19.5,-72],[-62,10.5,-118],1],
+      ['entrance',[-17.2,2.1,-53.5],[-12.5,2.2,-55.0],1],
       ['interior',[-11.3,1.8,-55],[-.8,1.55,-57],1],
+      ['rooftop',[-44,19.5,-72],[-62,10.5,-118],1],
+      ['alley',[-66,2.3,-42],[-66,5.2,-96],1],
+      ['plaza',[-46,3.4,-118],[-60,3.2,-126],1],
       ['skyline',[19,15.5,-34],[-58,7.5,-98],1],
+      ['industrial',[-185,6.5,56],[-204,5.5,78],1],
       ['terrain',[-210,7,60],[-231,11,91],1],
+      ['coastline',[15,4.2,72],[32,6.5,118],1],
       ['night',[-26,3.6,-48],[-26,5.2,-110],5],
     ];
     const total=views.length, results=[];
@@ -264,18 +268,32 @@ async function main() {
       const viewMeta={id,name:id};
       await evalJs(cdp,`window.SALTLINE_INSPECT_VIEW(${presetView===5?5:0},{photoClean:false}); __G.openWorld.setPhotoMode(true); __G.player.invulnerable=true; __G.player.enabled=false; __G.player.pos.set(${pos}); __G.player.vel.set(0,0,0); __setShot({cam:"${[...pos,...look]}",fov:62}); __G.hud.show(false);__G.weapon.setVisible(false);document.body.classList.add('audit-clean');true`);
       await evalJs(cdp,`(()=>{if(!document.querySelector('#audit-clean')){const s=document.createElement('style');s.id='audit-clean';s.textContent='body.audit-clean > :not(#app):not(canvas),body.audit-clean #ui{visibility:hidden!important}';document.head.append(s)}return true})()`);
-      await sleep(1500);
+      await sleep(1400);
       const stats=await evalJs(cdp,`new Promise(resolve=>{
-        let start, frames=0, calls=0, triangles=0;
+        let prev, frames=0, calls=0, triangles=0;
+        const deltas=[];
         function tick(now){
-          if(start===undefined) start=now;
+          if(prev===undefined) prev=now;
           else {
-            const stats=SALTLINE_GET_STATS();
-            calls+=stats.drawCalls;
-            triangles+=stats.triangles;
-            if(++frames===30){
-              const ms=(now-start)/frames;
-              resolve({...stats,fps:1000/ms,frameTimeMs:ms,state:__G.game.state,
+            deltas.push(now-prev);
+            prev=now;
+            const st=SALTLINE_GET_STATS();
+            calls+=st.drawCalls;
+            triangles+=st.triangles;
+            if(++frames===60){
+              const sorted=[...deltas].sort((a,b)=>a-b);
+              const avgMs=deltas.reduce((a,b)=>a+b,0)/deltas.length;
+              const pct=p=>sorted[Math.min(sorted.length-1,Math.floor(sorted.length*p))];
+              const p99Ms=pct(0.99);
+              resolve({...st,
+                fps:Number((1000/avgMs).toFixed(2)),
+                onePercentLowFps:Number((1000/Math.max(0.01,p99Ms)).toFixed(2)),
+                frameTimeMs:Number(avgMs.toFixed(2)),
+                p50FrameMs:Number(pct(0.50).toFixed(2)),
+                p95FrameMs:Number(pct(0.95).toFixed(2)),
+                p99FrameMs:Number(p99Ms.toFixed(2)),
+                maxFrameMs:Number(sorted[sorted.length-1].toFixed(2)),
+                state:__G.game.state,
                 drawCalls:Math.round(calls/frames),triangles:Math.round(triangles/frames)});
               return;
             }
@@ -290,14 +308,17 @@ async function main() {
       fs.writeFileSync(path.join(OUT_DIR,filename),Buffer.from(shot.data,'base64'));
       const row = {
         index: idx + 1, id: viewMeta.id, name: viewMeta.name, file: filename,
-        fps: stats?.fps ?? null, frameTimeMs: stats?.frameTimeMs ?? null,
+        fps: stats?.fps ?? null, onePercentLowFps: stats?.onePercentLowFps ?? null,
+        frameTimeMs: stats?.frameTimeMs ?? null, p50FrameMs: stats?.p50FrameMs ?? null,
+        p95FrameMs: stats?.p95FrameMs ?? null, p99FrameMs: stats?.p99FrameMs ?? null,
+        maxFrameMs: stats?.maxFrameMs ?? null,
         drawCalls: stats?.drawCalls ?? null, triangles: stats?.triangles ?? null,
         gpuGeometries: stats?.gpuGeometries ?? null, gpuTextures: stats?.gpuTextures ?? null,
         loadedChunks: stats?.loadedCount ?? null, detailedChunks: stats?.detailedCount ?? null,
         quality: stats?.quality ?? null, dprScale: stats?.dprScale ?? null,
       };
       results.push(row);
-      console.log(`📸 [${idx + 1}/${total}] ${viewMeta.name} -> ${row.file} | FPS: ${row.fps ?? '-'} | Frame: ${row.frameTimeMs ?? '-'}ms | DC: ${row.drawCalls ?? '-'} | Tris: ${row.triangles ?? '-'}`);
+      console.log(`📸 [${idx + 1}/${total}] ${viewMeta.name} -> ${row.file} | AvgFPS: ${row.fps ?? '-'} | 1%Low: ${row.onePercentLowFps ?? '-'} | P50/P95/P99: ${row.p50FrameMs}/${row.p95FrameMs}/${row.p99FrameMs}ms | DC: ${row.drawCalls ?? '-'} | Tris: ${row.triangles ?? '-'}`);
     }
 
     const lifecycle = await evalJs(cdp,`(async()=>{
@@ -346,6 +367,10 @@ async function main() {
     const validDc = results.map((r) => r.drawCalls).filter((v) => typeof v === 'number');
     const validTris = results.map((r) => r.triangles).filter((v) => typeof v === 'number');
 
+    const valid1Low = results.map((r) => r.onePercentLowFps).filter((v) => typeof v === 'number' && v > 0);
+    const validP95 = results.map((r) => r.p95FrameMs).filter((v) => typeof v === 'number');
+    const validP99 = results.map((r) => r.p99FrameMs).filter((v) => typeof v === 'number');
+    const validMaxMs = results.map((r) => r.maxFrameMs).filter((v) => typeof v === 'number');
     const report = {
       capturedAt: new Date().toISOString(),
       viewport: '1120x630',
@@ -353,7 +378,11 @@ async function main() {
       summary: {
         avgFps: avg(validFps),
         minFps: validFps.length ? Math.min(...validFps) : null,
+        avgOnePercentLowFps: avg(valid1Low),
         avgFrameTimeMs: avg(validFrame),
+        maxP95FrameMs: validP95.length ? Math.max(...validP95) : null,
+        maxP99FrameMs: validP99.length ? Math.max(...validP99) : null,
+        worstMaxFrameMs: validMaxMs.length ? Math.max(...validMaxMs) : null,
         maxDrawCalls: validDc.length ? Math.max(...validDc) : null,
         maxTriangles: validTris.length ? Math.max(...validTris) : null,
       },

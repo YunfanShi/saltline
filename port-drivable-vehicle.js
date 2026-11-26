@@ -262,6 +262,9 @@
     const spdEl = hud.querySelector('[data-spd]');
     const pinProj = new Vector3();
 
+    const vehicleBox = physics?.addBox ? physics.addBox([0, 0, 0], [0, 0, 0], { surface: 'metal', tag: 'sar-4x4', noNav: true }) : null;
+    if (vehicleBox) vehicleBox.disabled = true;
+
     // 4-Corner Oriented Bumper Envelope Check (0.62m climb clearance prevents ramp/curb snags)
     const hitsPoint = (px, py, pz, r = .30) => {
       // Spatial column lookup (8m cells) keeps this O(nearby) instead of O(all boxes);
@@ -270,7 +273,7 @@
       if (!Array.isArray(boxes)) return false;
       for (let i = 0; i < boxes.length; i++) {
         const b = boxes[i];
-        if (!b || b.bulletOnly || b.disabled) continue;
+        if (!b || b === vehicleBox || b.bulletOnly || b.disabled) continue;
         if (b.max.y <= py + .62 || b.min.y >= py + 2.25) continue;
         if (px + r > b.min.x && px - r < b.max.x && pz + r > b.min.z && pz - r < b.max.z) return true;
       }
@@ -304,8 +307,23 @@
     const keys = { w: false, s: false, a: false, d: false, shift: false, space: false, fire: false };
     const visitedZones = new Set();
 
+    function syncVehicleCollider() {
+      if (!vehicleBox) return;
+      if (!active || driving) { vehicleBox.disabled = true; return; }
+      vehicleBox.disabled = false;
+      const ca = Math.abs(Math.cos(yaw)), sa = Math.abs(Math.sin(yaw));
+      const ex = 1.08 * ca + 2.48 * sa;
+      const ez = 1.08 * sa + 2.48 * ca;
+      if (typeof physics?.updateBox === 'function') {
+        physics.updateBox(vehicleBox, pos.x - ex, pos.y + 0.05, pos.z - ez, pos.x + ex, pos.y + 2.02, pos.z + ez);
+      } else {
+        vehicleBox.min.set(pos.x - ex, pos.y + 0.05, pos.z - ez);
+        vehicleBox.max.set(pos.x + ex, pos.y + 2.02, pos.z + ez);
+      }
+    }
     root.position.copy(pos);
     root.rotation.y = yaw;
+    syncVehicleCollider();
 
     function toggleDrive(player) {
       if (!player?.alive) return;
@@ -331,8 +349,10 @@
           const passengerExit = exits.find(p => p.distanceTo(exits[0]) > .8) ?? exits[0];
           maraExit.setSeated(false, passengerExit, yaw);
         }
+        syncVehicleCollider();
       } else if (player.pos.distanceTo(pos) <= 5.2) {
         driving = true;
+        syncVehicleCollider();
         headlight.intensity = lightsOn ? 38 : 0;
         world.weapon?.setVisible?.(false);
         hud.hidden = false;
@@ -420,6 +440,7 @@
         speed = 0;
         root.position.copy(pos);
         root.rotation.y = yaw;
+        syncVehicleCollider();
         return true;
       }
       return false;
@@ -624,6 +645,7 @@
       window.removeEventListener?.('keyup', ku);
       window.removeEventListener?.('mousedown', md);
       window.removeEventListener?.('mouseup', mu);
+      if (vehicleBox) physics?.removeBox?.(vehicleBox);
       if (driving) world.weapon?.setVisible?.(true);
       driving = false;
       root.removeFromParent();
@@ -649,6 +671,7 @@
         promptEl.hidden = true;
         pinEl.style.display = 'none';
       }
+      syncVehicleCollider();
     }
 
     function setPosition(newPos) {
@@ -656,6 +679,7 @@
       pos.copy(newPos);
       speed = 0;
       root.position.copy(pos);
+      syncVehicleCollider();
     }
 
     return {
