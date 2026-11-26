@@ -87,28 +87,34 @@
 
     const presets = [
       {
-        id: 'native', zh: '🌊 原版海港光影', en: 'Native Harbor', hour: 9.5,
-        fog: origFogColor, density: Math.min(0.00056, origFogDensity),
-        sun: 0xffe8cc, sunInt: 2.75, hemiSky: 0xb6d8ee, hemiGnd: 0x4f5a5f, hemiInt: 1.24,
-        envTop: 0x386a94, envHor: 0x9abbd0, envSea: 0x152f40, sunElev: 0.52, exposure: 1.08,
+        id: 'native', zh: '🌊 清朗海港日照', en: 'Crisp Coastal Morning', hour: 9.5,
+        fog: origFogColor, density: Math.min(0.00038, origFogDensity),
+        sun: 0xffe8cc, sunInt: 2.85, hemiSky: 0xb6d8ee, hemiGnd: 0x4f5a5f, hemiInt: 1.20,
+        envTop: 0x356894, envHor: 0x9abbd0, envSea: 0x152f40, sunElev: 0.54, exposure: 1.02,
       },
       {
         id: 'noon', zh: '☀️ 晴朗海湾（高细节无雾）', en: 'Clear Daylight', hour: 13.0,
-        fog: 0xa2c8e6, density: 0.00028,
-        sun: 0xfffbf2, sunInt: 3.15, hemiSky: 0xd0e9ff, hemiGnd: 0x5c6b73, hemiInt: 1.40,
-        envTop: 0x357ec7, envHor: 0xc5e1f5, envSea: 0x194966, sunElev: 0.92, exposure: 1.10,
+        fog: 0xa2c8e6, density: 0.00022,
+        sun: 0xfffbf2, sunInt: 3.10, hemiSky: 0xd0e9ff, hemiGnd: 0x5c6b73, hemiInt: 1.32,
+        envTop: 0x307ac4, envHor: 0xc2dff5, envSea: 0x194966, sunElev: 0.92, exposure: 1.04,
       },
       {
         id: 'sunset', zh: '🌇 晚霞黄昏', en: 'Crimson Sunset', hour: 18.2,
-        fog: 0x9c6754, density: 0.00068,
-        sun: 0xff9a54, sunInt: 2.65, hemiSky: 0xf4b68e, hemiGnd: 0x453438, hemiInt: 1.12,
-        envTop: 0x3f3761, envHor: 0xe68d5e, envSea: 0x222536, sunElev: 0.16, exposure: 1.04,
+        fog: 0x9c6754, density: 0.00054,
+        sun: 0xff9a54, sunInt: 2.70, hemiSky: 0xf4b68e, hemiGnd: 0x453438, hemiInt: 1.08,
+        envTop: 0x3f3761, envHor: 0xe68d5e, envSea: 0x222536, sunElev: 0.16, exposure: 1.00,
       },
       {
         id: 'moonlit', zh: '🌙 真实夜色港', en: 'True Night Harbor', hour: 23.0,
-        fog: 0x0e1a2b, density: 0.00072,
-        sun: 0x86b2e6, sunInt: 1.32, hemiSky: 0x3b5880, hemiGnd: 0x141e2b, hemiInt: 0.72,
-        envTop: 0x07101f, envHor: 0x1b304d, envSea: 0x060d18, sunElev: 0.62, exposure: 0.98,
+        fog: 0x0e1a2b, density: 0.00058,
+        sun: 0x86b2e6, sunInt: 1.36, hemiSky: 0x3b5880, hemiGnd: 0x141e2b, hemiInt: 0.74,
+        envTop: 0x07101f, envHor: 0x1b304d, envSea: 0x060d18, sunElev: 0.62, exposure: 0.96,
+      },
+      {
+        id: 'rain', zh: '🌧️ 暴雨海岸', en: 'Coastal Rainstorm', hour: 15.6,
+        fog: 0x556674, density: 0.00062,
+        sun: 0xcbd9e6, sunInt: 1.85, hemiSky: 0x7f93a4, hemiGnd: 0x343e45, hemiInt: 1.05,
+        envTop: 0x2e3d4c, envHor: 0x6b7c8a, envSea: 0x12222d, sunElev: 0.44, exposure: 0.98,
       },
     ];
 

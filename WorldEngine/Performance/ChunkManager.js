@@ -10,7 +10,7 @@
 
   const QUALITY_PRESETS = {
     low:    { streamMul: 0.72, detailMul: 0.62, maxDprScale: 0.80, minDprScale: 0.62, budgetMs: 1.5 },
-    medium: { streamMul: 1.00, detailMul: 0.96, maxDprScale: 0.92, minDprScale: 0.72, budgetMs: 3.0 },
+    medium: { streamMul: 0.76, detailMul: 0.64, maxDprScale: 0.92, minDprScale: 0.72, budgetMs: 1.8 },
     high:   { streamMul: 1.00, detailMul: 1.00, maxDprScale: 1.00, minDprScale: 0.75, budgetMs: 2.5 },
     ultra:  { streamMul: 1.25, detailMul: 1.25, maxDprScale: 1.00, minDprScale: 0.85, budgetMs: 3.5 },
   };
@@ -236,7 +236,7 @@
             if (ch.sec.detail) ch.sec.detail.visible = true;
             ch.lod = 0;
           }
-          if (needsBuild && ++builtThisFrame >= 2) break;
+          if (needsBuild && ++builtThisFrame >= 1) break;
           if (nowMs() >= deadline && i >= 0) break;
         }
       }
@@ -360,7 +360,7 @@
       return { built, total: list.length, loadedCount: getStats().loadedCount };
     }
 
-    async function warmUpAsync(anchorPos, { onProgress, sliceMs = 14, maxSteps = 320 } = {}) {
+    async function warmUpAsync(anchorPos, { onProgress, sliceMs = 16, maxSteps = 220 } = {}) {
       if (!anchorPos) {
         onProgress?.(1, 'World ready');
         return { built: 0, total: 0, loadedCount: getStats().loadedCount };

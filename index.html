@@ -407,6 +407,10 @@ kbd { display: inline-block; font: 500 10px/1 var(--f-mono); color: var(--bone);
 <script src="./port-mp-gadgets.js"></script>
 <script src="./port-mp-vehicles.js"></script>
 <script src="./port-mp-sync.js"></script>
+<script src="./saltline-campaign-core.js"></script>
+<script src="./saltline-campaign-menu.js"></script>
+<script src="./saltline-mp-modes.js"></script>
+<script src="./saltline-mp-maps.js"></script>
 <script defer src="./zh.js"></script>
 <script defer src="./port-lan.js"></script>
 <script>
@@ -7354,13 +7358,46 @@ const mpVehicles=window.createPortHeavyVehicles?.(i,{
  getConquest:()=>conquest,
  onRemoteEvent:(kind,payload)=>mpSync?.sendEvent?.(kind,payload),
 })??null;
+const mpMapLoader=window.SaltlineMPMaps?.createMultiplayerMapLoader?.(i)??null;
+let activeMpModeController=null;
 const mpSync=window.createPortMultiplayerSync?.(i,{
  getConquest:()=>conquest,
  getSquad:()=>mpSquad,
  getGadgets:()=>mpGadgets,
  getVehicles:()=>mpVehicles,
+ getModeController:()=>activeMpModeController,
 })??null;
-i.mpSquad=mpSquad;i.mpGadgets=mpGadgets;i.mpVehicles=mpVehicles;i.mpSync=mpSync;
+i.mpSquad=mpSquad;i.mpGadgets=mpGadgets;i.mpVehicles=mpVehicles;i.mpSync=mpSync;i.mpMapLoader=mpMapLoader;
+i.getMpModeController=()=>activeMpModeController;
+if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
+ const campHost=document.querySelector('[data-s="campaign"]');
+ if(campHost&&!campHost.dataset.v2Mounted){
+  campHost.dataset.v2Mounted='1';
+  const saveMgr=window.SaltlineCampaignV2.createCampaignSaveManager();
+  const setPieceMgr=window.SaltlineCampaignV2.createChapterSetPieceManager(i);
+  i.campaignV2={saveMgr,setPieceMgr,activeChapter:null};
+  window.mountSaltlineCampaignMenuV2(campHost,{
+   saveMgr,
+   onLaunchChapter:(chapterId,opts={})=>{
+    const ch=window.SaltlineCampaignV2.getChapter(chapterId)||window.SaltlineCampaignV2.CHAPTERS[0];
+    i.campaignV2.activeChapter=ch;
+    setPieceMgr?.activateChapter?.(ch.id);
+    window.SALTLINE_OPEN_WORLD_ROAM=(opts.mode==='freeroam');
+    mode='mission';
+    cleanupMultiplayerSession();
+    a(i.audio,'resume');
+    r.requestLock();
+    U({skipIntro:true});
+    if(i.player?.pos&&ch?.spawn){i.player.pos.set(...ch.spawn);i.player.vel?.set?.(0,0,0);i.openWorld?.warmUpSync?.(i.player.pos);}
+    if(i.openWorld?.setSkyPreset&&Number.isInteger(ch?.skyPreset))i.openWorld.setSkyPreset(ch.skyPreset,true);
+    i.tactical?.notify?.(`📖 ${ch.code} · ${ch.titleZh}`,`📖 ${ch.code} · ${ch.titleEn}`,true,4.5);
+   },
+   onTraining:()=>{document.querySelector('[data-campaign-range]')?.click?.();},
+   onFreeRoam:()=>{document.querySelector('[data-act="openworld"]')?.click?.();},
+   onBack:()=>{document.querySelector('[data-s="campaign"] [data-act="home"]')?.click?.();},
+  });
+ }
+}
 let activeLanSession=null;
 const MP_MAP_PRESETS={
  coastal_quarter:{nameZh:"沿海城区 · 警务04号站",spawn:[-26,.2,-42],sky:0,objectives:[{id:"cq_a",label:"Precinct 04",pos:[-10,0,-56]},{id:"cq_b",label:"Coastal Plaza",pos:[-26,0,-84]},{id:"cq_c",label:"North Overpass",pos:[-26,0,-118]}]},
@@ -7370,32 +7407,48 @@ const MP_MAP_PRESETS={
  coastal_industrial:{nameZh:"西南冷雾库 · 海岸工业区",spawn:[-168,.2,62],sky:0,objectives:[{id:"ci_a",label:"Cryo Depot",pos:[-148,0,76]},{id:"ci_b",label:"Field Clinic",pos:[-158,0,96]},{id:"ci_c",label:"South Freight",pos:[-126,0,42]}]},
 };
 window.SALTLINE_MP_MAPS=MP_MAP_PRESETS;
+function cleanupMultiplayerSession(){
+ activeLanSession=null;
+ mpSync?.disconnect?.();
+ activeMpModeController?.dispose?.();activeMpModeController=null;
+ mpMapLoader?.unloadMap?.();
+ if(i.openWorld?.root)i.openWorld.root.visible=true;
+}
 document.addEventListener("saltline:lan-start",ev=>{
  activeLanSession=ev.detail;
  const s=activeLanSession?.settings||{};
  const mpMode=s.mode||"conquest";
- const mpMap=MP_MAP_PRESETS[s.mapId]||MP_MAP_PRESETS.coastal_quarter;
+ const mapId=s.mapId||"coastal_metropolis";
  window.SALTLINE_OPEN_WORLD_ROAM=(mpMode==="sandbox");
  battleSettings={
   difficulty:s.difficulty||"normal",
   startingTickets:Number(s.startingTickets)||40,
   duration:Number(s.duration)||240,
-  aiEnabled:mpMode==="sandbox"?false:(s.aiEnabled!==false),
+  aiEnabled:mpMode==="sandbox"?Boolean(s.customRules?.aiWaves):(s.aiEnabled!==false),
  };
  mode=["conquest","breakthrough","coop_rescue","coop_campaign","sandbox"].includes(mpMode)?mpMode:"conquest";
  a(i.audio,"resume");
  r.requestLock();
  U({skipIntro:true});
- if(i.player?.pos&&mpMap?.spawn){i.player.pos.set(...mpMap.spawn);i.player.vel?.set?.(0,0,0);i.openWorld?.warmUpSync?.(i.player.pos);}
- if(i.openWorld?.setSkyPreset)i.openWorld.setSkyPreset(mpMap.sky,true);
- i.tactical?.notify?.(`🌐 联机部署：${mpMap.nameZh} · 模式 ${mpMode}`,`🌐 LAN Deployed: ${s.mapId||"coastal_quarter"} (${mpMode})`,true,4.5);
+ activeMpModeController?.dispose?.();
+ const loadedMap=mpMapLoader?.loadMap?.(mapId,{weather:s.weather,timeOfDay:s.timeOfDay})??null;
+ if(loadedMap&&i.openWorld?.root)i.openWorld.root.visible=false;
+ activeMpModeController=window.SaltlineMPModes?.createGameModeController?.(mode,{
+  mapMeta:loadedMap?.meta,
+  settings:s,
+  players:activeLanSession?.players||[],
+  isHost:activeLanSession?.yourId===activeLanSession?.hostId,
+ })??null;
+ const team=activeLanSession?.team||"blue";
+ const spawnPos=loadedMap?.meta?.spawns?.[team]?.[0]||MP_MAP_PRESETS[mapId]?.spawn||[0,0.4,0];
+ if(i.player?.pos&&spawnPos){i.player.pos.set(...spawnPos);i.player.vel?.set?.(0,0,0);}
+ const mapTitle=loadedMap?.meta?.nameZh||MP_MAP_PRESETS[mapId]?.nameZh||mapId;
+ i.tactical?.notify?.(`🌐 联机部署：${mapTitle} · 模式 ${mpMode}`,`🌐 LAN Deployed: ${loadedMap?.meta?.nameEn||mapId} (${mpMode})`,true,4.5);
  mpSync?.connect?.(activeLanSession);
 },{signal:i.chapterSignal});
-document.addEventListener("saltline:lan-leave",()=>{
- activeLanSession=null;
- mpSync?.disconnect?.();
-},{signal:i.chapterSignal});
-i.chapterSignal?.addEventListener?.("abort",()=>{mpSquad?.dispose?.();mpGadgets?.dispose?.();mpVehicles?.dispose?.();mpSync?.dispose?.();});
+document.addEventListener("saltline:lan-leave",cleanupMultiplayerSession,{signal:i.chapterSignal});
+document.addEventListener("saltline:lan-rematch",cleanupMultiplayerSession,{signal:i.chapterSignal});
+i.chapterSignal?.addEventListener?.("abort",()=>{cleanupMultiplayerSession();mpSquad?.dispose?.();mpGadgets?.dispose?.();mpVehicles?.dispose?.();mpSync?.dispose?.();});
 function startOperation(nextMode){
  window.SALTLINE_OPEN_WORLD_ROAM=false;
  mode=nextMode;
@@ -7833,6 +7886,7 @@ function tickConquest(dt) {
  mpSquad?.update?.(dt,n,i.enemies.list||[]);
  mpGadgets?.update?.(dt,n,i.enemies.list||[]);
  mpVehicles?.update?.(dt,n,i.enemies.list||[]);
+ activeMpModeController?.update?.(dt,{player:n,enemies:i.enemies.list||[],allies:mpSquad?.allies||[]});
  mpSync?.update?.(dt,n);
  applyMajorBattleEvents();
  updateRequisitionEffects();

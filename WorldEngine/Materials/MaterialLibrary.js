@@ -259,8 +259,8 @@
           } else if (kind === 'asphalt') {
             const agg = hash2(x, y, seed + 13);
             h = 0.5 + (agg - 0.5) * 0.32 + (fbm - 0.5) * 0.25;
-            const puddle = wetness > 0.1 ? Math.max(0, Math.min(1, (fbm - (0.72 - wetness * 0.35)) * 4.2)) : 0;
-            rough = roughness * (1 - puddle) + 0.14 * puddle;
+            const puddle = wetness > 0.18 ? Math.max(0, Math.min(1, (fbm - (0.76 - wetness * 0.30)) * 3.6)) : 0;
+            rough = roughness * (1 - puddle) + 0.36 * puddle;
             mix = (agg - 0.5) * 0.2 - puddle * 0.25;
           } else if (kind === 'plaster') {
             const panelSeam = (y % 64 < 2) ? 0.24 : 0;
@@ -297,7 +297,7 @@
           }
 
           const damp = wetness * Math.max(0, 0.7 - fbm * 0.5);
-          rough = Math.max(0.10, Math.min(0.98, rough - damp * 0.28));
+          rough = Math.max(0.24, Math.min(0.98, rough - damp * 0.20));
           heights[idx] = h;
 
           const t = Math.max(0, Math.min(1, 0.5 + mix));
@@ -352,7 +352,7 @@
       const normalMap = prepTex(cNrm, false);
       const aoMap = prepTex(cAo, false);
       const matOpts = {
-        map, roughnessMap, normalMap, aoMap, aoMapIntensity: 0.72,
+        map, roughnessMap, normalMap, aoMap, aoMapIntensity: 0.85,
         roughness: 1.0, metalness,
       };
       if (opts.emissiveHex !== undefined) {
@@ -369,7 +369,7 @@
 
     const presets = {
       concrete_dry:     { baseHex: 0x7c7f7b, accentHex: 0x5c5f5c, kind: 'concrete', weathering: 0.28, wetness: 0.05, roughness: 0.88, metalness: 0.04, seed: 11, resolution: 256 },
-      concrete_wet:     { baseHex: 0x5d615e, accentHex: 0x3b3f3d, kind: 'concrete', weathering: 0.45, wetness: 0.58, roughness: 0.72, metalness: 0.06, seed: 22, resolution: 256 },
+      concrete_wet:     { baseHex: 0x5d615e, accentHex: 0x3b3f3d, kind: 'concrete', weathering: 0.48, wetness: 0.28, roughness: 0.84, metalness: 0.05, seed: 22, resolution: 256 },
       concrete_aged:    { baseHex: 0x74736c, accentHex: 0x4c4b45, kind: 'concrete_cracked', weathering: 0.55, wetness: 0.22, roughness: 0.86, metalness: 0.04, seed: 33, resolution: 512 },
       sidewalk_paver:   { baseHex: 0x8a8c88, accentHex: 0x555855, kind: 'sidewalk_paver', weathering: 0.44, wetness: 0.28, roughness: 0.84, metalness: 0.04, seed: 37, resolution: 512, normalStrength: 2.8 },
       tank_industrial:  { baseHex: 0xc8cbc6, accentHex: 0x6f5542, kind: 'tank_industrial', weathering: 0.58, wetness: 0.18, roughness: 0.52, metalness: 0.34, seed: 39, resolution: 512, normalStrength: 2.6 },
@@ -388,7 +388,7 @@
       corrugated_steel: { baseHex: 0x435058, accentHex: 0x6b3e28, kind: 'corrugated', weathering: 0.52, wetness: 0.24, roughness: 0.56, metalness: 0.55, seed: 105, resolution: 512, normalStrength: 3.4 },
       window_office:    { baseHex: 0x1f3442, accentHex: 0x7aa0b5, kind: 'window_glass', weathering: 0.12, wetness: 0.08, roughness: 0.10, metalness: 0.72, seed: 108, resolution: 256, normalStrength: 0.45 },
       window_lit:       { baseHex: 0xb89054, accentHex: 0xffe0a8, kind: 'window_glass', weathering: 0.08, wetness: 0.0, roughness: 0.16, metalness: 0.22, seed: 109, resolution: 256, normalStrength: 0.4, emissiveHex: 0xffc978, emissiveIntensity: 0.44, nightEmissive: { day: 0.28, night: 1.55 } },
-      road_asphalt:     { baseHex: 0x2d3236, accentHex: 0x1b1e21, kind: 'asphalt', weathering: 0.50, wetness: 0.45, roughness: 0.86, metalness: 0.05, seed: 111, resolution: 512 },
+      road_asphalt:     { baseHex: 0x282d31, accentHex: 0x171a1d, kind: 'asphalt', weathering: 0.54, wetness: 0.14, roughness: 0.92, metalness: 0.03, seed: 111, resolution: 512 },
       cliff_stone:      { baseHex: 0x545952, accentHex: 0x333732, kind: 'stone', weathering: 0.72, wetness: 0.30, roughness: 0.92, metalness: 0.04, seed: 123, resolution: 512, normalStrength: 3.1 },
       grass_coastal:    { baseHex: 0x3a5234, accentHex: 0x4b3f2b, kind: 'grass', weathering: 0.58, wetness: 0.24, roughness: 0.92, metalness: 0.02, seed: 131, resolution: 512, normalStrength: 2.8 },
       coastal_soil:     { baseHex: 0x4d3f31, accentHex: 0x2d241b, kind: 'soil', weathering: 0.65, wetness: 0.32, roughness: 0.94, metalness: 0.02, seed: 137, resolution: 512, normalStrength: 3.0 },

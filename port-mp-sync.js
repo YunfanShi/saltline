@@ -7,7 +7,7 @@
   const SEND_INTERVAL_MS = 50; // 20 Hz matching IRONFRONT
   const RECONNECT_DELAYS = [250, 500, 1000, 1500, 2500, 3500, 4500];
 
-  function createPortMultiplayerSync(world, { getConquest, getSquad, getGadgets, getVehicles } = {}) {
+  function createPortMultiplayerSync(world, { getConquest, getSquad, getGadgets, getVehicles, getModeController } = {}) {
     const { THREE, scene, fx, audio } = world;
     const { Group, Mesh, BoxGeometry, CylinderGeometry, MeshBasicMaterial, MeshStandardMaterial, Vector3 } = THREE;
     const t = (en, zh) => window.SaltlineLocale?.t(en, zh) ?? en;
@@ -48,6 +48,9 @@
     let lastConquestSendAt = 0;
     let sentWinner = null;
     let pendingPromotion = false;
+    let lastAppliedStateSeq = 0;
+    let localEventCounter = 0;
+    let vehicleLocks = {};
 
     function spawnTracer(fromArr, dirArr, team) {
       const from = new Vector3(fromArr[0], fromArr[1], fromArr[2]);
@@ -127,7 +130,21 @@
 
     function sendEvent(kind, payload = {}) {
       if (!session || !connected) return;
-      send({ type: 'event', kind, payload });
+      localEventCounter += 1;
+      const eventId = `${session.yourId || 'local'}:${localEventCounter}:${Date.now()}`;
+      send({ type: 'event', eventId, kind, payload });
+    }
+
+    function requestVehicleEnter(vehicleId) {
+      if (!session || !connected || !vehicleId) return false;
+      send({ type: 'vehicleEnter', vehicleId: String(vehicleId) });
+      return true;
+    }
+
+    function requestVehicleExit(vehicleId) {
+      if (!session || !connected || !vehicleId) return false;
+      send({ type: 'vehicleExit', vehicleId: String(vehicleId) });
+      return true;
     }
 
     function handleIncomingEvent(ev) {
@@ -173,6 +190,13 @@
 
     function applySnapshot(msg) {
       if (!session) return;
+      if (typeof msg.stateSeq === 'number' && msg.stateSeq > 0) {
+        if (msg.stateSeq <= lastAppliedStateSeq) return;
+        lastAppliedStateSeq = msg.stateSeq;
+      }
+      if (msg.vehicleLocks && typeof msg.vehicleLocks === 'object') {
+        vehicleLocks = msg.vehicleLocks;
+      }
       const promoted = pendingPromotion || session.hostId !== session.yourId && msg.hostId === session.yourId;
       pendingPromotion = false;
       session.hostId = msg.hostId;
@@ -208,6 +232,10 @@
       const conquest = getConquest?.();
       if (conquest && msg.conquest && (session.yourId !== session.hostId || promoted)) {
         conquest.applySharedState?.(msg.conquest);
+      }
+      const modeCtrl = getModeController?.();
+      if (modeCtrl && msg.modeState && (session.yourId !== session.hostId || promoted)) {
+        modeCtrl.importState?.(msg.modeState);
       }
 
       // Sync shared IRONFRONT vehicles from server
@@ -385,8 +413,11 @@
           const base = session.origin || location.origin;
           await fetch(`${base}/api/lan/rooms/${session.code}/rematch`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: session.token }),
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.token}`,
+            },
+            body: JSON.stringify({}),
           });
         } catch {}
         hideSettlement();
@@ -400,6 +431,8 @@
       session = { ...nextSession };
       lastSendAt = 0;
       lastConquestSendAt = 0;
+      lastAppliedStateSeq = 0;
+      vehicleLocks = {};
       sentWinner = null;
       pendingPromotion = false;
       hideSettlement();
@@ -513,11 +546,18 @@
           },
         });
       }
-      if (connected && conquest && session.yourId === session.hostId &&
-        (now - lastConquestSendAt >= 200 || conquest.winner && conquest.winner !== sentWinner)) {
+      if (connected && session.yourId === session.hostId &&
+        (now - lastConquestSendAt >= 200 || (conquest?.winner && conquest.winner !== sentWinner))) {
         lastConquestSendAt = now;
-        sentWinner = conquest.winner;
-        send({ type: 'conquest', conquest: conquest.exportSharedState() });
+        if (conquest) {
+          sentWinner = conquest.winner;
+          send({ type: 'conquest', conquest: conquest.exportSharedState() });
+        }
+        const modeCtrl = getModeController?.();
+        if (modeCtrl?.exportState) {
+          const ms = modeCtrl.exportState();
+          send({ type: 'modeState', seq: ms.seq || 0, modeState: ms });
+        }
         const vehList = getVehicles?.()?.exportVehicles?.();
         if (vehList?.length) send({ type: 'vehicles', vehicles: vehList });
       }
@@ -589,6 +629,9 @@
       connect,
       disconnect,
       sendEvent,
+      requestVehicleEnter,
+      requestVehicleExit,
+      getVehicleLockOwner(vehicleId) { return vehicleLocks[vehicleId] || null; },
       updateConquest(dt, player, enemies, allies = []) {
         const conquest = getConquest?.();
         if (!session || !conquest) return null;
@@ -611,6 +654,7 @@
       get connected() { return connected; },
       get session() { return session; },
       get remoteCount() { return remotes.size; },
+      get lastStateSeq() { return lastAppliedStateSeq; },
     };
   }
 

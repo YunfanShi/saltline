@@ -31,6 +31,7 @@ const ASSETS = new Set([
   'WorldEngine/Performance/ChunkManager.js',
   'WorldEngine/Terrain/TerrainGenerator.js', 'WorldEngine/Rendering/LightingSystem.js',
   'port-external-assets.js', 'port-open-world-cinematics.js', 'port-open-world-district.js', 'port-drivable-vehicle.js', 'port-disaster-events.js',
+  'saltline-campaign-core.js', 'saltline-campaign-menu.js', 'saltline-mp-modes.js', 'saltline-mp-maps.js',
   'developer-menu.js', 'developer-menu.css',
   'art/campaign-prologue.jpg', 'art/campaign-berth.jpg', 'art/campaign-rail.jpg', 'art/campaign-drydock.jpg', 'art/campaign-tidegate.jpg',
   'art/campaign-anchorage.jpg', 'art/campaign-return-harbor.jpg', 'art/campaign-night-record.jpg',
@@ -52,8 +53,15 @@ const CONTENT_TYPES = {
 const PROTOCOL_VERSION = 2;
 const VALID_ROLES = new Set(['medic', 'support', 'recon', 'engineer', 'assault']);
 const VALID_TEAMS = new Set(['blue', 'red']);
-const VALID_MAPS = new Set(['coastal_quarter', 'port_rail', 'mountain_forest', 'old_harbor', 'coastal_industrial']);
+const CANONICAL_MAPS = ['coastal_metropolis', 'iron_harbor', 'highland_passage', 'old_saltline', 'industrial_coast'];
+const VALID_MAPS = new Set([
+  ...CANONICAL_MAPS,
+  'coastal_quarter', 'port_rail', 'mountain_forest', 'old_harbor', 'coastal_industrial',
+]);
 const VALID_MODES = new Set(['conquest', 'breakthrough', 'coop_rescue', 'coop_campaign', 'sandbox']);
+const VALID_WEATHER = new Set(['clear', 'overcast', 'rain', 'storm']);
+const VALID_TIME = new Set(['morning', 'day', 'sunset', 'night']);
+const VALID_VISIBILITY = new Set(['public', 'private']);
 
 class RequestError extends Error {
   constructor(status, code) {
@@ -109,16 +117,31 @@ function playerName(value) {
 function normalizeSettings(body = {}) {
   const mode = VALID_MODES.has(body.mode) ? body.mode : 'conquest';
   const mapId = VALID_MAPS.has(body.mapId) ? body.mapId : 'coastal_quarter';
-  return {
+  const dur = Number(body.duration);
+  const hasExtended = body.weather !== undefined || body.timeOfDay !== undefined || body.visibility !== undefined || body.customRules !== undefined;
+  const custom = body.customRules && typeof body.customRules === 'object' ? body.customRules : {};
+  const base = {
     mode,
     mapId,
     difficulty: ['easy', 'normal', 'hard'].includes(body.difficulty) ? body.difficulty : 'normal',
-    startingTickets: [25, 40, 70].includes(Number(body.startingTickets)) ? Number(body.startingTickets) : 40,
-    duration: [180, 240, 360].includes(Number(body.duration)) ? Number(body.duration) : 240,
-    aiEnabled: (mode === 'coop_rescue' || mode === 'coop_campaign') ? true : (mode === 'sandbox' ? false : body.aiEnabled !== false),
+    startingTickets: [25, 40, 60, 70, 100].includes(Number(body.startingTickets)) ? Number(body.startingTickets) : 40,
+    duration: [180, 240, 300, 360, 600, 900].includes(dur) ? dur : 240,
+    aiEnabled: (mode === 'coop_rescue' || mode === 'coop_campaign') ? true : (mode === 'sandbox' ? Boolean(custom.aiWaves) : body.aiEnabled !== false),
     joinTeam: (mode === 'coop_rescue' || mode === 'coop_campaign' || mode === 'sandbox') ? 'blue' : (['blue', 'red', 'alternate'].includes(body.joinTeam) ? body.joinTeam : 'blue'),
     allowMidJoin: body.allowMidJoin !== false,
   };
+  if (hasExtended) {
+    base.weather = VALID_WEATHER.has(body.weather) ? body.weather : 'overcast';
+    base.timeOfDay = VALID_TIME.has(body.timeOfDay) ? body.timeOfDay : 'day';
+    base.visibility = VALID_VISIBILITY.has(body.visibility) ? body.visibility : 'public';
+    base.customRules = {
+      friendlyFire: Boolean(custom.friendlyFire),
+      infiniteAmmo: mode === 'sandbox' ? custom.infiniteAmmo !== false : Boolean(custom.infiniteAmmo),
+      aiWaves: Boolean(custom.aiWaves),
+      startChapterIndex: Number.isInteger(Number(custom.startChapterIndex)) ? Math.max(0, Math.min(13, Number(custom.startChapterIndex))) : 0,
+    };
+  }
+  return base;
 }
 
 function assignTeam(room, isHost) {
@@ -357,11 +380,19 @@ function tickRoomAI(room, dt, now) {
 function createLanServer({ clock = Date.now, enableTick = true } = {}) {
   const rooms = new Map();
 
+  function releasePlayerVehicleLocks(room, playerId) {
+    if (!room.vehicleLocks) return;
+    for (const [vid, ownerId] of room.vehicleLocks) {
+      if (ownerId === playerId) room.vehicleLocks.delete(vid);
+    }
+  }
+
   function sweep(now) {
     for (const [code, room] of rooms) {
       advanceCountdown(room, now);
       for (const [token, player] of room.players) {
         if (now - player.lastSeen >= HEARTBEAT_MS + RESERVATION_MS) {
+          releasePlayerVehicleLocks(room, player.id);
           room.players.delete(token);
           const sock = room.sockets.get(token);
           if (sock) {
@@ -383,6 +414,7 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
   }
 
   function broadcastRoom(room, now) {
+    room.stateSeq = (room.stateSeq || 0) + 1;
     const events = room.pendingEvents.splice(0);
     const playersList = [...room.players.values()].map(m => ({
       id: m.id,
@@ -393,11 +425,13 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
       connected: connected(m, now),
       state: m.state,
     }));
+    const vehicleLocks = room.vehicleLocks ? Object.fromEntries(room.vehicleLocks) : {};
     for (const [token, socket] of room.sockets) {
       const member = room.players.get(token);
       if (!member) continue;
       sendWs(socket, {
         type: 'snapshot',
+        stateSeq: room.stateSeq,
         code: room.code,
         phase: room.phase,
         countdownMs: room.phase === 'countdown' ? Math.max(0, room.lockAt - now) : null,
@@ -406,8 +440,11 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
         settings: room.settings,
         players: playersList,
         conquest: room.conquest,
+        modeState: room.modeState ?? null,
+        modeStateSeq: room.modeStateSeq || 0,
         enemies: room.enemies ?? null,
         vehicles: room.vehicles ?? null,
+        vehicleLocks,
         events,
       });
     }
@@ -449,6 +486,41 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
       return;
     }
 
+    if (msg.type === 'modeState' && player.id === room.hostId && msg.modeState && typeof msg.modeState === 'object') {
+      const seq = Number(msg.seq);
+      const nextSeq = Number.isFinite(seq) ? seq : ((room.modeStateSeq || 0) + 1);
+      if (nextSeq >= (room.modeStateSeq || 0)) {
+        room.modeStateSeq = nextSeq;
+        room.modeState = msg.modeState;
+      }
+      return;
+    }
+
+    if (msg.type === 'vehicleEnter' && typeof msg.vehicleId === 'string') {
+      const vid = msg.vehicleId.slice(0, 48);
+      if (!room.vehicleLocks) room.vehicleLocks = new Map();
+      const holder = room.vehicleLocks.get(vid);
+      if (!holder || holder === player.id) {
+        room.vehicleLocks.set(vid, player.id);
+        player.state.driving = true;
+        room.pendingEvents.push({ kind: 'vehicleLocked', from: player.id, fromName: player.name, team: player.team, payload: { vehicleId: vid, ownerId: player.id }, at: now });
+      } else {
+        const sock = room.sockets.get(token);
+        if (sock) sendWs(sock, { type: 'vehicleDenied', vehicleId: vid, ownerId: holder });
+      }
+      return;
+    }
+
+    if (msg.type === 'vehicleExit' && typeof msg.vehicleId === 'string') {
+      const vid = msg.vehicleId.slice(0, 48);
+      if (room.vehicleLocks?.get(vid) === player.id) {
+        room.vehicleLocks.delete(vid);
+        player.state.driving = false;
+        room.pendingEvents.push({ kind: 'vehicleUnlocked', from: player.id, fromName: player.name, team: player.team, payload: { vehicleId: vid }, at: now });
+      }
+      return;
+    }
+
     if (msg.type === 'vehicles' && Array.isArray(msg.vehicles)) {
       if (player.id === room.hostId || !room.vehicles) {
         room.vehicles = msg.vehicles.slice(0, 24);
@@ -457,6 +529,16 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
     }
 
     if (msg.type === 'event' && typeof msg.kind === 'string') {
+      const eventId = typeof msg.eventId === 'string' ? msg.eventId.slice(0, 64) : null;
+      if (eventId) {
+        if (!room.seenEventIds) room.seenEventIds = new Set();
+        if (room.seenEventIds.has(eventId)) return;
+        room.seenEventIds.add(eventId);
+        if (room.seenEventIds.size > 256) {
+          const first = room.seenEventIds.values().next().value;
+          room.seenEventIds.delete(first);
+        }
+      }
       const payload = msg.payload && typeof msg.payload === 'object' ? msg.payload : {};
       if (msg.kind === 'enemyHit' && room.enemies && typeof payload.enemyId === 'string') {
         const target = room.enemies.find(e => e.id === payload.enemyId && e.alive);
@@ -473,6 +555,7 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
         return;
       }
       const ev = {
+        eventId,
         kind: msg.kind.slice(0, 24),
         from: player.id,
         fromName: player.name,
@@ -496,7 +579,7 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
       return json(response, 200, {
         version: '0.20.0-port',
         protocolVersion: PROTOCOL_VERSION,
-        maps: [...VALID_MAPS],
+        maps: CANONICAL_MAPS,
         modes: [...VALID_MODES],
         port,
         addresses: lanAddresses(port),
@@ -538,6 +621,11 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
         sockets: new Map(),
         pendingEvents: [],
         conquest: null,
+        modeState: null,
+        modeStateSeq: 0,
+        stateSeq: 0,
+        vehicleLocks: new Map(),
+        seenEventIds: new Set(),
         hostId: null,
       };
       const { token, player } = addPlayer(room, name, now, body.role);
@@ -564,6 +652,7 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
     if (!player) throw new RequestError(401, 'invalid_token');
     player.lastSeen = now;
     if (action === 'leave') {
+      releasePlayerVehicleLocks(room, player.id);
       room.players.delete(token);
       const sock = room.sockets.get(token);
       if (sock) {
@@ -583,18 +672,35 @@ function createLanServer({ clock = Date.now, enableTick = true } = {}) {
       room.phase = 'lobby';
       room.lockAt = null;
       room.conquest = null;
+      room.modeState = null;
+      room.modeStateSeq = 0;
+      room.stateSeq = 0;
       room.enemies = null;
       room.vehicles = null;
+      room.vehicleLocks?.clear();
+      room.seenEventIds?.clear();
       room.pendingEvents.length = 0;
-      for (const m of room.players.values()) m.ready = false;
+      for (const m of room.players.values()) {
+        m.ready = false;
+        m.state.kills = 0;
+        m.state.deaths = 0;
+        m.state.captures = 0;
+        m.state.hp = 100;
+        m.state.alive = true;
+        m.state.downed = false;
+        m.state.driving = false;
+      }
       return json(response, 200, { room: snapshot(room, player, now) });
     }
     if (action && action !== 'loadout' && room.phase === 'started') throw new RequestError(409, 'room_started');
     if (action === 'settings') {
       if (player.id !== room.hostId) throw new RequestError(403, 'host_only');
+      if (Number.isInteger(Number(body.maxPlayers)) && Number(body.maxPlayers) >= MIN_PLAYERS && Number(body.maxPlayers) <= HARD_MAX_PLAYERS) {
+        room.maxPlayers = Math.max(room.players.size, Number(body.maxPlayers));
+      }
       room.settings = normalizeSettings({ ...room.settings, ...body });
       for (const m of room.players.values()) {
-        if (room.settings.mode === 'coop_rescue') m.team = 'blue';
+        if (['coop_rescue', 'coop_campaign', 'sandbox'].includes(room.settings.mode)) m.team = 'blue';
         m.ready = false;
       }
       return json(response, 200, { room: snapshot(room, player, now) });

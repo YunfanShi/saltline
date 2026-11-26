@@ -1012,25 +1012,37 @@
       if (style === 'modern_office') {
         mass(0, 0, w, d, 0, h * .25, trim);
         mass(0, 0, w * .77, d * .79, h * .25, h * .65, sharedMats.smokedPane);
-        mass(0, 0, w * .52, d * .52, h * .9, h * .12, sharedMats.steelDark);
+        mass(0, 0, w * .52, d * .52, h * .9, h * .14, sharedMats.steelDark);
+        // Stepped crown parapet & rooftop antenna spire for skyline variety
+        mass(0, 0, w * .82, d * .84, h * .89, 0.42, trim);
+        mass(w * .14, -d * .12, 0.24, 0.24, h * 1.04, 3.8, sharedMats.steelGalv);
       } else if (style === 'harbor_apartment') {
         mass(0, -d * .21, w, d * .58, 0, h, wall);
         for (const side of [-1, 1]) mass(w * .33 * side, d * .29, w * .34, d * .42, 0, h, wall);
+        // Mansard crown & rooftop mechanical penthouse
+        mass(0, -d * .21, w * .92, d * .48, h, 1.35, sharedMats.slateSteel);
+        mass(-w * .22, -d * .21, w * .22, d * .22, h + 1.35, 1.8, trim);
       } else if (style === 'stepped_mixed_use') {
         mass(0, 0, w, d, 0, h * .72, trim);
         mass(0, 0, w * .76, d * .74, h * .72, h * .28, sharedMats.slateSteel);
         mass(w * .34, d * .34, w * .32, d * .32, 0, h + 2.2, trim);
+        mass(w * .34, d * .34, w * .22, d * .22, h + 2.2, 1.6, sharedMats.steelDark);
       } else if (style === 'waterfront_rowhouses') {
         const uw = w / 3;
         mass(-uw, 0, uw * .96, d * .9, 0, h * .92, trim);
         mass(0, -.4, uw * .96, d * .88, 0, h * 1.12, wall);
         mass(uw, .3, uw * .96, d * .92, 0, h * .84, sharedMats.slateSteel);
+        // Varied rooftop caps to break flat box line
+        mass(0, -.4, uw * .82, d * .68, h * 1.12, 1.15, sharedMats.steelDark);
       } else {
         mass(0, 0, w, d, 0, h * .80, style === 'industrial_hall' ? sharedMats.steelClad : (style === 'bonded_warehouse' ? wall : trim));
         if (style === 'industrial_hall' || style === 'coastal_residence' || style === 'bonded_warehouse') {
           const count = style === 'industrial_hall' ? 4 : 2;
           for (let i = 0; i < count; i++) push(sharedMats.corrugated, w + .4, .18, d / count * 1.05, cx, h * .85, cz - d / 2 + (i + .5) * d / count, .22);
-        } else mass(0, 0, w * .77, d * .71, h * .80, h * .18, wall);
+        } else {
+          mass(0, 0, w * .77, d * .71, h * .80, h * .18, wall);
+          mass(0, 0, w * .44, d * .40, h * .98, 1.25, sharedMats.steelDark);
+        }
       }
       flush(); parent.add(group); return group;
     }
