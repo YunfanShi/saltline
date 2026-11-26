@@ -567,8 +567,19 @@
       const existing = vehicles.find(v => v.id === vid);
       if (existing) return existing;
       const model = buildVehicleMesh(THREE, world, kind, team);
-      const y = typeof physics?.groundHeight === 'function' ? physics.groundHeight(pos.x, pos.z, (pos.y ?? 0) + 1.5) : (pos.y ?? 0);
-      const startPos = new Vector3(pos.x, y, pos.z);
+      const baseY = pos.y ?? 0;
+      let sx = pos.x, sz = pos.z;
+      let y = typeof physics?.groundHeight === 'function' ? physics.groundHeight(sx, sz, baseY + 1.5) : baseY;
+      // Avoid spawning ground/helipad vehicles on top of building roofs or floating high above road level
+      if (typeof physics?.groundHeight === 'function' && y > baseY + 2.2) {
+        const offsets = [[0, 6], [6, 0], [-6, 0], [0, -6], [10, 0], [-10, 0]];
+        for (const [ox, oz] of offsets) {
+          const gy = physics.groundHeight(sx + ox, sz + oz, baseY + 1.5);
+          if (gy <= baseY + 2.0) { sx += ox; sz += oz; y = gy; break; }
+        }
+        if (y > baseY + 2.2) y = baseY;
+      }
+      const startPos = new Vector3(sx, y, sz);
       model.root.position.copy(startPos);
       model.root.rotation.y = yaw;
       root.add(model.root);

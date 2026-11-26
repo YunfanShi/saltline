@@ -10,7 +10,7 @@
 
   const QUALITY_PRESETS = {
     low:    { streamMul: 0.72, detailMul: 0.62, maxDprScale: 0.80, minDprScale: 0.62, budgetMs: 1.5 },
-    medium: { streamMul: 0.88, detailMul: 0.80, maxDprScale: 0.92, minDprScale: 0.70, budgetMs: 2.0 },
+    medium: { streamMul: 1.00, detailMul: 0.96, maxDprScale: 0.92, minDprScale: 0.72, budgetMs: 3.0 },
     high:   { streamMul: 1.00, detailMul: 1.00, maxDprScale: 1.00, minDprScale: 0.75, budgetMs: 2.5 },
     ultra:  { streamMul: 1.25, detailMul: 1.25, maxDprScale: 1.00, minDprScale: 0.85, budgetMs: 3.5 },
   };
@@ -236,7 +236,7 @@
             if (ch.sec.detail) ch.sec.detail.visible = true;
             ch.lod = 0;
           }
-          if (needsBuild && ++builtThisFrame >= 1) break;
+          if (needsBuild && ++builtThisFrame >= 2) break;
           if (nowMs() >= deadline && i >= 0) break;
         }
       }
@@ -298,6 +298,120 @@
       };
     }
 
+    function syncLodCallbacks() {
+      for (const ch of chunks) {
+        if (!ch.sec.onLodChange) continue;
+        const lodKey = (ch.sec.loaded ? '1' : '0') + (ch.sec.detailed ? '1' : '0') + currentQuality;
+        if (ch.lastLodKey !== lodKey) {
+          ch.lastLodKey = lodKey;
+          ch.sec.onLodChange(ch.sec.loaded, ch.sec.detailed, currentQuality);
+        }
+      }
+    }
+
+    function collectWarmUpQueue(anchorPos) {
+      const list = [];
+      for (const ch of chunks) {
+        const { sec } = ch;
+        const dist = anchorPos ? anchorPos.distanceTo(sec.center) : 999;
+        ch.lastDist = dist;
+        const loadR = (sec.streamRadius || 275) * preset.streamMul;
+        const detailInR = (sec.detailRadius || 195) * preset.detailMul;
+        if (dist <= loadR) {
+          ch.priority = dist;
+          const needsBuild = typeof sec.onBuild === 'function' && !sec._built;
+          if (!sec.loaded || needsBuild || ch.state !== 'ACTIVE') {
+            ch.state = 'QUEUED';
+            list.push({ ch, detailInR });
+          } else if (!sec.detailed && dist <= detailInR) {
+            sec.detailed = true;
+            if (sec.detail) sec.detail.visible = true;
+            ch.lod = 0;
+          }
+        }
+      }
+      list.sort((a, b) => a.ch.priority - b.ch.priority);
+      return list;
+    }
+
+    function warmUpSync(anchorPos, maxSteps = 260) {
+      if (!anchorPos) return { built: 0, total: 0, loadedCount: getStats().loadedCount };
+      const list = collectWarmUpQueue(anchorPos);
+      let built = 0;
+      let steps = 0;
+      for (const item of list) {
+        if (steps >= maxSteps) break;
+        const { ch, detailInR } = item;
+        while (steps < maxSteps) {
+          steps++;
+          const ok = activateChunk(ch);
+          if (ok !== false) {
+            built++;
+            if (ch.lastDist <= detailInR) {
+              ch.sec.detailed = true;
+              if (ch.sec.detail) ch.sec.detail.visible = true;
+              ch.lod = 0;
+            }
+            break;
+          }
+        }
+      }
+      syncLodCallbacks();
+      return { built, total: list.length, loadedCount: getStats().loadedCount };
+    }
+
+    async function warmUpAsync(anchorPos, { onProgress, sliceMs = 14, maxSteps = 320 } = {}) {
+      if (!anchorPos) {
+        onProgress?.(1, 'World ready');
+        return { built: 0, total: 0, loadedCount: getStats().loadedCount };
+      }
+      const list = collectWarmUpQueue(anchorPos);
+      const total = list.length;
+      if (!total) {
+        syncLodCallbacks();
+        onProgress?.(1, 'World ready');
+        return { built: 0, total: 0, loadedCount: getStats().loadedCount };
+      }
+      let built = 0;
+      let steps = 0;
+      let sliceStart = nowMs();
+      const yieldFrame = () => new Promise(resolve => {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
+        else setTimeout(resolve, 0);
+      });
+      for (let i = 0; i < list.length && steps < maxSteps; i++) {
+        const { ch, detailInR } = list[i];
+        while (steps < maxSteps) {
+          steps++;
+          const ok = activateChunk(ch);
+          if (ok !== false) {
+            built++;
+            if (ch.lastDist <= detailInR) {
+              ch.sec.detailed = true;
+              if (ch.sec.detail) ch.sec.detail.visible = true;
+              ch.lod = 0;
+            }
+            break;
+          }
+          if (nowMs() - sliceStart >= sliceMs) {
+            syncLodCallbacks();
+            onProgress?.(Math.min(0.98, built / Math.max(1, total)), `Loading city blocks (${built}/${total})`);
+            await yieldFrame();
+            sliceStart = nowMs();
+          }
+        }
+        if (nowMs() - sliceStart >= sliceMs) {
+          syncLodCallbacks();
+          onProgress?.(Math.min(0.98, built / Math.max(1, total)), `Loading city blocks (${built}/${total})`);
+          await yieldFrame();
+          sliceStart = nowMs();
+        }
+      }
+      syncLodCallbacks();
+      onProgress?.(1, `World ready (${built}/${total})`);
+      return { built, total, loadedCount: getStats().loadedCount };
+    }
+
     function dispose() {
       for (const ch of chunks) unloadChunk(ch);
       resourceRefs.clear();
@@ -308,6 +422,8 @@
 
     return {
       update,
+      warmUpSync,
+      warmUpAsync,
       setQuality,
       getStats,
       dispose,

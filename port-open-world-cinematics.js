@@ -1,6 +1,5 @@
-/* Saltline Open-World Cinematic Cutscene Director, Interactive Signal Tuner & Tactical Progress Tracker.
- * Provides letterbox camera cutscenes (skippable via Space), frequency-lock decoding mini-games,
- * and live signal/hold progress tracking without per-frame allocations or DOM thrashing. */
+/* Saltline Open-World Cinematic Cutscene Director, Interactive Signal Tuner,
+ * NPC Face-to-Face Dialogue System, [J] Story Journal & Tactical Progress Tracker. */
 (() => {
   function injectStyles() {
     if (document.getElementById('saltline-cinematics-style')) return;
@@ -59,10 +58,42 @@
       .sl-tuner-btn{padding:9px 18px;border:1px solid rgba(242,196,90,.55);background:#26332f;color:#faf6ea;font:700 13px/1 system-ui,sans-serif;cursor:pointer}
       .sl-tuner-btn.primary{background:#c89835;color:#0b1114;border-color:#ffe08a}
       .sl-tuner-btn:hover{filter:brightness(1.12)}
+
       .sl-cod-stamp{position:fixed;left:28px;bottom:calc(12vh + 16px);z-index:44;pointer-events:none;font:700 13px/1.68 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.08em;color:#d6f5d6;text-shadow:0 1px 10px rgba(0,0,0,.95),0 0 12px rgba(92,224,148,.35);opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease}
       .sl-cod-stamp.on{opacity:1;transform:translateY(0)}
       .sl-cod-stamp-line{display:block;white-space:pre-wrap}
       .sl-cod-stamp-line:first-child{color:#f2c45a;font-size:14px;letter-spacing:.14em}
+
+      .sl-dlg-bars{position:fixed;inset:0;z-index:46;pointer-events:none;opacity:0;transition:opacity .32s ease}
+      .sl-dlg-bars.on{opacity:1}
+      .sl-dlg-bar{position:fixed;left:0;right:0;height:6.5vh;min-height:34px;max-height:60px;background:rgba(4,7,10,.94);transition:transform .4s cubic-bezier(.22,1,.36,1)}
+      .sl-dlg-bar.top{top:0;transform:translateY(-100%);border-bottom:1px solid rgba(110,210,240,.28)}
+      .sl-dlg-bar.bot{bottom:0;transform:translateY(100%);border-top:1px solid rgba(110,210,240,.28)}
+      .sl-dlg-bars.on .sl-dlg-bar{transform:translateY(0)}
+      .sl-dlg-cam-tag{position:fixed;top:calc(6.5vh + 12px);right:22px;padding:4px 10px;background:rgba(6,12,17,.72);border:1px solid rgba(110,210,240,.34);color:#9ee8ff;font:700 11px/1.2 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.14em}
+      .sl-dlg-wrap{position:fixed;left:50%;bottom:calc(6.5vh + 16px);transform:translateX(-50%);z-index:49;width:min(700px,92vw);display:none;background:rgba(8,15,21,.84);backdrop-filter:blur(8px);border:1px solid rgba(110,210,240,.48);border-top:3px solid #68d6f5;padding:16px 22px;color:#f2f6f8;box-shadow:0 20px 52px rgba(0,0,0,.72);font-family:system-ui,-apple-system,sans-serif}
+      .sl-dlg-wrap.on{display:block}
+      .sl-dlg-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+      .sl-dlg-who{font-size:15px;font-weight:800;color:#7ee4ff;letter-spacing:.04em}
+      .sl-dlg-who.ally{color:#7ee5a8}
+      .sl-dlg-who.hostile{color:#ff8c7a}
+      .sl-dlg-page{font-size:11px;font-weight:700;color:#9ab6c2;letter-spacing:.08em}
+      .sl-dlg-text{font-size:15px;line-height:1.7;color:#f4f7f8;min-height:52px;margin:0 0 12px}
+      .sl-dlg-choices{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+      .sl-dlg-choice{padding:7px 13px;background:rgba(24,48,62,.88);border:1px solid rgba(110,210,240,.46);color:#e6f6fb;font:600 13px/1.3 system-ui,sans-serif;cursor:pointer;text-align:left}
+      .sl-dlg-choice:hover{background:#29556d;border-color:#98ecff}
+      .sl-dlg-foot{display:flex;justify-content:space-between;align-items:center;gap:10px}
+      .sl-dlg-hint{font-size:12px;color:#9cb7c4}
+      .sl-dlg-btn{padding:8px 16px;border:1px solid rgba(242,196,90,.55);background:#c89835;color:#0b1114;font:800 13px/1 system-ui,sans-serif;cursor:pointer}
+      .sl-dlg-btn.ghost{background:#1b2932;color:#dbe8ee;border-color:rgba(150,190,206,.38)}
+
+      .sl-journal-bg{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;background:rgba(5,10,14,.78);backdrop-filter:blur(4px);font-family:system-ui,-apple-system,sans-serif}
+      .sl-journal-bg.on{display:flex}
+      .sl-journal-card{width:min(680px,92vw);max-height:82vh;display:flex;flex-direction:column;background:#0e171e;border:1px solid rgba(110,210,240,.45);border-top:3px solid #f2c45a;color:#eef5f7;padding:20px 22px;box-shadow:0 20px 56px rgba(0,0,0,.78)}
+      .sl-journal-brief{background:rgba(26,44,56,.62);border-left:3px solid #f2c45a;padding:11px 14px;margin:10px 0 14px;font-size:13.5px;line-height:1.65;color:#e6f2f6}
+      .sl-journal-list{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;padding-right:4px;margin-bottom:14px}
+      .sl-journal-item{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:8px 11px;font-size:13px;line-height:1.55}
+      .sl-journal-item b{color:#7ee4ff;margin-right:6px}
       @media (max-width:760px){.sl-tracker{top:calc(206px + var(--sat, 0px));width:min(280px,68vw)}.sl-cod-stamp{left:14px;bottom:10vh;font-size:11px}}
     `;
     document.head.appendChild(style);
@@ -123,7 +154,7 @@
           <div class="sl-tuner-zone"></div>
           <div class="sl-tuner-needle"></div>
         </div>
-        <div class="sl-tuner-status">指针进入金色频段时按 [空格] 或点击「锁定频段」</div>
+        <div class="sl-tuner-status">指针进入金色频段时按 [空格] 或 [E] 锁定</div>
         <div class="sl-tuner-actions">
           <button type="button" class="sl-tuner-btn" data-tuner-cancel>取消 [Esc]</button>
           <button type="button" class="sl-tuner-btn primary" data-tuner-lock>锁定频段 [Space]</button>
@@ -146,13 +177,73 @@
     document.body.appendChild(stampEl);
     let stampTimer = null, stampFadeTimer = null;
 
+    // 5. Interactive NPC Face-to-Face Dialogue Cinema Bars + Box DOM & Portrait Key Light
+    const dlgBars = document.createElement('div');
+    dlgBars.className = 'sl-dlg-bars';
+    dlgBars.innerHTML = `<div class="sl-dlg-bar top"></div><div class="sl-dlg-bar bot"></div><div class="sl-dlg-cam-tag">DIALOGUE CAM · 50MM</div>`;
+    document.body.appendChild(dlgBars);
+
+    let dlgKeyLight = null;
+    if (world.THREE?.PointLight && world.scene) {
+      dlgKeyLight = new world.THREE.PointLight(0xfff1dc, 0, 6.2, 1.5);
+      world.scene.add(dlgKeyLight);
+    }
+    const tmpDlgHead = world.THREE ? new world.THREE.Vector3() : null;
+    const tmpDlgFwd = world.THREE ? new world.THREE.Vector3() : null;
+    const tmpDlgRight = world.THREE ? new world.THREE.Vector3() : null;
+    const tmpDlgCamCur = world.THREE ? new world.THREE.Vector3() : null;
+    const tmpDlgLookCur = world.THREE ? new world.THREE.Vector3() : null;
+    const tmpDlgSway = world.THREE ? new world.THREE.Vector3() : null;
+
+    const dlgWrap = document.createElement('div');
+    dlgWrap.className = 'sl-dlg-wrap';
+    dlgWrap.innerHTML = `
+      <div class="sl-dlg-head"><span class="sl-dlg-who"></span><span class="sl-dlg-page"></span></div>
+      <p class="sl-dlg-text"></p>
+      <div class="sl-dlg-choices"></div>
+      <div class="sl-dlg-foot">
+        <span class="sl-dlg-hint">按 [空格] / [E] 慢慢翻页 · [Esc] 结束对话</span>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="sl-dlg-btn ghost" data-dlg-close>离开 [Esc]</button>
+          <button type="button" class="sl-dlg-btn" data-dlg-next>下一句 [Space]</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dlgWrap);
+    const dlgWho = dlgWrap.querySelector('.sl-dlg-who');
+    const dlgPage = dlgWrap.querySelector('.sl-dlg-page');
+    const dlgText = dlgWrap.querySelector('.sl-dlg-text');
+    const dlgChoices = dlgWrap.querySelector('.sl-dlg-choices');
+    const dlgNextBtn = dlgWrap.querySelector('[data-dlg-next]');
+    const dlgCloseBtn = dlgWrap.querySelector('[data-dlg-close]');
+
+    // 6. Story Case Journal & Dialogue History Drawer ([J])
+    const journalBg = document.createElement('div');
+    journalBg.className = 'sl-journal-bg';
+    journalBg.innerHTML = `
+      <div class="sl-journal-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div><div style="font-size:11px;font-weight:800;letter-spacing:.18em;color:#f2c45a;">SAR-04 · 《失联名单》案情日志</div><h3 style="margin:4px 0 0;font-size:20px;" data-j-title></h3></div>
+          <button type="button" class="sl-dlg-btn ghost" data-j-close>关闭 [J / Esc]</button>
+        </div>
+        <div class="sl-journal-brief" data-j-brief></div>
+        <div style="font-size:12px;font-weight:700;color:#9cb8c4;margin-bottom:6px;">电台与 NPC 访谈记录（随时按 [J] 回看）</div>
+        <div class="sl-journal-list" data-j-list></div>
+      </div>
+    `;
+    document.body.appendChild(journalBg);
+    const jTitle = journalBg.querySelector('[data-j-title]');
+    const jBrief = journalBg.querySelector('[data-j-brief]');
+    const jList = journalBg.querySelector('[data-j-list]');
+    const jCloseBtn = journalBg.querySelector('[data-j-close]');
+
     function clearCodStamp() {
       clearInterval(stampTimer); clearTimeout(stampFadeTimer);
       stampTimer = stampFadeTimer = null;
       stampEl.classList.remove('on');
     }
 
-    function showCodStamp(lines = [], holdMs = 5200) {
+    function showCodStamp(lines = [], holdMs = 7200) {
       if (!Array.isArray(lines) || !lines.length || document.body.classList.contains('audit-clean')) return;
       clearCodStamp();
       stampEl.innerHTML = '';
@@ -174,7 +265,7 @@
         ci += 2;
         els[li].textContent = target.slice(0, ci) + (ci < target.length ? '▌' : '');
         if (ci >= target.length) { li++; ci = 0; }
-      }, 26);
+      }, 32);
     }
 
     // State
@@ -186,7 +277,20 @@
     const playedCutscenes = new Set();
 
     let activeTuner = null;
+    let activeDialogue = null;
+    let journalOpen = false;
+    const storyLog = [];
     let lastTrackerKey = '';
+
+    function recordStoryEntry(speaker, line) {
+      if (!line) return;
+      const cleanWho = String(speaker || 'SAR-04').trim();
+      const cleanLine = String(line).trim();
+      const last = storyLog[storyLog.length - 1];
+      if (last && last.speaker === cleanWho && last.line === cleanLine) return;
+      storyLog.push({ speaker: cleanWho, line: cleanLine });
+      if (storyLog.length > 40) storyLog.shift();
+    }
 
     function stopCutscene(runCallback = true) {
       if (!activeCine) return;
@@ -206,7 +310,7 @@
 
     function playCutscene({
       id, tag = '剧情演出 · CINEMATIC', title = '', subtitle = '',
-      duration = 5.5, camFrom, camTo, lookAt, lookAtEnd = null,
+      duration = 9.0, camFrom, camTo, lookAt, lookAtEnd = null,
       lines = [], once = true, onComplete = null,
     }) {
       if (document.body.classList.contains('audit-clean')) {
@@ -232,15 +336,22 @@
       cineSub.textContent = subtitle;
       cineCap.classList.remove('on');
       cineRoot.classList.add('on');
+      for (const ln of lines) recordStoryEntry(ln.speaker, ln.line);
+      // Give players comfortable reading time (min 8.5s, still skippable via Space anytime)
+      const slowDuration = Math.max(8.5, duration * 1.45);
+      const scaledLines = lines.map((ln, idx) => ({
+        ...ln,
+        at: idx === 0 ? Math.max(0.4, ln.at ?? 0.4) : Math.max(4.4 * idx, (ln.at ?? 0) * 1.45),
+      }));
       activeCine = {
         id,
-        duration: Math.max(2.0, duration),
+        duration: slowDuration,
         elapsed: 0,
         camFrom: camFrom ? new Vector3(camFrom[0], camFrom[1], camFrom[2]) : null,
         camTo: camTo ? new Vector3(camTo[0], camTo[1], camTo[2]) : null,
         lookAt: lookAt ? new Vector3(lookAt[0], lookAt[1], lookAt[2]) : null,
         lookAtEnd: lookAtEnd ? new Vector3(lookAtEnd[0], lookAtEnd[1], lookAtEnd[2]) : null,
-        lines,
+        lines: scaledLines,
         lastLineIdx: -1,
         onComplete,
       };
@@ -274,6 +385,7 @@
       activeTuner = null;
       tunerBg.classList.remove('on');
       if (world.player) world.player.enabled = true;
+      try { world.input?.requestLock?.(); } catch {}
       if (cancelled) t.onCancel?.();
     }
 
@@ -282,7 +394,6 @@
       onSuccess = null, onCancel = null,
     }) {
       if (activeTuner) return false;
-      try { document.exitPointerLock?.(); } catch {}
       if (world.player) {
         world.player.enabled = false;
         if (world.player.vel) world.player.vel.set(0, 0, 0);
@@ -298,7 +409,7 @@
         pips.push(el);
       }
       tuStatus.className = 'sl-tuner-status';
-      tuStatus.textContent = `指针进入金色频段时按 [空格] 或点击锁定（0/${locksNeeded}）`;
+      tuStatus.textContent = `指针进入金色频段时按 [空格] / [E] 或点击锁定（0/${locksNeeded}）`;
       activeTuner = {
         locksNeeded,
         locks: 0,
@@ -314,6 +425,7 @@
       };
       placeTunerZone(activeTuner);
       tunerBg.classList.add('on');
+      try { document.exitPointerLock?.(); } catch {}
       return true;
     }
 
@@ -349,22 +461,241 @@
     tuLockBtn.addEventListener('click', attemptTunerLock);
     tuCancelBtn.addEventListener('click', () => closeSignalTuner(true));
 
+    function computeDialogueShot(d, shotIndex = 0) {
+      if (!d || !world.THREE || (!d.npcHuman && !d.npcActor)) return false;
+      const head = tmpDlgHead;
+      if (d.npcHuman?.getHeadWorldPos) {
+        d.npcHuman.getHeadWorldPos(head);
+      } else if (d.npcActor?.getWorldPosition) {
+        d.npcActor.updateMatrixWorld(true);
+        d.npcActor.getWorldPosition(head);
+        head.y += 1.56;
+      } else {
+        return false;
+      }
+      let yaw = d.npcActor?.rotation?.y ?? 0;
+      if (world.player?.pos && d.npcActor?.getWorldPosition) {
+        const actorPos = d.npcActor.getWorldPosition(tmpDlgFwd);
+        yaw = Math.atan2(world.player.pos.x - actorPos.x, world.player.pos.z - actorPos.z);
+      }
+      tmpDlgFwd.set(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+      tmpDlgRight.set(tmpDlgFwd.z, 0, -tmpDlgFwd.x).normalize();
+      const side = (shotIndex % 2 === 0) ? 1 : -1;
+      const dist = (shotIndex % 3 === 1) ? 1.44 : 1.62;
+      const lat = side * 0.34;
+      const camY = (shotIndex % 3 === 2) ? head.y + 0.04 : head.y - 0.03;
+      d.camTarget.set(
+        head.x + tmpDlgFwd.x * dist + tmpDlgRight.x * lat,
+        camY,
+        head.z + tmpDlgFwd.z * dist + tmpDlgRight.z * lat
+      );
+      // Frame NPC eyes cleanly in upper-middle third above dialogue box
+      d.lookTarget.set(
+        head.x - tmpDlgRight.x * (side * 0.07),
+        head.y - 0.10,
+        head.z - tmpDlgRight.z * (side * 0.07)
+      );
+      if (dlgKeyLight) {
+        dlgKeyLight.position.set(
+          head.x + tmpDlgFwd.x * 1.15 - tmpDlgRight.x * (side * 0.65),
+          head.y + 0.48,
+          head.z + tmpDlgFwd.z * 1.15 - tmpDlgRight.z * (side * 0.65)
+        );
+      }
+      return true;
+    }
+
+    function renderDialogue() {
+      if (!activeDialogue) return;
+      const d = activeDialogue;
+      dlgWho.textContent = d.role ? `${d.speaker} · ${d.role}` : d.speaker;
+      dlgWho.className = 'sl-dlg-who' + (d.tone ? ' ' + d.tone : '');
+      if (d.replyText) {
+        dlgPage.textContent = '追问回复';
+        dlgText.textContent = d.replyText;
+        dlgChoices.innerHTML = '';
+        dlgNextBtn.textContent = '返回选项 [Space]';
+        return;
+      }
+      const total = d.pages.length;
+      dlgPage.textContent = `第 ${d.page + 1} / ${total} 句`;
+      dlgText.textContent = d.pages[d.page] || '';
+      dlgChoices.innerHTML = '';
+      const isLast = d.page >= total - 1;
+      if (isLast && Array.isArray(d.choices) && d.choices.length) {
+        for (const ch of d.choices) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sl-dlg-choice';
+          btn.textContent = `💬 ${ch.label}`;
+          btn.addEventListener('click', () => {
+            if (!activeDialogue) return;
+            recordStoryEntry(d.speaker, ch.reply);
+            activeDialogue.replyText = ch.reply;
+            activeDialogue.shotIndex = (activeDialogue.shotIndex || 0) + 1;
+            computeDialogueShot(activeDialogue, activeDialogue.shotIndex);
+            ch.onSelect?.();
+            renderDialogue();
+          });
+          dlgChoices.appendChild(btn);
+        }
+        dlgNextBtn.textContent = '结束对话 [Space]';
+      } else {
+        dlgNextBtn.textContent = isLast ? '结束对话 [Space]' : '下一句 [Space]';
+      }
+    }
+
+    function closeDialogue() {
+      if (!activeDialogue) return;
+      const d = activeDialogue;
+      const cb = d.onComplete;
+      activeDialogue = null;
+      dlgWrap.classList.remove('on');
+      dlgBars.classList.remove('on');
+      if (dlgKeyLight) dlgKeyLight.intensity = 0;
+      if (d.hasCam && world.camera) {
+        if (d.savedPos && world.camera.position?.copy) world.camera.position.copy(d.savedPos);
+        if (d.savedQuat && world.camera.quaternion?.copy) world.camera.quaternion.copy(d.savedQuat);
+        if (Number.isFinite(d.savedFov) && world.camera.fov !== d.savedFov) {
+          world.camera.fov = d.savedFov;
+          world.camera.updateProjectionMatrix?.();
+        }
+      }
+      if (d.weaponRoot && d.savedWeaponVis !== null) d.weaponRoot.visible = d.savedWeaponVis;
+      if (world.player) {
+        world.player.enabled = true;
+        if (d.savedInvuln !== null) world.player.invulnerable = d.savedInvuln;
+      }
+      try { world.input?.requestLock?.(); } catch {}
+      cb?.();
+    }
+
+    function openDialogue({ speaker = 'NPC', role = '', tone = 'ally', pages = [], choices = [], npcActor = null, npcHuman = null, onComplete = null } = {}) {
+      if (activeDialogue || activeTuner || !pages.length) return false;
+      const savedInvuln = world.player ? !!world.player.invulnerable : null;
+      if (world.player) {
+        world.player.enabled = false;
+        world.player.invulnerable = true;
+        if (world.player.vel) world.player.vel.set(0, 0, 0);
+      }
+      const weaponRoot = world.weapon?.root || world.sidearm?.root || null;
+      const savedWeaponVis = weaponRoot ? weaponRoot.visible : null;
+      if (weaponRoot) weaponRoot.visible = false;
+      for (const p of pages) recordStoryEntry(speaker, p);
+      const camTarget = world.THREE ? new world.THREE.Vector3() : null;
+      const lookTarget = world.THREE ? new world.THREE.Vector3() : null;
+      const d = {
+        speaker, role, tone, pages, choices, page: 0, replyText: null, onComplete,
+        npcActor, npcHuman, shotIndex: 0, elapsed: 0, hasCam: false,
+        camTarget, lookTarget,
+        savedPos: world.camera?.position?.clone?.() || null,
+        savedQuat: world.camera?.quaternion?.clone?.() || null,
+        savedFov: world.camera?.fov,
+        savedInvuln, weaponRoot, savedWeaponVis,
+      };
+      if (world.camera && computeDialogueShot(d, 0)) {
+        d.hasCam = true;
+        if (tmpDlgCamCur && world.camera.position) tmpDlgCamCur.copy(world.camera.position);
+        if (tmpDlgLookCur) {
+          if (world.camera.quaternion && world.camera.position) {
+            const fwd = new world.THREE.Vector3(0, 0, -1).applyQuaternion(world.camera.quaternion);
+            tmpDlgLookCur.copy(world.camera.position).addScaledVector(fwd, 2.2);
+          } else {
+            tmpDlgLookCur.copy(d.lookTarget);
+          }
+        }
+      }
+      activeDialogue = d;
+      renderDialogue();
+      dlgWrap.classList.add('on');
+      dlgBars.classList.add('on');
+      try { document.exitPointerLock?.(); } catch {}
+      return true;
+    }
+
+    function advanceDialogue() {
+      if (!activeDialogue) return;
+      if (activeDialogue.replyText) {
+        activeDialogue.replyText = null;
+        activeDialogue.shotIndex = (activeDialogue.shotIndex || 0) + 1;
+        computeDialogueShot(activeDialogue, activeDialogue.shotIndex);
+        renderDialogue();
+        return;
+      }
+      if (activeDialogue.page + 1 < activeDialogue.pages.length) {
+        activeDialogue.page++;
+        activeDialogue.shotIndex = (activeDialogue.shotIndex || 0) + 1;
+        computeDialogueShot(activeDialogue, activeDialogue.shotIndex);
+        renderDialogue();
+      } else {
+        closeDialogue();
+      }
+    }
+
+    dlgNextBtn.addEventListener('click', advanceDialogue);
+    dlgCloseBtn.addEventListener('click', closeDialogue);
+
+    function toggleJournal(force, { title = '当前案情简报', brief = '' } = {}) {
+      const next = force !== undefined ? Boolean(force) : !journalOpen;
+      journalOpen = next;
+      if (!journalOpen) {
+        journalBg.classList.remove('on');
+        if (world.player && !activeDialogue && !activeTuner && !activeCine) world.player.enabled = true;
+        try { world.input?.requestLock?.(); } catch {}
+        return false;
+      }
+      if (world.player) {
+        world.player.enabled = false;
+        if (world.player.vel) world.player.vel.set(0, 0, 0);
+      }
+      jTitle.textContent = title;
+      jBrief.textContent = brief || '沿着左侧目标指引推进主线，或靠近港区任意 NPC 按 [E] 对话了解《失联名单》背后的来龙去脉。';
+      jList.innerHTML = storyLog.length
+        ? storyLog.slice().reverse().map(it => `<div class="sl-journal-item"><b>${String(it.speaker).replace(/[<>&]/g, '')}：</b>${String(it.line).replace(/[<>&]/g, '')}</div>`).join('')
+        : '<div class="sl-journal-item">暂无通话记录，靠近码头老霍克或推进任务后将自动记录全部对白。</div>';
+      journalBg.classList.add('on');
+      try { document.exitPointerLock?.(); } catch {}
+      return true;
+    }
+
+    jCloseBtn.addEventListener('click', () => toggleJournal(false));
+
     function onKeyDown(e) {
-      if (activeTuner) {
-        if (e.code === 'Space' && !e.repeat) {
+      if (journalOpen) {
+        if ((e.code === 'Escape' || e.code === 'KeyJ') && !e.repeat) {
           e.preventDefault();
-          e.stopPropagation();
+          e.stopImmediatePropagation();
+          toggleJournal(false);
+        }
+        return;
+      }
+      if (activeDialogue) {
+        if ((e.code === 'Space' || e.code === 'KeyE') && !e.repeat) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          advanceDialogue();
+        } else if (e.code === 'Escape' && !e.repeat) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          closeDialogue();
+        }
+        return;
+      }
+      if (activeTuner) {
+        if ((e.code === 'Space' || e.code === 'KeyE') && !e.repeat) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
           attemptTunerLock();
         } else if (e.code === 'Escape' && !e.repeat) {
           e.preventDefault();
-          e.stopPropagation();
+          e.stopImmediatePropagation();
           closeSignalTuner(true);
         }
         return;
       }
       if (activeCine && (e.code === 'Space' || e.code === 'Escape') && !e.repeat) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         stopCutscene(true);
       }
     }
@@ -372,6 +703,27 @@
 
     function update(dt) {
       if (!(dt > 0)) return;
+      if (activeDialogue && activeDialogue.hasCam && world.camera && tmpDlgCamCur && tmpDlgLookCur) {
+        activeDialogue.elapsed += dt;
+        computeDialogueShot(activeDialogue, activeDialogue.shotIndex);
+        const smooth = 1 - Math.exp(-Math.min(dt, 0.08) * 5.4);
+        tmpDlgCamCur.lerp(activeDialogue.camTarget, smooth);
+        tmpDlgLookCur.lerp(activeDialogue.lookTarget, smooth);
+        const t = activeDialogue.elapsed;
+        tmpDlgSway.set(Math.sin(t * 0.95) * 0.014, Math.cos(t * 1.25) * 0.010, Math.sin(t * 0.7) * 0.008);
+        world.camera.position.copy(tmpDlgCamCur).add(tmpDlgSway);
+        world.camera.lookAt(tmpDlgLookCur);
+        if (Number.isFinite(world.camera.fov)) {
+          const nextFov = world.camera.fov + (44 - world.camera.fov) * smooth;
+          if (Math.abs(nextFov - world.camera.fov) > 0.02) {
+            world.camera.fov = nextFov;
+            world.camera.updateProjectionMatrix?.();
+          }
+        }
+        if (dlgKeyLight) {
+          dlgKeyLight.intensity += (1.45 - dlgKeyLight.intensity) * smooth;
+        }
+      }
       if (activeTuner && !activeTuner.finishing) {
         activeTuner.pos += activeTuner.dir * activeTuner.speed * dt;
         if (activeTuner.pos >= 0.98) { activeTuner.pos = 0.98; activeTuner.dir = -1; }
@@ -421,10 +773,16 @@
       clearCodStamp();
       stopCutscene(false);
       closeSignalTuner(false);
+      closeDialogue();
+      toggleJournal(false);
+      if (dlgKeyLight) dlgKeyLight.removeFromParent();
       cineRoot.remove();
       trackerEl.remove();
       tunerBg.remove();
       stampEl.remove();
+      dlgBars.remove();
+      dlgWrap.remove();
+      journalBg.remove();
     }
 
     return {
@@ -432,6 +790,10 @@
       stopCutscene,
       openSignalTuner,
       closeSignalTuner,
+      openDialogue,
+      closeDialogue,
+      recordStoryEntry,
+      toggleJournal,
       setTracker,
       showCodStamp,
       clearCodStamp,
@@ -440,6 +802,8 @@
       dispose,
       get isPlayingCutscene() { return !!activeCine; },
       get isTunerOpen() { return !!activeTuner; },
+      get isDialogueOpen() { return !!activeDialogue; },
+      get isJournalOpen() { return !!journalOpen; },
     };
   };
 })();

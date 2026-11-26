@@ -29,8 +29,14 @@
     netBadge.dataset.noLocalize = '';
     netBadge.hidden = true;
     netBadge.style.cssText = 'position:fixed;left:16px;bottom:82px;z-index:22;background:rgba(10,16,22,.84);border:1px solid #586c76;color:#d6e9ef;padding:4px 10px;font:600 12px/1.3 system-ui,-apple-system,sans-serif;pointer-events:none;';
+    const settlementEl = document.createElement('div');
+    settlementEl.className = 'port-mp-settlement';
+    settlementEl.dataset.noLocalize = '';
+    settlementEl.hidden = true;
+    settlementEl.style.cssText = 'position:fixed;inset:0;z-index:48;display:none;align-items:center;justify-content:center;background:rgba(6,10,15,.82);backdrop-filter:blur(6px);font-family:system-ui,-apple-system,sans-serif;color:#e6f1f5;';
     const appEl = document.getElementById('app');
-    if (appEl) appEl.append(netBadge);
+    if (appEl) appEl.append(netBadge, settlementEl);
+    let settlementShownFor = null;
 
     let ws = null;
     let session = null; // { code, token, yourId, hostId, team, settings, origin }
@@ -91,6 +97,9 @@
         alive: entry.state?.alive !== false,
         downed: Boolean(entry.state?.downed),
         crouch: Boolean(entry.state?.crouch),
+        kills: Number(entry.state?.kills) || 0,
+        deaths: Number(entry.state?.deaths) || 0,
+        captures: Number(entry.state?.captures) || 0,
         stride: 0,
         age: 0,
       };
@@ -187,6 +196,9 @@
         r.alive = st.alive !== false && entry.connected !== false;
         r.downed = Boolean(st.downed);
         r.crouch = Boolean(st.crouch);
+        if (typeof st.kills === 'number') r.kills = st.kills;
+        if (typeof st.deaths === 'number') r.deaths = st.deaths;
+        if (typeof st.captures === 'number') r.captures = st.captures;
       }
       for (const id of [...remotes.keys()]) {
         if (!seen.has(id)) removeRemote(id);
@@ -303,6 +315,85 @@
       netBadge.style.borderColor = connected ? '#6df5a6' : '#ffb347';
     }
 
+    function hideSettlement() {
+      settlementShownFor = null;
+      settlementEl.hidden = true;
+      settlementEl.style.display = 'none';
+      settlementEl.innerHTML = '';
+    }
+
+    function showSettlement(conquest) {
+      if (!session || !conquest?.winner || settlementShownFor === conquest.winner) return;
+      settlementShownFor = conquest.winner;
+      try { document.exitPointerLock?.(); } catch {}
+      const rows = [
+        {
+          name: session.name || t('You', '你'),
+          team: session.team || 'blue',
+          kills: conquest.kills || 0,
+          deaths: conquest.deaths || 0,
+          captures: conquest.captures || 0,
+        },
+        ...[...remotes.values()].map(r => ({
+          name: r.name,
+          team: r.team,
+          kills: r.kills || 0,
+          deaths: r.deaths || 0,
+          captures: r.captures || 0,
+        })),
+      ].map(r => ({ ...r, score: r.kills * 100 + r.captures * 250 })).sort((a, b) => b.score - a.score);
+      const winText = conquest.winner === 'blue'
+        ? t('BLUE TEAM VICTORY', '蓝方联军胜利')
+        : conquest.winner === 'red'
+          ? t('RED TEAM VICTORY', '红方守军胜利')
+          : t('MATCH DRAW', '双方平局');
+      const isHost = session.yourId === session.hostId;
+      const rowsHtml = rows.map(r => `
+        <tr style="border-top:1px solid rgba(255,255,255,.1);">
+          <td style="padding:6px 10px;">${String(r.name).replace(/[<>&]/g, '')}</td>
+          <td style="padding:6px 10px;color:${r.team === 'red' ? '#ff8a7a' : '#7ae4ff'};">${r.team === 'red' ? 'RED' : 'BLUE'}</td>
+          <td style="padding:6px 10px;text-align:right;">${r.kills}</td>
+          <td style="padding:6px 10px;text-align:right;">${r.deaths}</td>
+          <td style="padding:6px 10px;text-align:right;">${r.captures}</td>
+          <td style="padding:6px 10px;text-align:right;font-weight:700;color:#ffd36a;">${r.score}</td>
+        </tr>`).join('');
+      settlementEl.innerHTML = `
+        <div style="width:min(640px,92vw);background:rgba(12,20,28,.96);border:1px solid #4e6b7a;padding:22px 24px;border-radius:6px;">
+          <div style="font-size:12px;letter-spacing:1.4px;color:#7ec8de;margin-bottom:4px;">LAN ${session.code} · ${conquest.mode.toUpperCase()}</div>
+          <div style="font-size:26px;font-weight:800;margin-bottom:14px;">${winText}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px;">
+            <thead><tr style="color:#9cb6c2;text-align:left;">
+              <th style="padding:6px 10px;">${t('Player', '玩家')}</th>
+              <th style="padding:6px 10px;">${t('Team', '阵营')}</th>
+              <th style="padding:6px 10px;text-align:right;">${t('Kills', '击杀')}</th>
+              <th style="padding:6px 10px;text-align:right;">${t('Deaths', '阵亡')}</th>
+              <th style="padding:6px 10px;text-align:right;">${t('Caps', '占点')}</th>
+              <th style="padding:6px 10px;text-align:right;">${t('Score', '积分')}</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <div style="display:flex;gap:10px;justify-content:flex-end;">
+            ${isHost ? `<button data-mp-rematch style="padding:8px 16px;background:#2a8cb8;color:#fff;border:none;border-radius:4px;font-weight:700;cursor:pointer;">${t('Return to Lobby & Rematch', '返回大厅重开一局')}</button>` : ''}
+            <button data-mp-close style="padding:8px 14px;background:#263540;color:#dbe9ef;border:1px solid #4d6775;border-radius:4px;cursor:pointer;">${t('Close', '关闭战报')}</button>
+          </div>
+        </div>`;
+      settlementEl.hidden = false;
+      settlementEl.style.display = 'flex';
+      settlementEl.querySelector('[data-mp-close]')?.addEventListener('click', hideSettlement);
+      settlementEl.querySelector('[data-mp-rematch]')?.addEventListener('click', async () => {
+        try {
+          const base = session.origin || location.origin;
+          await fetch(`${base}/api/lan/rooms/${session.code}/rematch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: session.token }),
+          });
+        } catch {}
+        hideSettlement();
+        document.dispatchEvent(new CustomEvent('saltline:lan-rematch', { detail: { code: session?.code } }));
+      });
+    }
+
     function connect(nextSession) {
       disconnect();
       closedByUser = false;
@@ -311,6 +402,7 @@
       lastConquestSendAt = 0;
       sentWinner = null;
       pendingPromotion = false;
+      hideSettlement();
       openSocket();
       updateBadge();
     }
@@ -321,6 +413,7 @@
       connected = false;
       reconnecting = false;
       session = null;
+      hideSettlement();
       if (ws) {
         try { ws.close(); } catch {}
         ws = null;
@@ -430,6 +523,7 @@
       }
 
       updateBadge();
+      if (conquest?.winner) showSettlement(conquest);
 
       // Interpolate server-authoritative AI enemies
       for (const se of srvEnemies.values()) {
@@ -488,6 +582,7 @@
       tracers.length = 0;
       root.removeFromParent();
       netBadge.remove();
+      settlementEl.remove();
     }
 
     return {

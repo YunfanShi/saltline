@@ -335,6 +335,19 @@
     const activeFlyovers = [];
     const activeTracers = [];
     let blastFlashTimer = null;
+    // Single pre-allocated pooled PointLight: NEVER add/remove PointLights at runtime (avoids full-scene WebGL shader recompilation stutters!)
+    const sharedBlastLight = PointLight ? new PointLight(0xff7724, 0, 48, 1.4) : null;
+    let sharedLightDecay = 0;
+    if (sharedBlastLight) { sharedBlastLight.position.set(0, -100, 0); fxRoot.add(sharedBlastLight); }
+
+    function pulseSharedLight(pos, hex, intensity, distance = 46, dur = .78) {
+      if (!sharedBlastLight) return;
+      sharedBlastLight.color.setHex(hex);
+      sharedBlastLight.position.set(pos.x, pos.y + 3.0, pos.z);
+      sharedBlastLight.distance = distance;
+      sharedBlastLight.intensity = Math.max(sharedBlastLight.intensity, intensity);
+      sharedLightDecay = Math.max(sharedLightDecay, intensity / Math.max(0.15, dur));
+    }
 
     function spawnFireballExplosion(pos, scale = 1.0) {
       const coreMat = blastCoreBase.clone();
@@ -347,10 +360,9 @@
       outer.position.set(pos.x, pos.y + 1.3 * scale, pos.z);
       shock.rotation.x = -Math.PI / 2;
       shock.position.set(pos.x, pos.y + .22, pos.z);
-      const light = PointLight ? new PointLight(0xff7724, 55 * scale, 42 * scale, 1.4) : null;
-      if (light) { light.position.set(pos.x, pos.y + 3.2 * scale, pos.z); fxRoot.add(light); }
+      pulseSharedLight(pos, 0xff7724, 52 * scale, 42 * scale, .78);
       fxRoot.add(core, outer, shock);
-      activeBlasts.push({ core, outer, shock, light, coreMat, outerMat, shockMat, age: 0, dur: .78, scale });
+      activeBlasts.push({ core, outer, shock, coreMat, outerMat, shockMat, age: 0, dur: .78, scale });
       const pPos = world.player?.pos;
       if (pPos) {
         const dist = pPos.distanceTo(pos);
@@ -368,10 +380,22 @@
       const mesh = new Mesh(fireballGeo, mat);
       mesh.scale.setScalar(.36);
       mesh.position.copy(origin);
-      const light = PointLight ? new PointLight(hex, 28, 36, 1.4) : null;
-      if (light) { light.position.copy(origin); fxRoot.add(light); }
+      pulseSharedLight(origin, hex, 26, 36, 3.6);
       fxRoot.add(mesh);
-      activeFlares.push({ mesh, mat, light, vel: new Vector3(vx, vy, vz), age: 0, dur: 4.2, trailTick: 0 });
+      activeFlares.push({ mesh, mat, vel: new Vector3(vx, vy, vz), age: 0, dur: 4.2, trailTick: 0 });
+    }
+
+    let shadersWarmed = false;
+    function warmUpShaders() {
+      if (shadersWarmed || !world.renderer?.compile || !world.camera) return;
+      shadersWarmed = true;
+      const prevTsunami = tsunamiRoot.visible;
+      try {
+        tsunamiRoot.visible = true;
+        world.renderer.compile(root, world.camera);
+      } catch {} finally {
+        tsunamiRoot.visible = prevTsunami;
+      }
     }
 
     function addBranch(boltGroup, x0, y0, z0, x1, y1, z1, thickness = 1) {
@@ -708,14 +732,13 @@
       for (const b of tempBolts.splice(0)) fxRoot.remove(b.group);
       for (const s of pendingShells.splice(0)) { fxRoot.remove(s.ring); s.ring.material.dispose(); }
       for (const m of scorchMarks.splice(0)) fxRoot.remove(m);
+      if (sharedBlastLight) { sharedBlastLight.intensity = 0; sharedLightDecay = 0; }
       for (const b of activeBlasts.splice(0)) {
         fxRoot.remove(b.core, b.outer, b.shock);
-        if (b.light) fxRoot.remove(b.light);
         b.coreMat.dispose(); b.outerMat.dispose(); b.shockMat.dispose();
       }
       for (const f of activeFlares.splice(0)) {
         fxRoot.remove(f.mesh);
-        if (f.light) fxRoot.remove(f.light);
         f.mat.dispose();
       }
       for (const j of activeFlyovers.splice(0)) fxRoot.remove(j.group);
@@ -798,13 +821,14 @@
         b.coreMat.opacity = Math.max(0, (1 - t) * .95);
         b.outerMat.opacity = Math.max(0, (1 - t) * .82);
         b.shockMat.opacity = Math.max(0, (1 - t) * .76);
-        if (b.light) b.light.intensity = Math.max(0, (1 - t) * 55 * b.scale);
         if (b.age >= b.dur) {
           fxRoot.remove(b.core, b.outer, b.shock);
-          if (b.light) fxRoot.remove(b.light);
           b.coreMat.dispose(); b.outerMat.dispose(); b.shockMat.dispose();
           activeBlasts.splice(i, 1);
         }
+      }
+      if (sharedBlastLight && sharedBlastLight.intensity > 0) {
+        sharedBlastLight.intensity = Math.max(0, sharedBlastLight.intensity - sharedLightDecay * dt);
       }
 
       for (let i = activeFlares.length - 1; i >= 0; i--) {
@@ -812,7 +836,6 @@
         f.age += dt;
         f.vel.y -= 6.8 * dt;
         f.mesh.position.addScaledVector(f.vel, dt);
-        if (f.light) f.light.position.copy(f.mesh.position);
         f.trailTick += dt;
         if (f.trailTick >= .12) {
           f.trailTick = 0;
@@ -820,10 +843,8 @@
         }
         const fade = Math.max(0, 1 - f.age / f.dur);
         f.mat.opacity = fade;
-        if (f.light) f.light.intensity = fade * 28;
         if (f.age >= f.dur) {
           fxRoot.remove(f.mesh);
-          if (f.light) fxRoot.remove(f.light);
           f.mat.dispose();
           activeFlares.splice(i, 1);
         }
@@ -1037,6 +1058,7 @@
       triggerVictoryFlareBarrage,
       triggerSkyBattlePass,
       spawnFireballExplosion,
+      warmUpShaders,
       triggerEvent,
       triggerRandomEvent,
       stopAllEvents,

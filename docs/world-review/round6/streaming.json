@@ -1,0 +1,1075 @@
+{
+  "imports": {
+    "metal_office_desk": 2,
+    "vintage_radio_transceiver": 1,
+    "desk_lamp_arm_01": 2,
+    "painted_wooden_chair_02": 5,
+    "industrial_wall_lamp": 2,
+    "office_notepads": 2,
+    "modular_factory_facade": 2
+  },
+  "cycles": [
+    {
+      "loc": [
+        -215,
+        0.2,
+        140
+      ],
+      "geometries": 1250,
+      "textures": 366,
+      "disposals": 662,
+      "active": 15
+    },
+    {
+      "loc": [
+        -26,
+        0.2,
+        -55
+      ],
+      "geometries": 1210,
+      "textures": 366,
+      "disposals": 1024,
+      "active": 29
+    },
+    {
+      "loc": [
+        -215,
+        0.2,
+        140
+      ],
+      "geometries": 1115,
+      "textures": 366,
+      "disposals": 1305,
+      "active": 15
+    },
+    {
+      "loc": [
+        -26,
+        0.2,
+        -55
+      ],
+      "geometries": 1241,
+      "textures": 366,
+      "disposals": 1666,
+      "active": 29
+    }
+  ],
+  "geoDrift": 31,
+  "texDrift": 0,
+  "door": {
+    "closed": -13.795000000000002,
+    "opened": -12.30000000000001
+  },
+  "buildTimingCount": 21,
+  "maxPhaseMs": 31,
+  "buildTimings": [
+    {
+      "id": "building-commercial_arcade-101",
+      "archetype": "commercial_arcade",
+      "totalMs": 34.2,
+      "maxPhaseMs": 31,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0.2,
+          "ops": 43
+        },
+        {
+          "phase": "facade",
+          "ms": 1.1,
+          "ops": 70
+        },
+        {
+          "phase": "openings",
+          "ms": 0.6,
+          "ops": 703
+        },
+        {
+          "phase": "roof",
+          "ms": 0.6,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 31,
+          "ops": 188
+        },
+        {
+          "phase": "interior",
+          "ms": 0.1,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.5,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-stepped_mixed_use-309",
+      "archetype": "stepped_mixed_use",
+      "totalMs": 4.7,
+      "maxPhaseMs": 4.4,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 5
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 98
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 580
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 4.4,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-civic_customs-404",
+      "archetype": "civic_customs",
+      "totalMs": 6.2,
+      "maxPhaseMs": 5.7,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 7
+        },
+        {
+          "phase": "facade",
+          "ms": 0.1,
+          "ops": 236
+        },
+        {
+          "phase": "openings",
+          "ms": 0.2,
+          "ops": 800
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 3
+        },
+        {
+          "phase": "attachments",
+          "ms": 5.7,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-modern_office-202",
+      "archetype": "modern_office",
+      "totalMs": 12.7,
+      "maxPhaseMs": 11.7,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0.3,
+          "ops": 13
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 148
+        },
+        {
+          "phase": "openings",
+          "ms": 0.2,
+          "ops": 722
+        },
+        {
+          "phase": "roof",
+          "ms": 0.4,
+          "ops": 2
+        },
+        {
+          "phase": "attachments",
+          "ms": 11.7,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-harbor_apartment-303",
+      "archetype": "harbor_apartment",
+      "totalMs": 7.8,
+      "maxPhaseMs": 7.3,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 7
+        },
+        {
+          "phase": "facade",
+          "ms": 0.1,
+          "ops": 160
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 578
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 7.3,
+          "ops": 149
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.2,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-waterfront_rowhouses-612",
+      "archetype": "waterfront_rowhouses",
+      "totalMs": 3,
+      "maxPhaseMs": 2.6,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 6
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 112
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 729
+        },
+        {
+          "phase": "roof",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "attachments",
+          "ms": 2.6,
+          "ops": 108
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.2,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-bonded_warehouse-511",
+      "archetype": "bonded_warehouse",
+      "totalMs": 2.8,
+      "maxPhaseMs": 2.4,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "facade",
+          "ms": 0.1,
+          "ops": 88
+        },
+        {
+          "phase": "openings",
+          "ms": 0,
+          "ops": 326
+        },
+        {
+          "phase": "roof",
+          "ms": 0.2,
+          "ops": 0
+        },
+        {
+          "phase": "attachments",
+          "ms": 2.4,
+          "ops": 26
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-stepped_mixed_use-309",
+      "archetype": "stepped_mixed_use",
+      "totalMs": 0.8,
+      "maxPhaseMs": 0.5,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 5
+        },
+        {
+          "phase": "facade",
+          "ms": 0.1,
+          "ops": 98
+        },
+        {
+          "phase": "openings",
+          "ms": 0.2,
+          "ops": 580
+        },
+        {
+          "phase": "roof",
+          "ms": 0,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.5,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-civic_customs-404",
+      "archetype": "civic_customs",
+      "totalMs": 0.3,
+      "maxPhaseMs": 0.1,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 7
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 236
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 800
+        },
+        {
+          "phase": "roof",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-commercial_arcade-101",
+      "archetype": "commercial_arcade",
+      "totalMs": 0.7,
+      "maxPhaseMs": 0.2,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 43
+        },
+        {
+          "phase": "facade",
+          "ms": 0.2,
+          "ops": 70
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 703
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.2,
+          "ops": 188
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-modern_office-202",
+      "archetype": "modern_office",
+      "totalMs": 0.7,
+      "maxPhaseMs": 0.3,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0.3,
+          "ops": 13
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 148
+        },
+        {
+          "phase": "openings",
+          "ms": 0.2,
+          "ops": 722
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 2
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-harbor_apartment-303",
+      "archetype": "harbor_apartment",
+      "totalMs": 0.4,
+      "maxPhaseMs": 0.2,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 7
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 160
+        },
+        {
+          "phase": "openings",
+          "ms": 0,
+          "ops": 578
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.2,
+          "ops": 149
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-waterfront_rowhouses-612",
+      "archetype": "waterfront_rowhouses",
+      "totalMs": 0.4,
+      "maxPhaseMs": 0.2,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 6
+        },
+        {
+          "phase": "facade",
+          "ms": 0.1,
+          "ops": 112
+        },
+        {
+          "phase": "openings",
+          "ms": 0.2,
+          "ops": 729
+        },
+        {
+          "phase": "roof",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.1,
+          "ops": 108
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-bonded_warehouse-511",
+      "archetype": "bonded_warehouse",
+      "totalMs": 0.5,
+      "maxPhaseMs": 0.4,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 88
+        },
+        {
+          "phase": "openings",
+          "ms": 0,
+          "ops": 326
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "attachments",
+          "ms": 0,
+          "ops": 26
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.4,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-stepped_mixed_use-309",
+      "archetype": "stepped_mixed_use",
+      "totalMs": 0.6,
+      "maxPhaseMs": 0.2,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 5
+        },
+        {
+          "phase": "facade",
+          "ms": 0.1,
+          "ops": 98
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 580
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.2,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-civic_customs-404",
+      "archetype": "civic_customs",
+      "totalMs": 0.2,
+      "maxPhaseMs": 0.1,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 7
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 236
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 800
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 3
+        },
+        {
+          "phase": "attachments",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-commercial_arcade-101",
+      "archetype": "commercial_arcade",
+      "totalMs": 0.3,
+      "maxPhaseMs": 0.1,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 43
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 70
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 703
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 0,
+          "ops": 188
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-modern_office-202",
+      "archetype": "modern_office",
+      "totalMs": 0.5,
+      "maxPhaseMs": 0.2,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0.2,
+          "ops": 13
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 148
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 722
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 2
+        },
+        {
+          "phase": "attachments",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-harbor_apartment-303",
+      "archetype": "harbor_apartment",
+      "totalMs": 0.5,
+      "maxPhaseMs": 0.1,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 7
+        },
+        {
+          "phase": "facade",
+          "ms": 0.1,
+          "ops": 160
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 578
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 4
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.1,
+          "ops": 149
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-waterfront_rowhouses-612",
+      "archetype": "waterfront_rowhouses",
+      "totalMs": 0.4,
+      "maxPhaseMs": 0.1,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 6
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 112
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 729
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "attachments",
+          "ms": 0.1,
+          "ops": 108
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    },
+    {
+      "id": "building-bonded_warehouse-511",
+      "archetype": "bonded_warehouse",
+      "totalMs": 0.3,
+      "maxPhaseMs": 0.1,
+      "phases": [
+        {
+          "phase": "structure",
+          "ms": 0,
+          "ops": 3
+        },
+        {
+          "phase": "facade",
+          "ms": 0,
+          "ops": 88
+        },
+        {
+          "phase": "openings",
+          "ms": 0.1,
+          "ops": 326
+        },
+        {
+          "phase": "roof",
+          "ms": 0.1,
+          "ops": 0
+        },
+        {
+          "phase": "attachments",
+          "ms": 0,
+          "ops": 26
+        },
+        {
+          "phase": "interior",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "colliders",
+          "ms": 0,
+          "ops": 0
+        },
+        {
+          "phase": "activate",
+          "ms": 0.1,
+          "ops": 0
+        }
+      ]
+    }
+  ]
+}

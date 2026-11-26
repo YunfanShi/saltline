@@ -75,10 +75,42 @@
     },
     {
       id: 'ow-7', stage: 7, art: './art/campaign-reopen.jpg',
-      title: ['Act VIII · Runway Extraction', '第八幕 · 海岸应急机场绝境撤离'],
+      title: ['Act VIII · Airfield Fuel & Blackbox', '第八幕 · 海岸应急机场油料与黑匣子夺取'],
       description: [
-        'Race north under runway artillery to the NW Coastal Airfield hangar and lift off aboard the rescue transport as the truth reaches port.',
-        '顶着跑道重炮与战机拦截全速冲入西北机场拱形机库，乘救援运输机升空撤离，让十七个名字重见天日。'
+        'Race north under runway artillery to the NW Coastal Airfield hangar to secure the SAR fuel manifest and flight recorder.',
+        '顶着跑道重炮与战机拦截冲入西北机场拱形机库，夺回搜救机燃油舱单与飞行记录仪。'
+      ]
+    },
+    {
+      id: 'ow-8', stage: 8, art: './art/campaign-anchorage.jpg',
+      title: ['Act IX · Outer Anchorage Evacuation', '第九幕 · 外海锚地与码头疏散'],
+      description: [
+        'Return to South Quay to knock out two Anvil boarding jammers and hold the gangway perimeter while trapped Petrel crew evacuate.',
+        '折返南港码头摧毁 2 座登船干扰器，并守住舷梯撤离走廊 10 秒掩护被困船员登艇。'
+      ]
+    },
+    {
+      id: 'ow-9', stage: 9, art: './art/campaign-night-record.jpg',
+      title: ['Act X · Night Shift Precinct Lockdown', '第十幕 · 深夜档案封锁与反攻'],
+      description: [
+        'Break back into Precinct 04 under an Anvil counter-raid, decrypt Ward’s offshore ledger, and hold the precinct uplink.',
+        '在铁砧反扑中重返沿海警务 04 号站，破译沃德离岸资金总账并坚守警务上行链路。'
+      ]
+    },
+    {
+      id: 'ow-10', stage: 10, art: './art/campaign-last-pilot.jpg',
+      title: ['Act XI · Last Pilot Highway Escort', '第十一幕 · 最后引航与海岸公路护送'],
+      description: [
+        'Clear two Anvil SAM pods along North Coastal Boulevard and escort the final rescue convoy to the airfield approach.',
+        '沿北段沿海大道摧毁 2 座铁砧防空导弹发射架，护送最后一批搜救车队冲抵机场跑道入口。'
+      ]
+    },
+    {
+      id: 'ow-11', stage: 11, art: './art/campaign-reopen.jpg',
+      title: ['Act XII · Open Water Dawn', '第十二幕 · 晴海启航与真相尾声'],
+      description: [
+        'As dawn breaks over a cleared Saltline Harbor, board the SAR transport at the airfield hangar to seal the Missing Manifest case.',
+        '风暴散尽、晨光照亮盐线港，登上机场拱形机库的救援运输机，见证你的抉择所改写的海港结局。'
       ]
     }
   ]);
@@ -308,9 +340,9 @@
       redCore: new MeshBasicMaterial({ color: 0xd93824 }),
       blueTaxi: new MeshBasicMaterial({ color: 0x3b8fd9 }),
       beamGold: new MeshBasicMaterial({ color: 0xf5d993, transparent: true, opacity: .22, depthWrite: false }),
-      sedanDark: new MeshStandardMaterial({ color: 0x243647, roughness: .38, metalness: .56 }),
-      sedanGrey: new MeshStandardMaterial({ color: 0x7e858a, roughness: .42, metalness: .44 }),
-      sedanBurgundy: new MeshStandardMaterial({ color: 0x592422, roughness: .42, metalness: .48 }),
+      sedanDark: new MeshStandardMaterial({ color: 0x1e2e3d, roughness: .22, metalness: .62, envMapIntensity: 1.45 }),
+      sedanGrey: new MeshStandardMaterial({ color: 0x727b82, roughness: .24, metalness: .54, envMapIntensity: 1.40 }),
+      sedanBurgundy: new MeshStandardMaterial({ color: 0x521d1c, roughness: .24, metalness: .58, envMapIntensity: 1.40 }),
       craneRed: new MeshStandardMaterial({ color: 0xb52922, roughness: .54, metalness: .34 }),
       craneWhite: new MeshStandardMaterial({ color: 0xd6dad6, roughness: .62, metalness: .16 }),
       safetyOrange: new MeshStandardMaterial({ color: 0xd66d18, roughness: .52, metalness: .24 }),
@@ -753,13 +785,22 @@
     crown.setAttribute('position', new THREE.Float32BufferAttribute(needles, 3));
     crown.computeVertexNormals();
     M.pineDark.side = THREE.DoubleSide;
+    const taperedTrunkGeo = new CylinderGeometry(.07, .21, 4.95, 9);
+    customGeos.push(taperedTrunkGeo);
     function addPineTree(parent, x, y, z, scale = 1) {
       const g = new Group();
       g.position.set(x, y, z);
-      g.scale.setScalar(scale);
+      const hVar = 0.88 + ((Math.abs(x * 17 + z * 23) % 28) / 100);
+      g.scale.set(scale, scale * hVar, scale);
       g.rotation.y = (Math.abs(x * 13 + z * 7) % 628) / 100;
-      addCyl(g, M.wood, .14, 4.85, .08, 2.42, 0, 0, -.035);
-      g.add(new Mesh(crown, M.pineDark));
+      g.rotation.z = (((Math.abs(x * 7 + z * 11) % 10) - 5) * 0.008);
+      const trunk = new Mesh(taperedTrunkGeo, M.wood);
+      trunk.position.set(.04, 2.44, 0);
+      trunk.matrixAutoUpdate = false; trunk.updateMatrix();
+      g.add(trunk);
+      const canopy = new Mesh(crown, M.pineDark);
+      canopy.matrixAutoUpdate = false; canopy.updateMatrix();
+      g.add(canopy);
       parent.add(g);
       const tr = Math.max(0.22, 0.24 * scale);
       addColliderForParent(parent, x - tr, y, z - tr, x + tr, y + 4.6 * scale, z + tr, 'wood');
@@ -1380,7 +1421,26 @@
         coolingGeo = new THREE.LatheGeometry(pts, 28);
         customGeos.push(coolingGeo);
       }
-      const steamMat = new MeshBasicMaterial({ color: 0xdce6ec, transparent: true, opacity: .22, depthWrite: false });
+      // Soft radial-gradient volumetric steam sprite texture (replaces hard-edged geometric spheres!)
+      let steamTex = null;
+      try {
+        const sc = document.createElement('canvas');
+        sc.width = 128; sc.height = 128;
+        const sctx = sc.getContext?.('2d');
+        if (sctx && THREE.CanvasTexture) {
+          sctx.clearRect(0, 0, 128, 128);
+          const lobes = [[64,64,56,.42],[48,58,38,.28],[80,68,36,.26],[62,48,34,.24],[58,76,34,.22]];
+          for (const [lx, ly, lr, la] of lobes) {
+            const grd = sctx.createRadialGradient(lx, ly, 4, lx, ly, lr);
+            grd.addColorStop(0, `rgba(224,233,238,${la})`);
+            grd.addColorStop(0.55, `rgba(210,222,230,${la * .48})`);
+            grd.addColorStop(1, 'rgba(200,214,224,0)');
+            sctx.fillStyle = grd;
+            sctx.fillRect(0, 0, 128, 128);
+          }
+          steamTex = new THREE.CanvasTexture(sc);
+        }
+      } catch {}
       const steamPuffs = [];
       for (const ox of [0, 21.5]) {
         if (coolingGeo) {
@@ -1398,11 +1458,14 @@
           addBox(g, M.concrete, .38, 2.5, .38, px, 1.35, pz);
         }
         addCyl(g, M.concreteDirty, 5.45, .55, ox, 25.7, 0);
-        for (let p = 0; p < 4; p++) {
-          const puff = new Mesh(sphGeo, steamMat);
-          puff.position.set(ox, 26.2 + p * 3.8, 0);
+        for (let p = 0; p < 6; p++) {
+          const mat = (THREE.SpriteMaterial && steamTex)
+            ? new THREE.SpriteMaterial({ map: steamTex, transparent: true, opacity: .38, depthWrite: false })
+            : new MeshBasicMaterial({ color: 0xdce6ec, transparent: true, opacity: .14, depthWrite: false });
+          const puff = (THREE.Sprite && steamTex) ? new THREE.Sprite(mat) : new Mesh(sphGeo, mat);
+          puff.position.set(ox, 26.2 + p * 3.0, 0);
           g.add(puff);
-          steamPuffs.push({ mesh: puff, ox, phase: p * .25 + (ox > 0 ? .12 : 0) });
+          steamPuffs.push({ mesh: puff, mat, ox, phase: p / 6 + (ox > 0 ? .09 : 0), driftZ: (p % 2 ? 1 : -1) * 1.6 });
         }
         if (sec) {
           sec.colliderSpecs.push({ min: new Vector3(x + ox - 7.8, .16, z - 7.8), max: new Vector3(x + ox + 7.8, 25.0, z + 7.8), surface: 'concrete' });
@@ -1410,11 +1473,12 @@
       }
       updaters.push(dt => {
         for (const sp of steamPuffs) {
-          sp.phase = (sp.phase + dt * .16) % 1;
+          sp.phase = (sp.phase + dt * .11) % 1;
           const t = sp.phase;
-          sp.mesh.position.set(sp.ox + t * 5.2, 25.8 + t * 15.5, Math.sin(t * 6.28) * 1.4);
-          const sc = 3.2 + t * 4.4;
-          sp.mesh.scale.set(sc, sc * .68, sc);
+          sp.mesh.position.set(sp.ox + t * 11.5, 25.6 + t * 17.0, Math.sin(t * 4.2) * sp.driftZ);
+          const sc = 8.5 + t * 15.5;
+          sp.mesh.scale.set(sc, sc * .78, sc);
+          sp.mat.opacity = Math.sin(t * Math.PI) * .46;
         }
       });
       const addStripedStack = (sx, sz, totalH = 38.0) => {
@@ -1763,21 +1827,164 @@
       }
       return ch1Branch;
     }
+    const actMechanics = {
+      act2PowerRestored: false,
+      railSwitches: new Set(),
+      cryoValvesClosed: new Set(),
+      rescuedWorkers: new Set(),
+      ridgeRelaysAligned: new Set(),
+      tideGateValves: new Set(),
+      lighthouseGenActive: false,
+      airfieldFuelReady: false,
+    };
     window.SALTLINE_CH1_BENCHMARK = {
       get cluesFound() { return [...ch1Clues]; },
       get clueCount() { return ch1Clues.size; },
       get branch() { return ch1Branch; },
       chooseBranch: chooseCh1Branch,
     };
+    window.SALTLINE_CAMPAIGN_STATE = {
+      get clues() { return [...ch1Clues]; },
+      get branch() { return ch1Branch; },
+      get act2PowerRestored() { return actMechanics.act2PowerRestored; },
+      get railSwitchesCount() { return actMechanics.railSwitches.size; },
+      get cryoValvesCount() { return actMechanics.cryoValvesClosed.size; },
+      get rescuedWorkersCount() { return actMechanics.rescuedWorkers.size; },
+      get ridgeRelaysCount() { return actMechanics.ridgeRelaysAligned.size; },
+      get tideGateValvesCount() { return actMechanics.tideGateValves.size; },
+      get lighthouseGenActive() { return actMechanics.lighthouseGenActive; },
+      get airfieldFuelReady() { return actMechanics.airfieldFuelReady; },
+      getEpilogueSummary() {
+        const branchLabel = ch1Branch === 'stealth' ? '静默截取密钥（潜行突袭线）' : ch1Branch === 'broadcast' ? '公开广播真相（全港响应线）' : '标准突围线';
+        return {
+          branch: ch1Branch || 'standard',
+          branchLabel,
+          clues: ch1Clues.size,
+          rescuedWorkers: actMechanics.rescuedWorkers.size,
+          facilitiesRestored: (actMechanics.act2PowerRestored ? 1 : 0) + actMechanics.railSwitches.size + actMechanics.cryoValvesClosed.size + actMechanics.ridgeRelaysAligned.size + actMechanics.tideGateValves.size + (actMechanics.lighthouseGenActive ? 1 : 0) + (actMechanics.airfieldFuelReady ? 1 : 0),
+        };
+      },
+    };
+
+    // Act 2: Coastal Blvd Auxiliary Power Breaker (restores city grid after Anvil EMP blackout)
+    addInteractiveTerminal(horizonRoot, {
+      id: 'act2-power-breaker', promptZh: '按 [E] 合闸城区备用配电箱，恢复沿海大道夜间照明', x: -36.2, y: 0.16, z: -74.0, colorMat: M.glassWarm,
+      onUse() {
+        if (actMechanics.act2PowerRestored) return;
+        actMechanics.act2PowerRestored = true;
+        audio?.play?.('rail_touchdown', { pos: new Vector3(-36.2, 1, -74.0), ref: 20, gain: .5, jitter: .04 });
+        world.hud?.radio?.('玛拉：「城区备用电网已重新上线！整条沿海大道的监控和照明恢复了，敌方伏兵无处可藏！」', 6.2);
+        world.tactical?.notify?.('⚡ 沿海城区备用电网已恢复！', '⚡ Coastal City backup power restored!', true, 4.2);
+      },
+    });
+
+    // Act 3: 2 Physical Rail Yard Track Switches (reroute emergency freight spur beside live train)
+    for (const [swId, swLabel, swZ] of [
+      ['rail-switch-north', '北段铁路道岔扳手', -46],
+      ['rail-switch-south', '南段铁路道岔扳手', 18],
+    ]) {
+      addInteractiveTerminal(horizonRoot, {
+        id: swId, promptZh: `按 [E] 扳动${swLabel}（切换应急救援支线）`, x: -127.5, y: 0.16, z: swZ, colorMat: M.hazard,
+        onUse() {
+          if (actMechanics.railSwitches.has(swId)) return;
+          actMechanics.railSwitches.add(swId);
+          audio?.play?.('rail_touchdown', { pos: new Vector3(-127.5, 1, swZ), ref: 22, gain: .55, jitter: .06 });
+          world.tactical?.notify?.(`🚆 已切换${swLabel}（${actMechanics.railSwitches.size}/2）`, `🚆 Rail switch toggled (${actMechanics.railSwitches.size}/2)`, true, 4.0);
+        },
+      });
+    }
+
+    // Act 4: 2 Cryogenic Tank Pressure Relief Valves + 3 Stranded Dock Workers Rescue
+    for (const [vId, vx, vz] of [['cryo-valve-1', -198.5, 74], ['cryo-valve-2', -209.5, 82]]) {
+      addInteractiveTerminal(horizonRoot, {
+        id: vId, promptZh: '按 [E] 关闭低温储罐泄压阀，切断毒雾泄漏', x: vx, y: 0.16, z: vz, colorMat: M.glassCyan,
+        onUse() {
+          if (actMechanics.cryoValvesClosed.has(vId)) return;
+          actMechanics.cryoValvesClosed.add(vId);
+          audio?.play?.('rail_touchdown', { pos: new Vector3(vx, 1, vz), ref: 18, gain: .48, jitter: .05 });
+          world.tactical?.notify?.(`❄️ 低温储罐泄压阀已关闭（${actMechanics.cryoValvesClosed.size}/2）`, `❄️ Cryo tank valve sealed (${actMechanics.cryoValvesClosed.size}/2)`, true, 4.0);
+        },
+      });
+    }
+    for (const [wId, wName, wx, wz] of [
+      ['rescue-worker-1', '夜班技师阿周', -176, 72],
+      ['rescue-worker-2', '冷库班长老陈', -192, 86],
+      ['rescue-worker-3', '分诊护士林岚', -158, 92],
+    ]) {
+      interactables.push({
+        id: wId, pos: new Vector3(wx, 1.0, wz), radius: 3.6,
+        getPrompt: () => actMechanics.rescuedWorkers.has(wId) ? `已护送${wName}撤离` : `按 [E] 搜救并引导${wName}撤往战地分诊中心`,
+        use() {
+          if (actMechanics.rescuedWorkers.has(wId)) return;
+          actMechanics.rescuedWorkers.add(wId);
+          audio?.play?.('rail_touchdown', { pos: new Vector3(wx, 1, wz), ref: 18, gain: .42, jitter: .04 });
+          world.hud?.radio?.(`玛拉：「${wName}已安全进入撤离通道！（已营救 ${actMechanics.rescuedWorkers.size}/3 名失联工人）」`, 5.8);
+          world.tactical?.notify?.(`🛟 已营救${wName}（${actMechanics.rescuedWorkers.size}/3）`, `🛟 Rescued worker (${actMechanics.rescuedWorkers.size}/3)`, true, 4.2);
+        },
+        cleanup() {},
+      });
+    }
+
+    // Act 5: 2 West Mountain Ridge Directional Relay Towers
+    for (const [rId, rx, ry, rz] of [['ridge-relay-n', -218, 12.2, -56], ['ridge-relay-s', -221, 11.4, -84]]) {
+      addInteractiveTerminal(horizonRoot, {
+        id: rId, promptZh: '按 [E] 校准西岸山脊定向中继天线', x: rx, y: ry, z: rz, colorMat: M.glassCyan,
+        onUse() {
+          if (actMechanics.ridgeRelaysAligned.has(rId)) return;
+          actMechanics.ridgeRelaysAligned.add(rId);
+          world.tactical?.notify?.(`📡 山脊中继天线已对齐（${actMechanics.ridgeRelaysAligned.size}/2）`, `📡 Ridge relay aligned (${actMechanics.ridgeRelaysAligned.size}/2)`, true, 4.0);
+        },
+      });
+    }
+
+    // Act 6: 2 South Tide Gate Hydraulic Pressure Valves
+    for (const [gId, gx] of [['tidegate-valve-w', -35.5], ['tidegate-valve-e', -16.5]]) {
+      addInteractiveTerminal(horizonRoot, {
+        id: gId, promptZh: '按 [E] 关闭防潮闸液压泄压阀，稳固干船坞撤离通道', x: gx, y: 0.16, z: 93.0, colorMat: M.glassWarm,
+        onUse() {
+          if (actMechanics.tideGateValves.has(gId)) return;
+          actMechanics.tideGateValves.add(gId);
+          world.tactical?.notify?.(`🌊 防潮闸液压阀已锁定（${actMechanics.tideGateValves.size}/2）`, `🌊 Tide gate valve locked (${actMechanics.tideGateValves.size}/2)`, true, 4.0);
+        },
+      });
+    }
+
+    // Act 7: 22m Headland Lighthouse Auxiliary Diesel Generator
+    addInteractiveTerminal(horizonRoot, {
+      id: 'lighthouse-gen', promptZh: '按 [E] 启动 22 米灯塔备用柴油发电机', x: 9.5, y: 0.16, z: 134.0, colorMat: M.glassWarm,
+      onUse() {
+        if (actMechanics.lighthouseGenActive) return;
+        actMechanics.lighthouseGenActive = true;
+        audio?.play?.('rail_touchdown', { pos: new Vector3(9.5, 1, 134.0), ref: 24, gain: .55, jitter: .05 });
+        world.hud?.radio?.('玛拉：「灯塔备用发电机轰鸣启动！现在去塔顶校准光学透镜，海上搜救艇就能看到我们的航标！」', 6.5);
+        world.tactical?.notify?.('🔦 灯塔主供电已恢复！', '🔦 Lighthouse generator online!', true, 4.2);
+      },
+    });
+
+    // Act 8: Coastal Airfield Aviation Fuel Pump
+    addInteractiveTerminal(horizonRoot, {
+      id: 'airfield-fuel-pump', promptZh: '按 [E] 启动机库航空燃油加注泵，为撤离运输机加注燃料', x: -186.0, y: 0.16, z: -186.0, colorMat: M.hazard,
+      onUse() {
+        if (actMechanics.airfieldFuelReady) return;
+        actMechanics.airfieldFuelReady = true;
+        audio?.play?.('rail_touchdown', { pos: new Vector3(-186, 1, -186), ref: 24, gain: .52, jitter: .04 });
+        world.hud?.radio?.('玛拉：「航空燃油加注完毕！SAR 运输机双发随时可以点火升空，死守跑道！」', 6.5);
+        world.tactical?.notify?.('✈️ 运输机燃油加注完成！', '✈️ Evacuation transport fueled!', true, 4.2);
+      },
+    });
     window.SALTLINE_CAMPAIGN_MATRIX = [
-      { act: 1, id: 'ow-1', titleZh: '孤港迷雾 · 警务04号站调查', estMinutes: 20, coreLoop: ['环境探索', '多线索取证(3/3)', '分支抉择', '防空干扰破坏'], uniqueZone: '四号泊位 + 沿海警务04号站室内' },
-      { act: 2, id: 'ow-2', titleZh: '沿海大道突围', estMinutes: 18, coreLoop: ['四驱车高速追逐', '路障冲锋', '移动车队交火'], uniqueZone: '沿海城区主干道 + 过街天桥' },
-      { act: 3, id: 'ow-3', titleZh: '铁路货场截获', estMinutes: 22, coreLoop: ['动态货运列车规避', '频谱仪修复录音', '调度塔夺控'], uniqueZone: '西区铁路货场 + 隧道口' },
-      { act: 4, id: 'ow-4', titleZh: '西南冷雾库救援', estMinutes: 20, coreLoop: ['低温储罐工业区搜救', '战地分诊护卫', '停机坪压制'], uniqueZone: '西南冷雾库 + 战地医院' },
-      { act: 5, id: 'ow-5', titleZh: '西岸山脊卫星站', estMinutes: 24, coreLoop: ['+14m 盘山公路攀爬', '卫星频段校准解谜', '制高点防守'], uniqueZone: '西岸山地 + 海岸松林' },
-      { act: 6, id: 'ow-6', titleZh: '南港防潮闸风暴', estMinutes: 22, coreLoop: ['海啸灾难求生', '防潮闸结构爆破', '干船坞撤离'], uniqueZone: '南港旧船坞 + 防潮大闸' },
-      { act: 7, id: 'ow-7', titleZh: '南角灯塔夜间指引', estMinutes: 20, coreLoop: ['夜间炮击规避', '22m 灯塔透镜校准', '海上信号协同'], uniqueZone: '22m 岸角灯塔 + 礁石海岸' },
-      { act: 8, id: 'ow-8', titleZh: '海岸机场终局撤离', estMinutes: 25, coreLoop: ['机库防线死守', '运输机引擎启动演出', '跑道决战'], uniqueZone: '海岸应急机场 + 110m 跑道' },
+      { act: 1, id: 'ow-0', titleZh: '孤港迷雾 · 05:31 停电疑云', estMinutes: 22, coreLoop: ['环境探索', '多线索取证(3/3)', '分支抉择', '防空干扰破坏'], uniqueZone: '四号泊位 + 沿海警务04号站室内' },
+      { act: 2, id: 'ow-1', titleZh: '沿海大道冲卡与警务调档', estMinutes: 20, coreLoop: ['四驱车高速追逐', '路障冲锋', '警务楼镜像防守'], uniqueZone: '沿海城区主干道 + 过街天桥' },
+      { act: 3, id: 'ow-2', titleZh: '西南冷雾库与第 17 人真相', estMinutes: 22, coreLoop: ['低温储罐工业区搜救', '雷暴破锁', '战地诊所修复录音'], uniqueZone: '西南冷雾库 + 战地医院' },
+      { act: 4, id: 'ow-3', titleZh: '西区铁路货场死线截车', estMinutes: 24, coreLoop: ['动态货运列车规避', '道岔信号破坏', '车厢货单扫描'], uniqueZone: '西区铁路货场 + 隧道口' },
+      { act: 5, id: 'ow-4', titleZh: '西岸山顶夺取全城广播', estMinutes: 24, coreLoop: ['+14m 盘山公路攀爬', '卫星频段校准解谜', '制高点防守'], uniqueZone: '西岸山地 + 海岸松林' },
+      { act: 6, id: 'ow-5', titleZh: '零号泄洪与海啸坚守', estMinutes: 22, coreLoop: ['12m 海啸灾难求生', '高地掩体坚守', '东海舰队通联'], uniqueZone: '西岸高地 + 南港防潮大闸' },
+      { act: 7, id: 'ow-6', titleZh: '南港船坞炮火点灯', estMinutes: 22, coreLoop: ['夜间炮击规避', '干扰器清除', '22m 灯塔透镜校准'], uniqueZone: '南港旧船坞 + 22m 岸角灯塔' },
+      { act: 8, id: 'ow-7', titleZh: '海岸应急机场油料与黑匣子夺取', estMinutes: 24, coreLoop: ['跑道炮火突击', '机库油泵抢修', '飞行记录仪回收'], uniqueZone: '海岸应急机场 + 110m 跑道' },
+      { act: 9, id: 'ow-8', titleZh: '外海锚地与码头疏散', estMinutes: 24, coreLoop: ['登船干扰清除', '舷梯撤离防线', '被困船员护送'], uniqueZone: '南港外海锚地 + 集装箱泊位' },
+      { act: 10, id: 'ow-9', titleZh: '深夜档案封锁与反攻', estMinutes: 24, coreLoop: ['铁砧反扑阻击', '离岸总账破译', '警务上行链路坚守'], uniqueZone: '沿海警务04号站 + 城区街区' },
+      { act: 11, id: 'ow-10', titleZh: '最后引航与海岸公路护送', estMinutes: 25, coreLoop: ['北段防空阵地清除', '海岸公路高速护航', '机场入口汇合'], uniqueZone: '北段沿海大道 + 海岸公路' },
+      { act: 12, id: 'ow-11', titleZh: '晴海启航与真相尾声', estMinutes: 18, coreLoop: ['晴空黎明港区巡礼', '救援机登机过场', '多分支结局结算'], uniqueZone: '盐线全港晴空 + 海岸应急机场' },
     ];
 
     addInteractiveTerminal(horizonRoot, {
@@ -1864,6 +2071,10 @@
     root.add(jammerRoot);
     spawnShootTarget(jammerRoot, { id: 'jammer-yard', stage: 0, labelZh: '货场防空干扰塔', pos: new Vector3(-4, 0, -8), tall: true, maxHp: 3 });
     spawnShootTarget(jammerRoot, { id: 'jammer-quay', stage: 0, labelZh: '码头防空干扰塔', pos: new Vector3(17.5, 0, 10.5), tall: true, maxHp: 3 });
+    spawnShootTarget(jammerRoot, { id: 'anchor-jam-1', stage: 8, labelZh: '南锚地北舷干扰器', pos: new Vector3(12, 0, 74), tall: true, maxHp: 3 });
+    spawnShootTarget(jammerRoot, { id: 'anchor-jam-2', stage: 8, labelZh: '南锚地南舷干扰器', pos: new Vector3(18, 0, 96), tall: true, maxHp: 3 });
+    spawnShootTarget(jammerRoot, { id: 'highway-sam-1', stage: 10, labelZh: '北段海岸大道防空架 A', pos: new Vector3(-22, 0, -108), tall: true, maxHp: 3 });
+    spawnShootTarget(jammerRoot, { id: 'highway-sam-2', stage: 10, labelZh: '北段海岸大道防空架 B', pos: new Vector3(-54, 0, -126), tall: true, maxHp: 3 });
 
     // =========================================================================
     // SECTOR 1 (NORTH): COASTAL CITY DOWNTOWN & EAST SEAFRONT PROMENADE (x: -107..+24, z: -145..-30)
@@ -2198,7 +2409,7 @@
           },
         });
       } else {
-        const lot = makeParcel(blk.style, blk.cx, blk.cz, 172, 95);
+        const lot = makeParcel(blk.style, blk.cx, blk.cz, 245, 190);
         const skyline = buildingGen.buildDistantBuilding(root, blk);
         // Permanent fallback building footprint collider active whenever detailed multi-volume colliders aren't loaded yet!
         const fallbackBox = addPermanentCollider(
@@ -2207,22 +2418,30 @@
           { surface: 'concrete', tag: 'building-footprint' }
         );
         lot.onLodChange = (loaded, detailed, quality) => {
-          const showFull = loaded && (detailed || (quality !== 'low' && quality !== 'medium'));
+          const showFull = loaded && (detailed || quality !== 'low');
           lot.shell.visible = showFull;
           skyline.visible = !showFull;
         };
         let buildTask = null;
+        let buildGeoDone = false;
         lot.onBuild = () => {
           if (!buildTask) {
             lot.colliderSpecs.length = 0;
+            buildGeoDone = false;
             buildTask = buildingGen.createCoastalBuildingTask(lot.shell, blk, { colliderTarget: lot.colliderSpecs });
           }
-          const done = buildTask.step();
-          if (done) {
-            skyline.visible = false;
-            if (fallbackBox && lot.colliderSpecs.length > 0) fallbackBox.disabled = true;
+          if (!buildGeoDone) {
+            buildGeoDone = buildTask.step();
+            if (buildGeoDone) {
+              skyline.visible = false;
+              if (fallbackBox && lot.colliderSpecs.length > 0) fallbackBox.disabled = true;
+              return false;
+            }
+            return false;
           }
-          return done;
+          if (typeof batchStaticGroup === 'function') batchStaticGroup(lot.shell, 96);
+          if (typeof mergeStaticByMaterial === 'function') mergeStaticByMaterial(lot.shell, 96);
+          return true;
         };
         lot.onUnload = () => {
           buildTask?.cancel?.();
@@ -2254,9 +2473,9 @@
       city.detail.add(porchGlow);
       lightingSys?.registerDynamicLight?.(porchGlow, { dayIntensity: 1.5, nightIntensity: 20 });
     }
-    addParkedSedan(city.detail, -38.4, .18, -52, 0, M.sedanDark);
-    addParkedSedan(city.detail, 17.5, .18, -64, Math.PI, M.sedanGrey);
-    addParkedSedan(city.detail, -38.4, .18, -106, 0, M.sedanBurgundy);
+    addParkedSedan(city.detail, -32.2, .18, -52, 0, M.sedanDark);
+    addParkedSedan(city.detail, 18.2, .18, -64, Math.PI, M.sedanGrey);
+    addParkedSedan(city.detail, -32.2, .18, -106, 0, M.sedanBurgundy);
     for (const mz of [-40, -58, -76, -98, -118, -136]) placePortProp(city, city.detail, 'bollard_mooring', 22.8, .16, mz, 0, {}, false);
     for (const [lx, lz] of [[-37, -42], [-15, -76], [-37, -112], [18, -56], [18, -104], [-68, -76]]) placePortProp(city, city.detail, 'light_mast', lx, .16, lz, 0);
     placePortProp(city, city.detail, 'container40', -72, .16, -75, 0, { color: 'blue', doors: .5 });
@@ -2288,8 +2507,8 @@
     addBox(city.detail, smokedPane, .10, 2.2, 5.2, -14.4, 1.56, -44);
     addBox(city.detail, M.wood, .55, .48, 3.8, -15.0, .50, -44);
     city.colliderSpecs.push({ min: new Vector3(-15.32, 0.16, -46.75), max: new Vector3(-14.30, 2.90, -41.25), surface: 'metal' });
-    addParkedSedan(city.detail, 17.5, .18, -110, Math.PI, M.sedanDark);
-    addParkedSedan(city.detail, -38.4, .18, -40, 0, M.sedanGrey);
+    addParkedSedan(city.detail, 18.2, .18, -110, Math.PI, M.sedanDark);
+    addParkedSedan(city.detail, -32.2, .18, -40, 0, M.sedanGrey);
     // Street-level urban life: fire hydrants, municipal litter bins, crosswalk stop bars & coastal bike rack
     for (const [hx, hz] of [[-15.4, -49.5], [-36.6, -63.5], [-15.4, -84.5], [-36.6, -98.5]]) {
       addCyl(city.detail, M.craneRed, .14, .72, hx, .54, hz);
@@ -2356,7 +2575,7 @@
         const sx0 = xStart + (xEnd - xStart) * f0;
         const sx1 = xStart + (xEnd - xStart) * f1;
         const sy = yStart + dy * f1;
-        mountain.colliderSpecs.push({ min: new Vector3(Math.min(sx0, sx1) - .15, sy - 1.0, -85.1), max: new Vector3(Math.max(sx0, sx1) + .15, sy, -70.9), surface: 'concrete' });
+        addPermanentCollider(new Vector3(Math.min(sx0, sx1) - .15, sy - 1.0, -85.1), new Vector3(Math.max(sx0, sx1) + .15, sy, -70.9), { surface: 'concrete', tag: 'bridge-ramp' });
       }
     };
     // Segment 1: East Approach Ramp (x: -112 -> -124, y: 0.21 -> 5.60, 26 fine 0.21m steps)
@@ -2368,6 +2587,7 @@
       addBox(horizonRoot, M.steelWorn, 26.6, .85, .42, -137, bridgeY + .18, gz); // Heavy riveted side steel girder
       addBox(horizonRoot, M.steelGalv, 26.6, .14, .56, -137, bridgeY + .64, gz);
       addBox(horizonRoot, M.yellowPaint, 26.4, .09, .12, -137, bridgeY + 1.18, gz); // Bridge top safety rail
+      addPermanentCollider(new Vector3(-150.2, bridgeY, gz - .25), new Vector3(-123.8, bridgeY + 1.25, gz + .25), { surface: 'metal', tag: 'bridge-rail', noNav: true });
       for (let px = -149; px <= -125; px += 4.0) {
         addBox(horizonRoot, M.steelDark, .18, 1.15, .18, px, bridgeY + .62, gz);
       }
@@ -2377,10 +2597,10 @@
       addBox(horizonRoot, M.concrete, 1.8, .65, 14.6, px, bridgeY - .78, -78); // Crosshead cap beam
       for (const pz of [-84.0, -72.0]) {
         addBox(horizonRoot, M.concreteDirty, 1.6, bridgeY - .95, 1.8, px, (bridgeY - .95) / 2 + .16, pz);
-        mountain.colliderSpecs.push({ min: new Vector3(px - .85, .16, pz - .95), max: new Vector3(px + .85, bridgeY - .6, pz + .95), surface: 'concrete' });
+        addPermanentCollider(new Vector3(px - .85, .16, pz - .95), new Vector3(px + .85, bridgeY - .6, pz + .95), { surface: 'concrete', tag: 'bridge-pier' });
       }
     }
-    mountain.colliderSpecs.push({ min: new Vector3(-150.2, bridgeY - .55, -85.1), max: new Vector3(-123.8, bridgeY, -70.9), surface: 'concrete' });
+    addPermanentCollider(new Vector3(-150.2, bridgeY - .55, -85.1), new Vector3(-123.8, bridgeY, -70.9), { surface: 'concrete', tag: 'bridge-deck' });
     // Segment 3: West Mountain Climb Ramp (x: -150 -> -168, y: 5.60 -> 14.0, 44 fine 0.19m steps)
     addRampSpan(-150, bridgeY, -168, summitY, 44);
     // Sloped rocky embankment piers ONLY under Segment 3 (west of x = -152, strictly below road surface)
@@ -2773,13 +2993,13 @@
     }
     addBox(tunG, M.rock, 28.0, 14.5, 16.0, 0, 7.2, -9.5); // Rocky mountain cliff above tunnel
     tunG.matrixAutoUpdate = false; tunG.updateMatrix(); horizonRoot.add(tunG);
-    railWest.colliderSpecs.push({ min: new Vector3(-148, .16, -118), max: new Vector3(-125, 12.0, -112), surface: 'concrete' });
+    addPermanentCollider(new Vector3(-148, .16, -118), new Vector3(-125, 12.0, -112), { surface: 'concrete', tag: 'rail-tunnel-north' });
     // Yellow-Hatched Railway Level Crossing at South Perimeter Road (x = -136.5, z = 122) with AUTO-LOWERING GATES & FLASHING LAMPS!
     addBox(horizonRoot, M.asphalt, 46.0, .04, 12.0, -136.5, .185, 122);
     for (let gx = -148; gx <= -125; gx += 2.4) addBox(horizonRoot, M.yellowPaint, .42, .015, 10.6, gx, .228, 122);
     for (let gz = 117; gz <= 127; gz += 2.4) addBox(horizonRoot, M.yellowPaint, 24.0, .015, .42, -136.5, .228, gz);
     const crossingGates = [], crossingLamps = [];
-    for (const [cx, cz, sign] of [[-151, 115.5, 1], [-122, 128.5, -1]]) {
+    for (const [cx, cz, sign] of [[-145.5, 115.5, 1], [-122, 128.5, -1]]) {
       addCyl(horizonRoot, M.steelDark, .16, 3.8, cx, 2.0, cz);
       const armPivot = new Group(); armPivot.userData.noBatch = true; armPivot.position.set(cx, 1.35, cz);
       for (let seg = 0; seg < 5; seg++) {
@@ -2808,7 +3028,7 @@
     }
     addBox(tunSouth, M.rock, 28.0, 13.5, 14.0, 0, 6.6, 8.5);
     tunSouth.matrixAutoUpdate = false; tunSouth.updateMatrix(); horizonRoot.add(tunSouth);
-    railWest.colliderSpecs.push({ min: new Vector3(-148, .16, 141), max: new Vector3(-125, 12.0, 147), surface: 'concrete' });
+    addPermanentCollider(new Vector3(-148, .16, 141), new Vector3(-125, 12.0, 147), { surface: 'concrete', tag: 'rail-tunnel-south' });
     // LIVE MOVING ARTICULATED 5-CAR FREIGHT TRAIN on North-South Track 2 (x = -133)
     // Per-car tunnel visibility clipping ensures every car smoothly exits North Tunnel (-115) & enters South Tunnel (+144)!
     const liveTrain = new Group(); liveTrain.userData.noBatch = true;
@@ -3139,13 +3359,13 @@
         world.tactical?.notify?.('🏥 战地急救完成！生命值已恢复至 100%', '🏥 Field triage complete! Health restored to 100%', false, 3.0);
       },
     });
-    for (const [lx, lz] of [[-172, 74], [-172, 128], [-150, 98], [-216, 128]]) placePortProp(swClinic, swClinic.detail, 'light_mast', lx, .16, lz, 0);
+    for (const [lx, lz] of [[-172, 74], [-172, 128], [-148, 98], [-216, 128]]) placePortProp(swClinic, swClinic.detail, 'light_mast', lx, .16, lz, 0);
     placePortProp(swClinic, swClinic.detail, 'forklift', -172, .16, 104, -.4);
     placePortProp(swClinic, swClinic.detail, 'pallet_stack', -172, .16, 114, .1);
     placePortProp(swClinic, swClinic.detail, 'ibc_tote', -194, .16, 82, 0);
-    placePortProp(swClinic, swClinic.detail, 'gas_cylinders', -154, .16, 98, 0);
+    placePortProp(swClinic, swClinic.detail, 'gas_cylinders', -153.5, .16, 94.8, 0);
     placePortProp(swClinic, swClinic.detail, 'sandbags', -166, .16, 98, 0);
-    addParkedSedan(swClinic.detail, -153, .18, 98, Math.PI / 2, M.whitePaint);
+    addParkedSedan(swClinic.detail, -147.2, .18, 86, 0, M.whitePaint);
     placeExternal(swClinic.detail, 'modular_industrial_pipes_01', -172.0, .16, 56.0, 0, 1.0);
     placeExternal(swClinic.detail, 'portable_generator', -172.0, .16, 82.0, .6, 1.0);
     placeExternal(swClinic.detail, 'utility_box_01', -152.0, .16, 86.0, Math.PI / 2, 1.0);
@@ -3158,31 +3378,141 @@
     spawnShootTarget(swClinic.shell, { id: 'cryo-lock-1', stage: 2, labelZh: '1 号冷雾库锁控箱', pos: new Vector3(-152, 0, 64), tall: false, maxHp: 3 });
     spawnShootTarget(swClinic.shell, { id: 'cryo-lock-2', stage: 2, labelZh: '2 号冷雾库锁控箱', pos: new Vector3(-152, 0, 88), tall: false, maxHp: 3 });
 
-    // Station & Patrol High-Precision Realistic Human NPCs (createSaltlineHuman) across all Coastal City Districts
+    // Station & Patrol High-Precision Realistic Human NPCs (createSaltlineHuman + GLB rigged models) across all Coastal City Districts
+    window.SaltlineNpcModels?.preloadAll?.(THREE);
     if (typeof window.createSaltlineHuman === 'function') {
       const npcSpecs = [
-        { parent: horizonRoot, name: 'city-npc-dock', role: 'worker', pos: [-31, 0, -21], yaw: .6, variation: 0, patrol: [0, 8] },
-        { parent: city.shell, name: 'city-npc-precinct', role: 'operator', pos: [-16.8, .16, -50], yaw: -1.4, variation: 1, patrol: [0, -14] },
-        { parent: city.shell, name: 'city-npc-plaza', role: 'worker', pos: [-6, .28, -149], yaw: 1.57, variation: 2, patrol: [12, 0] },
-        { parent: city.shell, name: 'city-npc-promenade', role: 'operator', pos: [19.8, .30, -112], yaw: 0, variation: 0, patrol: [0, -24] },
-        { parent: swClinic.shell, name: 'city-npc-nurse', role: 'medic', pos: [-152, 0, 118], yaw: 1.5, variation: 2, patrol: [0, -8] },
-        { parent: railWest.shell, name: 'city-npc-rail', role: 'engineer', pos: [-196, 0, 7.5], yaw: 1.2, variation: 0, patrol: [8, 0] },
-        { parent: mountain.shell, name: 'city-npc-comms', role: 'engineer', pos: [-185, summitY, -75], yaw: 1.6, variation: 1 },
-        { parent: southHarbor.shell, name: 'city-npc-keeper', role: 'worker', pos: [7.5, 0, 131], yaw: -2.2, variation: 2 },
+        {
+          parent: horizonRoot, name: 'city-npc-dock', role: 'worker', modelType: 'civilian', pos: [-31, 0, -21], yaw: .6, variation: 0, patrol: [0, 8],
+          displayName: '老霍克', title: '四号泊位夜班值班员',
+          pages: [
+            '林恩，你终于来了！别听港务局长里德在广播里胡说——凌晨 05:31 全港断电根本不是什么线路老化！',
+            '我亲眼看见「铁砧」的武装无人机封死了四号泊位，把「海燕号」上的 17 名船员押走了。他们还在 05:34 篡改了我的值班交接单，写成全员 05:31 已安全离港。',
+            '「海燕号」的大副趁乱把加密黑匣子藏在了北侧货箱区（坐标 -20, -18）。你先过去按 [E] 用频谱仪解码黑匣子，拿到了铁证我们再往城区追查！'
+          ],
+          choices: [
+            { label: '铁砧为什么要抓这 17 名船员？', reply: '「海燕号」上周在东海拖回了一批违规倾倒的工业沉箱，船员们拍下了水文坐标和里德签字的放行单。铁砧是里德雇来灭口的私兵。' },
+            { label: '我现在具体该先做什么？', reply: '先往东北方向走到北侧货箱区的信号信标旁按 [E] 解码黑匣子，然后打爆泊位两座防空干扰塔，打通通讯后按 [G] 叫车北上警务 04 号站！随时按 [J] 也能回看案情。' }
+          ]
+        },
+        {
+          parent: city.shell, name: 'city-npc-precinct', role: 'operator', modelType: 'female', pos: [-16.8, .16, -50], yaw: -1.4, variation: 1, patrol: [0, -14],
+          displayName: '苏珊', title: '沿海警务 04 号站调度员',
+          pages: [
+            '嘘——小声点，SAR-04！铁砧刚刚封锁了沿海大道十字路口，正在远程清空我们警务楼里的船员转运和体检档案。',
+            '我把原始备份藏在了调度台主机里，但一旦启动镜像下载，警报会立刻把铁砧无人机引过来。你得在楼里守住 14 秒直到进度到 100%。'
+          ],
+          choices: [
+            { label: '第 17 名失联者托马斯·万斯是谁？', reply: '他是玛拉·陈的哥哥，也是「海燕号」的水文测量师。里德在官方名单上把他的名字彻底抹掉了，仿佛船上只有 16 个人。' },
+            { label: '档案指向盐线市哪里？', reply: '转运单显示，船员们的随身证物和托马斯的录音笔被贴上冷链封条，送去了西南冷雾库和战地分诊中心。' }
+          ]
+        },
+        {
+          parent: city.shell, name: 'city-npc-plaza', role: 'worker', modelType: 'civilian', pos: [-6, .28, -149], yaw: 1.57, variation: 2, patrol: [12, 0],
+          displayName: '周先生', title: '滨海广场目击市民',
+          pages: [
+            '天亮前全城突然黑了一片，我从阳台上看见三辆没挂牌照的装甲卡车拉着封条货箱，一路从沿海大道冲向了西南冷雾库。',
+            '后来西岸山顶的雷达大锅也停转了，手机一点信号都没有。你们搜救队一定要把真相传出去啊！'
+          ],
+          choices: [
+            { label: '你有看到船员被带去哪里吗？', reply: '有一批人被押上了西区货场的铁路平板车，另一批好像留在了南港外海锚地的集装箱泊位。' }
+          ]
+        },
+        {
+          parent: city.shell, name: 'city-npc-promenade', role: 'operator', modelType: 'civilian', pos: [19.8, .30, -112], yaw: 0, variation: 0, patrol: [0, -24],
+          displayName: '老赵', title: '盐线港资深引航员',
+          pages: [
+            '你看东海那道黑压压的风暴雾墙——东海救援舰队其实已经在雾墙外待命了，但南角 22 米灯塔被铁砧切断了电源。',
+            '没有灯塔的光学聚光指引，大吨位救援舰根本不敢强闯暗礁区。等你们拿齐证据发出广播后，一定要去南港重新点亮灯塔！'
+          ],
+          choices: [
+            { label: '南港防潮闸有什么危险？', reply: '那座防潮闸挡着东海 12 米风暴潮。如果沃德狗急跳墙引爆闸门，低洼港区会瞬间被淹，必须立刻撤上西岸 +14 米山顶高地避险！' }
+          ]
+        },
+        {
+          parent: swClinic.shell, name: 'city-npc-nurse', role: 'medic', modelType: 'female', pos: [-152, 0, 118], yaw: 1.5, variation: 2, patrol: [0, -8],
+          displayName: '林婉', title: '西南战地分诊中心护士',
+          pages: [
+            '托马斯·万斯被铁砧押送路过这里时受了冻伤，趁看守换班，他偷偷把一块受损的水文录音芯片塞进了我的急救箱。',
+            '铁砧发现后锁死了外面两台冷库配电锁控箱。你先把外面那两台锁控箱打爆，再进诊所急救台按 [E] 修复他的录音芯片！'
+          ],
+          choices: [
+            { label: '录音芯片里记录了什么？', reply: '里面有托马斯的亲口证词，他说铁砧把 17 名船员的原始签收货单装上了西区货场的货运专列，准备开进北隧道彻底销毁。' }
+          ]
+        },
+        {
+          parent: railWest.shell, name: 'city-npc-rail', role: 'engineer', modelType: 'civilian', pos: [-196, 0, 7.5], yaw: 1.2, variation: 0, patrol: [8, 0],
+          displayName: '陈师傅', title: '西区铁路编组站老扳道工',
+          pages: [
+            '铁砧半小时前强行征用了 3 号编组线的货运专列，把全港扣押的原始货单和证物箱全塞进了车厢。',
+            '硬拦火车是不可能的，但只要你炸毁货场两处铁路信号主控闸，安全联锁会自动触发紧急制动把专列逼停，到时你就能靠近车厢扫描完整《失联名单》！'
+          ],
+          choices: [
+            { label: '专列被逼停后还要注意什么？', reply: '货场旁边全是燃油储罐，信号闸短路可能会引发油罐连爆，扫描货单时记得找车厢掩体躲避无人机火力。' }
+          ]
+        },
+        {
+          parent: mountain.shell, name: 'city-npc-comms', role: 'engineer', modelType: 'soldier', pos: [-185, summitY, -75], yaw: 1.6, variation: 1,
+          displayName: '陆工', title: '西岸山顶卫星站工程师',
+          pages: [
+            '这座 +14 米山顶雷达站是全盐线市唯一能穿透风暴层直连海事局公频的发射塔。',
+            '沃德用三组外置散热芯把发射机锁在了静默模式。先狙击打爆 3 个散热芯，再在控制台按 [E] 校准海事频段，守住 10 秒就能把 17 人的真相广播给全城和救援舰队！'
+          ],
+          choices: [
+            { label: '广播发出去以后沃德会怎么做？', reply: '我截获了他的备用加密指令——一旦公频接通，他就会引爆南港防潮闸制造 12 米海啸冲毁全港。千万别急着下山，先在山顶撑过 15 秒洪峰！' }
+          ]
+        },
+        {
+          parent: southHarbor.shell, name: 'city-npc-keeper', role: 'worker', modelType: 'civilian', pos: [7.5, 0, 131], yaw: -2.2, variation: 2,
+          displayName: '老沈', title: '南角灯塔守塔人',
+          pages: [
+            '我守了三十年南角灯塔，头一回见人往灯塔电源上装军用干扰器。',
+            '帮我清掉南港船坞那两座电源干扰器，然后到灯塔基座按 [E] 手动把光学透镜对齐海平线，救援舰队立刻就能看见航道强光！'
+          ],
+          choices: [
+            { label: '灯塔点亮后怎么撤离？', reply: '救援舰队的先遣运输机已经降落在西北海岸应急机场了，你们先去机库拿回黑匣子与燃油舱单，再护送锚地幸存船员和车队一起撤离。' }
+          ]
+        },
       ];
       const cityNpcs = npcSpecs.map((sp, idx) => {
-        const h = window.createSaltlineHuman(THREE, { name: sp.name, role: sp.role, variation: sp.variation });
+        const h = window.createSaltlineHuman(THREE, { name: sp.name, role: sp.role, modelType: sp.modelType, variation: sp.variation });
         h.actor.position.set(sp.pos[0], sp.pos[1], sp.pos[2]);
         h.actor.rotation.y = sp.yaw;
         h._baseX = sp.pos[0]; h._baseZ = sp.pos[2];
         h._patrol = sp.patrol || null;
         h._phase = idx * 1.7;
         h._parent = sp.parent;
+        h._talking = false;
         h._collider = addDynamicCollider(
           new Vector3(sp.pos[0] - 0.34, sp.pos[1], sp.pos[2] - 0.34),
           new Vector3(sp.pos[0] + 0.34, sp.pos[1] + 1.75, sp.pos[2] + 0.34),
           { surface: 'concrete', tag: 'city-npc', noNav: true }
         );
+        const talkPos = new Vector3(sp.pos[0], sp.pos[1] + 1.0, sp.pos[2]);
+        h._talkPos = talkPos;
+        interactables.push({
+          id: `npc-talk-${sp.name}`,
+          pos: talkPos,
+          radius: 4.0,
+          getPrompt: () => (h.actor.visible && sp.parent.visible && !storyDirector?.isDialogueOpen) ? `按 [E] 与 ${sp.displayName}（${sp.title}）面对面交谈` : '',
+          use() {
+            if (!storyDirector?.openDialogue) return;
+            h._talking = true;
+            if (world.player?.pos) {
+              h.actor.rotation.y = Math.atan2(world.player.pos.x - h.actor.position.x, world.player.pos.z - h.actor.position.z);
+            }
+            storyDirector.openDialogue({
+              speaker: sp.displayName,
+              role: sp.title,
+              tone: 'ally',
+              pages: sp.pages,
+              choices: sp.choices,
+              npcActor: h.actor,
+              npcHuman: h,
+              onComplete: () => { h._talking = false; },
+            });
+          },
+        });
         sp.parent.add(h.actor);
         return h;
       });
@@ -3205,6 +3535,16 @@
           const activeNpc = npc.actor.visible && npc._parent.visible;
           if (npc._collider) npc._collider.disabled = !activeNpc;
           if (!activeNpc) continue;
+          if (npc._talkPos) npc._talkPos.set(npc.actor.position.x, npc.actor.position.y + 1.0, npc.actor.position.z);
+          if (npc._talking) {
+            if (world.player?.pos) {
+              const targetYaw = Math.atan2(world.player.pos.x - npc.actor.position.x, world.player.pos.z - npc.actor.position.z);
+              const diff = Math.atan2(Math.sin(targetYaw - npc.actor.rotation.y), Math.cos(targetYaw - npc.actor.rotation.y));
+              npc.actor.rotation.y += diff * Math.min(1, dt * 8);
+            }
+            npc.pose?.('talk', 0, npcAge + i * 1.1, false, dt);
+            continue;
+          }
           if (npc._patrol) {
             const [dx, dz] = npc._patrol;
             const dist = Math.max(1, Math.hypot(dx, dz));
@@ -3213,26 +3553,158 @@
               npc.actor.position.x = npc._baseX + dx * cycle;
               npc.actor.position.z = npc._baseZ + dz * cycle;
               npc.actor.rotation.y = Math.atan2(dx, dz);
-              npc.pose('walk', 1.15, npcAge + i * 1.1, false);
+              npc.pose('walk', npcAge * 5.2, npcAge + i * 1.1, true, dt);
               if (npc._collider) updateDynamicBox(npc._collider, npc.actor.position.x - 0.34, npc.actor.position.y, npc.actor.position.z - 0.34, npc.actor.position.x + 0.34, npc.actor.position.y + 1.75, npc.actor.position.z + 0.34);
             } else if (cycle < 1.2) {
-              npc.pose('stand', 0, npcAge + i * 1.1, false);
+              npc.pose('stand', 0, npcAge + i * 1.1, false, dt);
             } else if (cycle < 2.2) {
               const back = 1.0 - (cycle - 1.2);
               npc.actor.position.x = npc._baseX + dx * back;
               npc.actor.position.z = npc._baseZ + dz * back;
               npc.actor.rotation.y = Math.atan2(-dx, -dz);
-              npc.pose('walk', 1.15, npcAge + i * 1.1, false);
+              npc.pose('walk', npcAge * 5.2, npcAge + i * 1.1, true, dt);
               if (npc._collider) updateDynamicBox(npc._collider, npc.actor.position.x - 0.34, npc.actor.position.y, npc.actor.position.z - 0.34, npc.actor.position.x + 0.34, npc.actor.position.y + 1.75, npc.actor.position.z + 0.34);
             } else {
-              npc.pose('stand', 0, npcAge + i * 1.1, false);
+              npc.pose('stand', 0, npcAge + i * 1.1, false, dt);
             }
           } else {
-            npc.pose('stand', 0, npcAge + i * 1.1, false);
+            npc.pose('stand', 0, npcAge + i * 1.1, false, dt);
           }
         }
       });
     }
+
+    // =========================================================================
+    // ACTIVE AI SQUADMATES (MARA CHEN + KAI) & FUN PORT EASTER EGGS
+    // =========================================================================
+    const squadAllies = [];
+    if (typeof window.createPortCompanionAI === 'function') {
+      squadAllies.push(
+        window.createPortCompanionAI(world, {
+          name: 'Mara Chen', displayName: '玛拉·陈', role: 'medic', modelType: 'female', coat: 0x3b7a78, variation: 1,
+          flankOffset: [2.4, -2.0], canHeal: true, fireRate: 1.05,
+          startPos: new Vector3(-14, .16, -18),
+          onSpeak: (_en, zh) => { storyDirector?.recordStoryEntry?.('玛拉·陈', zh); world.hud?.radio?.(zh, 6.5, null, { speaker: '玛拉·陈', side: 'ally' }); },
+        }),
+        window.createPortCompanionAI(world, {
+          name: 'Kai', displayName: '凯尔', role: 'operator', modelType: 'soldier', coat: 0x364f6b, variation: 0,
+          flankOffset: [-2.6, -2.2], canHeal: false, fireRate: 0.85,
+          startPos: new Vector3(-18.5, .16, -18.5),
+          onSpeak: (_en, zh) => { storyDirector?.recordStoryEntry?.('凯尔', zh); world.hud?.radio?.(zh, 6.5, null, { speaker: '凯尔', side: 'ally' }); },
+        }),
+      );
+      const allyDialogs = [
+        {
+          ally: squadAllies[0], title: 'SAR-04 医疗官',
+          pages: [
+            '林恩，我哥哥托马斯就在「海燕号」那 17 个人里。只要你受伤了，我会第一时间冲过来给你打医疗针。',
+            '记住按 [H] 可以把我和凯尔随时叫到你身边集结，我们一起把这份《失联名单》查个水落石出。'
+          ],
+          choices: [
+            { label: '你哥哥最后联系你是什么时候？', reply: '凌晨五点零五分，他说四号泊位突然驶进了两艘无编号拖船，随后全港就断电失联了。' },
+            { label: '帮我检查一下当前装备和状态', reply: '医疗包满载，随时准备就绪。你专心推进调查和压制无人机，后背交给我和凯尔。' }
+          ]
+        },
+        {
+          ally: squadAllies[1], title: 'SAR-04 火力支援手',
+          pages: [
+            '队长，铁砧这帮私兵的无人机看着唬人，但外壳护甲很薄，我会帮你吸引并压制它们的火力。',
+            '路上看到老霍克、苏珊或者灯塔守塔人记得停下来按 [E] 聊聊，他们手里的线索比无线电里清楚得多！'
+          ],
+          choices: [
+            { label: '遇到成群无人机怎么打最稳？', reply: '优先点掉空中的海鸥无人机和干扰塔，按 [G] 把四驱车叫出来用车载机枪扫射最解气。' }
+          ]
+        }
+      ];
+      for (const ad of allyDialogs) {
+        const aPos = new Vector3();
+        ad._talkPos = aPos;
+        interactables.push({
+          id: `ally-talk-${ad.ally.name.toLowerCase().replace(/\s+/g, '-')}`,
+          pos: aPos,
+          radius: 3.4,
+          getPrompt: () => (!isMultiplayer() && !ad.ally.seated && !storyDirector?.isDialogueOpen) ? `按 [E] 与队友 ${ad.ally.displayName}（${ad.title}）交谈` : '',
+          use() {
+            if (!storyDirector?.openDialogue || ad.ally.seated) return;
+            ad.ally.setTalking?.(true);
+            storyDirector.openDialogue({
+              speaker: ad.ally.displayName,
+              role: ad.title,
+              tone: 'ally',
+              pages: ad.pages,
+              choices: ad.choices,
+              npcActor: ad.ally.root,
+              npcHuman: ad.ally.human,
+              onComplete: () => { ad.ally.setTalking?.(false); },
+            });
+          },
+        });
+      }
+      updaters.push(() => {
+        for (const ad of allyDialogs) ad._talkPos.set(ad.ally.pos.x, ad.ally.pos.y + 1.0, ad.ally.pos.z);
+      });
+      let banterClock = 18;
+      let driveBanterCd = 0;
+      const funBanter = [
+        ['凯尔', '「说真的林恩，这趟差事干完，港务局至少得赔我们一人一杯双倍浓缩咖啡。」'],
+        ['玛拉·陈', '「先活着把这 17 个人的名字送出去，回头我亲自给你们俩泡一壶。」'],
+        ['凯尔', '「收到！不过按 [H] 随时喊我俩集结补血，别一个人冲太猛！」'],
+        ['玛拉·陈', '「记住随时按 [J] 可以翻看案情日志，路边碰到老霍克或苏珊也可以按 [E] 聊聊。」'],
+      ];
+      let banterIdx = 0;
+      updaters.push(dt => {
+        if (isMultiplayer()) return;
+        const p = world.player;
+        for (let i = 0; i < squadAllies.length; i++) squadAllies[i].update(dt, p);
+        if (driveBanterCd > 0) driveBanterCd -= dt;
+        if (world.vehicle?.driving && driveBanterCd <= 0) {
+          driveBanterCd = 28;
+          squadAllies[0]?.speak?.('玛拉·陈：「林恩！你这四驱车漂移差点把我的急救箱甩进东海！稳一点！」', 'Mara: Easy on the drift!', true);
+        }
+        if (!freeRoam && cityCampaignActive && banterClock > 0) {
+          banterClock -= dt;
+          if (banterClock <= 0 && banterIdx < funBanter.length) {
+            const [who, line] = funBanter[banterIdx++];
+            const speakerAlly = who === '凯尔' ? squadAllies[1] : squadAllies[0];
+            speakerAlly?.speak?.(`${who}：${line}`, line, true);
+            banterClock = 38;
+          }
+        }
+      });
+    }
+    interactables.push(
+      {
+        id: 'egg-berth-coffee', pos: new Vector3(-25.5, .6, -14.5), radius: 3.4,
+        getPrompt: () => '按 [E] 港区自动咖啡机（喝一杯特浓美式 +25 HP）',
+        use() {
+          world.player?.heal?.(25);
+          squadAllies[1]?.speak?.('凯尔：「天哪，这机器里的海盐美式比防潮闸的铁锈还苦……但确实提神！」', 'Kai: Strongest port coffee ever!', true);
+          world.tactical?.notify?.('☕ 喝下港口特浓美式！生命值 +25', '☕ Harbor Espresso! +25 HP', false, 3.2);
+        },
+      },
+      {
+        id: 'egg-precinct-radio', pos: new Vector3(-8.5, .8, -55.0), radius: 3.4,
+        getPrompt: () => '按 [E] 调试警务室海盗调频收音机（窃听铁砧吐槽频道）',
+        use() {
+          storyDirector?.openDialogue?.({
+            speaker: '铁砧巡逻频道（窃听）', role: '加密串台', tone: 'hostile',
+            pages: [
+              '铁砧小兵 A：「喂，沃德指挥官说今天只是例行封港，怎么连 22 米灯塔和海啸闸都扯进来了？」',
+              '铁砧小兵 B：「小声点！刚才那个 SAR 搜救员开着四驱车直接把咱们路障撞飞了，我加班费还没结呢！」'
+            ],
+            choices: [{ label: '插话吓唬他们一下', reply: '林恩：「SAR-04 收到，劝你们现在就投降，还能赶上早饭。」频道那头瞬间传来一阵慌乱的静电杂音。' }],
+          });
+        },
+      },
+      {
+        id: 'egg-promenade-scope', pos: new Vector3(21.2, .9, -84.0), radius: 3.6,
+        getPrompt: () => '按 [E] 滨海长廊高倍望远镜（远眺东海救援舰队）',
+        use() {
+          squadAllies[0]?.speak?.('玛拉·陈：「透过雾墙能看到东海救援舰队的探照灯剪影了！只要点亮灯塔，他们就能全速入港！」', 'Mara: I can see the rescue fleet beyond the fog!', true);
+          world.tactical?.notify?.('🔭 东海雾墙外可见 3 艘救援舰轮廓正等待引航信号', '🔭 3 Rescue Fleet ships spotted beyond the fog wall', false, 4.2);
+        },
+      },
+    );
 
     // =========================================================================
     // TIME-OF-DAY & PMREM LIGHTING SYSTEM ([T] KEY — powered by WorldEngine.LightingSystem)
@@ -3310,15 +3782,17 @@
       for (const id of storyTimers.splice(0)) clearTimeout(id);
     }
 
-    function showStoryBeat({ speaker, line, tone, dur = 5200 }) {
+    function showStoryBeat({ speaker, line, tone, dur = 9200 }) {
       if (freeRoam || isMultiplayer()) return;
       const [name] = speaker.split(' · ');
       const names = {
         LIN: ['Lin', '林恩'], 'MARA CHEN': ['Mara Chen', '玛拉·陈'],
         'MARITIME RESCUE FLEET': ['Rescue Fleet', '救援舰队'], REED: ['Reed', '里德'], WARD: ['Ward', '沃德'],
       };
-      world.hud?.radio?.(line, dur / 1000, null, {
-        speaker: names[name] ? local(...names[name]) : name,
+      const dispSpeaker = names[name] ? local(...names[name]) : name;
+      storyDirector?.recordStoryEntry?.(dispSpeaker, line);
+      world.hud?.radio?.(line, Math.max(8.5, dur / 1000), null, {
+        speaker: dispSpeaker,
         side: tone === 'hostile' ? 'hostile' : 'ally',
       });
     }
@@ -3326,8 +3800,10 @@
     function playStorySequence(beats) {
       clearStoryTimers();
       if (!Array.isArray(beats) || freeRoam) return;
-      for (const b of beats) {
-        storyTimers.push(setTimeout(() => showStoryBeat(b), (b.at ?? 0) * 1000));
+      for (let i = 0; i < beats.length; i++) {
+        const b = beats[i];
+        const delayMs = i === 0 ? Math.max(600, (b.at ?? 0.6) * 1000) : Math.max(9200 * i, (b.at ?? 0) * 1450);
+        storyTimers.push(setTimeout(() => showStoryBeat(b), delayMs));
       }
     }
 
@@ -3398,12 +3874,44 @@
         spawns: [['hound', -14, 0, 118], ['hound', 6, 0, 126], ['gull', 0, 14, 130]],
       },
       {
-        tag: 'ACT VIII · 绝境撤离', sub: '舰队先遣运输机已在西北机场机库起转引擎，穿越跑道炮火登机撤离',
+        tag: 'ACT VIII · 机库夺证', sub: '舰队先遣运输机已在西北机场机库就位，冲过跑道炮火夺回搜救燃油舱单与黑匣子',
         beats: [
-          { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '已目视南角灯塔强光！先遣舰队正进港接管防务，西北机场救援运输机已就位，全速前往拱形机库！' },
-          { at: 6.0, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '托马斯和十七个兄弟终于等到了真相……林恩，把油门踩到底，冲进 110 米跑道尽头的机库！' },
+          { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '已目视南角灯塔强光！先遣舰队正进港接管防务，请先冲入西北机场拱形机库确保起降油料与记录仪！' },
+          { at: 6.0, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '跑道被铁砧炮火封锁了！林恩，把油门踩到底冲进 110 米跑道尽头的拱形机库！' },
         ],
         spawns: [['hound', -154, 0, -174], ['gull', -168, 14, -182]],
+      },
+      {
+        tag: 'ACT IX · 锚地疏散', sub: '南港外海锚地仍有被困船员待撤，摧毁 2 座登船干扰器并守住舷梯 10 秒',
+        beats: [
+          { at: .3, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '机库黑匣子刚解码出一条紧急求救：南港锚地还有一批「海燕号」幸存船员被铁砧堵在泊位舷梯！' },
+          { at: 6.0, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: 'SAR-04，清除南港锚地 2 座登船干扰器并守住码头舷梯 10 秒，我们的气垫艇立刻靠泊接人！' },
+        ],
+        spawns: [['hound', 10, 0, 76], ['hound', 16, 0, 94], ['gull', 14, 14, 86]],
+      },
+      {
+        tag: 'ACT X · 深夜反攻', sub: '铁砧残部突袭警务 04 号站企图毁账，破译沃德离岸资金总账并坚守链路 10 秒',
+        beats: [
+          { at: .3, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '绝不能让海事检察官拿到我的离岸资金总账！特种分队立刻夺回警务 04 号站，把服务器烧了！' },
+          { at: 5.8, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '锚地船员全部安全登艇了！快回沿海警务 04 号站按 [E] 破译沃德总账，别让铁砧把最后证据毁掉！' },
+        ],
+        spawns: [['hound', -16, 0, -52], ['hound', -6, 0, -62], ['gull', -12, 13, -56]],
+      },
+      {
+        tag: 'ACT XI · 公路护航', sub: '摧毁北段沿海大道 2 座防空导弹发射架，护送最后搜救车队冲向西北机场入口',
+        beats: [
+          { at: .3, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '沃德的离岸总账已上传至海事检察院！铁砧在北段沿海大道架起了 2 座防空导弹想击落我们的撤离运输机！' },
+          { at: 6.0, speaker: 'LIN · SAR-04', tone: 'ally', line: '全速北上！把北段公路两座防空导弹发射架全打爆，护送车队到机场跑道入口！' },
+        ],
+        spawns: [['hound', -28, 0, -112], ['hound', -58, 0, -124], ['gull', -42, 14, -118]],
+      },
+      {
+        tag: 'ACT XII · 晴海尾声', sub: '风暴散尽、黎明破晓，登上西北机场拱形机库的救援运输机见证盐线港的新生',
+        beats: [
+          { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '防空威胁已全部肃清！风暴云层正在散去，请前往西北机场拱形机库登机，准备收官归航！' },
+          { at: 5.8, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '太阳出来了，林恩……十七个名字、托马斯的遗愿和整座盐线港，我们全都守住了。' },
+        ],
+        spawns: [],
       },
     ];
 
@@ -3415,7 +3923,11 @@
       ['行动阶段 V // 夺取海事公频', '地点：西岸高地雷达站 (+14m)', '时间：07:28:50 · 全城通讯静默', '目标：狙击散热芯并校准卫星公开广播'],
       ['紧急事态 // 零号泄洪协议已触发', '地点：西岸山顶高地 (+14m)', '时间：07:41:09 · 12米东海风暴潮袭港', '目标：坚守高地 15 秒并接通救援舰队'],
       ['行动阶段 VII // 破雾引航', '地点：南港旧船坞 → 22m 岸角灯塔', '时间：08:05:30 · 敌舰重炮覆盖', '目标：清除电源干扰并校准灯塔主透镜'],
-      ['终章行动 // 绝境跑道撤离', '地点：西北海岸应急机场 · 110m 主跑道', '时间：08:29:44 · 救援运输机引擎已起转', '目标：突破炮火冲入拱形机库登机撤离'],
+      ['行动阶段 VIII // 机库黑匣子突击', '地点：西北海岸应急机场 · 110m 主跑道', '时间：08:29:44 · 敌方炮火压制', '目标：突破跑道冲入机库确保燃油与记录仪'],
+      ['行动阶段 IX // 外海锚地疏散', '地点：南港锚地泊位 · 舷梯撤离点', '时间：08:47:15 · 幸存船员待撤', '目标：摧毁登船干扰器并守住撤离走廊'],
+      ['行动阶段 X // 深夜档案保卫战', '地点：沿海警务调度楼 04 号站', '时间：09:08:22 · 铁砧残部反扑', '目标：破译沃德离岸总账并坚守上行链路'],
+      ['行动阶段 XI // 最后引航护送', '地点：北段沿海大道 → 西北机场入口', '时间：09:26:50 · 防空阵地封锁', '目标：摧毁 2 座防空架护送车队抵近机场'],
+      ['终章尾声 // 晴海启航', '地点：盐线港全区 · 西北机场拱形机库', '时间：09:50:00 · 晴空晨曦', '目标：登机归航并见证盐线港多分支结局'],
     ];
     function playActBriefing(idx) {
       const act = OPEN_WORLD_ACTS[idx];
@@ -3521,14 +4033,18 @@
     ];
 
     const stageStarts = [
-      { zh: '1/8 泊位破局 · 炸干扰塔+炮艇坍塌', en: '1/8 Berth 4 Jammers', pos: new Vector3(-16, .1, -16) },
-      { zh: '2/8 城区撞卡 · 四驱车冲破路障', en: '2/8 City Roadblock', pos: new Vector3(-26, .1, -46) },
-      { zh: '3/8 西南冷雾 · 解锁医疗样本+雷暴', en: '3/8 SW Cold Storage', pos: new Vector3(-138, .1, 74) },
-      { zh: '4/8 西区货场 · 炸信号闸+油罐连爆', en: '4/8 West Rail Yard', pos: new Vector3(-124, .1, 5) },
-      { zh: '5/8 西岸山顶 · 登+14m劫持大锅雷达', en: '5/8 Mountain Comms', pos: new Vector3(-172, 14.1, -78) },
-      { zh: '6/8 洪峰求生 · 12米东海海啸避险', en: '6/8 Tsunami Survival', pos: new Vector3(-174, 14.1, -78) },
-      { zh: '7/8 南港点灯 · 炮火下重启岸角灯塔', en: '7/8 Lighthouse Restore', pos: new Vector3(-26, .1, 108) },
-      { zh: '8/8 跑道撤离 · 冲进西北机场机库', en: '8/8 Airfield Exfil', pos: new Vector3(-130, .1, -172) },
+      { zh: '1/12 泊位破局 · 炸干扰塔+炮艇坍塌', en: '1/12 Berth 4 Jammers', pos: new Vector3(-16, .1, -16) },
+      { zh: '2/12 城区撞卡 · 四驱车冲破路障', en: '2/12 City Roadblock', pos: new Vector3(-26, .1, -46) },
+      { zh: '3/12 西南冷雾 · 解锁医疗样本+雷暴', en: '3/12 SW Cold Storage', pos: new Vector3(-138, .1, 74) },
+      { zh: '4/12 西区货场 · 炸信号闸+油罐连爆', en: '4/12 West Rail Yard', pos: new Vector3(-124, .1, 5) },
+      { zh: '5/12 西岸山顶 · 登+14m劫持大锅雷达', en: '5/12 Mountain Comms', pos: new Vector3(-172, 14.1, -78) },
+      { zh: '6/12 洪峰求生 · 12米东海海啸避险', en: '6/12 Tsunami Survival', pos: new Vector3(-174, 14.1, -78) },
+      { zh: '7/12 南港点灯 · 炮火下重启岸角灯塔', en: '7/12 Lighthouse Restore', pos: new Vector3(-26, .1, 108) },
+      { zh: '8/12 机库夺证 · 冲进西北机场机库', en: '8/12 Airfield Hangar', pos: new Vector3(-130, .1, -172) },
+      { zh: '9/12 锚地疏散 · 南港舷梯掩护撤离', en: '9/12 Outer Anchorage', pos: new Vector3(-8, .1, 82) },
+      { zh: '10/12 深夜反攻 · 警务04号站保卫战', en: '10/12 Precinct Lockdown', pos: new Vector3(-24, .1, -56) },
+      { zh: '11/12 公路护航 · 摧毁北段防空阵地', en: '11/12 Highway Escort', pos: new Vector3(-26, .1, -96) },
+      { zh: '12/12 晴海尾声 · 黎明登机多分支结局', en: '12/12 Open Water Dawn', pos: new Vector3(-140, .1, -176) },
     ];
 
     let customGpsTarget = null;
@@ -3660,6 +4176,7 @@
 
     function teleportToDistrict(d) {
       movePlayerAndVehicle(d.pos, true);
+      chunkMgr?.warmUpSync?.(d.pos);
       toggleMap(false);
       world.tactical?.notify?.(`⚡ 已快速传送至：${d.nameZh}（四驱车已同步就位）`, `⚡ Fast-traveled to: ${d.nameEn}`, false, 3.2);
     }
@@ -3816,6 +4333,23 @@
         e.stopImmediatePropagation();
         toggleMap(false);
       } else if (e.code === 'KeyM' && !e.repeat) { e.preventDefault(); toggleMap(); }
+      else if (e.code === 'KeyJ' && !e.repeat) {
+        e.preventDefault();
+        const act = OPEN_WORLD_ACTS[Math.min(stage, OPEN_WORLD_ACTS.length - 1)];
+        const obj = currentObjectiveInfo();
+        storyDirector?.toggleJournal?.(undefined, {
+          title: act ? local(...act.title) : '《失联名单》案情简报',
+          brief: `${act ? local(...act.description) : ''}${obj?.zh ? `\n当前目标：${obj.zh}` : ''}（提示：靠近四号泊位老霍克、警务室苏珊、战地护士林婉等任意 NPC 按 [E] 可面对面了解完整案情）`,
+        });
+      }
+      else if (e.code === 'KeyH' && !e.repeat) {
+        e.preventDefault();
+        if (squadAllies.length && world.player?.pos) {
+          for (const ally of squadAllies) ally.moveTo(world.player.pos);
+          const healed = squadAllies[0]?.healPlayer?.(world.player, 35);
+          if (!healed) squadAllies[1]?.speak?.('凯尔：「收到！小队正在向你靠拢，火力掩护马上就位！」', 'Kai: Regrouping on you!', true);
+        }
+      }
       else if (e.code === 'KeyU' && !e.repeat) {
         e.preventDefault();
         teleportToSafeStart();
@@ -3845,8 +4379,29 @@
     const POS_TRAIN_SCAN = new Vector3(-164, .5, 4);
     const POS_SAT_CONSOLE = new Vector3(-174, 14.5, -78);
     const POS_LIGHTHOUSE_LENS = new Vector3(14, .5, 128);
+    const POS_ANCHORAGE_EVAC = new Vector3(16, .5, 86);
+    const POS_HIGHWAY_CONVOY = new Vector3(-130, .5, -172);
 
     interactables.push(
+      {
+        id: 'story-precinct-ledger', pos: POS_PRECINCT, radius: 5.5,
+        getPrompt: () => (stage === 9 && subStage === 0 && cityCampaignActive && !freeRoam) ? '按 [E] 破译沃德离岸资金总账并启动上行校验' : '',
+        use() {
+          if (!(stage === 9 && subStage === 0 && cityCampaignActive && !freeRoam)) return;
+          const ok = storyDirector?.openSignalTuner?.({
+            title: '破译沃德离岸资金总账',
+            subtitle: '铁砧正在远程擦除账本密钥，连续锁定 3 次金色频段冻结服务器！',
+            locksNeeded: 3, speed: 1.05, zoneWidth: 0.21,
+            onSuccess() {
+              subStage = 1;
+              holdProgress = 0;
+              world.tactical?.notify?.('🔐 离岸总账已解封！坚守警务 04 号站 10 秒完成海事检察院同步！', '🔐 Offshore ledger decrypted! Hold Precinct 04 for 10s!', true, 4.8);
+              spawnStageDefenders(9);
+            },
+          });
+          if (!ok) { subStage = 1; holdProgress = 0; spawnStageDefenders(9); }
+        },
+      },
       {
         id: 'story-berth-blackbox', pos: POS_BLACKBOX, radius: 4.5,
         getPrompt: () => (stage === 0 && subStage === 0 && cityCampaignActive && !freeRoam) ? '按 [E] 启动战术频谱仪解码「海燕号」加密黑匣子' : '',
@@ -3953,9 +4508,13 @@
       satTuned = false;
       precinctWaveSpawned = false;
       storyDirector?.setTracker?.({ active: false });
-      if (nextStage < 8) {
+      if (nextStage === 11) {
+        world.disasters?.stopAllEvents?.();
+        applySkyPreset(1, true);
+      }
+      if (nextStage < OPEN_WORLD_ACTS.length) {
         playActBriefing(nextStage);
-        if (nextStage !== 0) spawnStageDefenders(nextStage);
+        if (nextStage !== 0 && nextStage !== 11) spawnStageDefenders(nextStage);
       }
     }
 
@@ -3969,7 +4528,7 @@
       storyDirector?.setTracker?.({ active: false });
       if (world.developer?.flags) world.developer.flags.noEnemies = false;
       if (clearEnemies) world.enemies?.clear?.();
-      const idx = Math.max(0, Math.min(7, Number(targetStage) || 0));
+      const idx = Math.max(0, Math.min(OPEN_WORLD_ACTS.length - 1, Number(targetStage) || 0));
       stage = idx;
       subStage = 0;
       holdProgress = 0;
@@ -3994,14 +4553,21 @@
       syncOpenWorldMissionProps();
       finaleCard.classList.remove('open');
       const st = stageStarts[idx];
-      if (teleport && st) movePlayerAndVehicle(st.pos, true);
+      if (teleport && st) {
+        movePlayerAndVehicle(st.pos, true);
+        chunkMgr?.warmUpSync?.(st.pos);
+      }
       if (idx === 5) {
         world.disasters?.triggerTideGateDemolition?.();
         world.disasters?.triggerTsunami?.();
       }
       if (idx === 6) world.disasters?.triggerArtilleryBarrage?.();
+      if (idx === 11) {
+        world.disasters?.stopAllEvents?.();
+        applySkyPreset(1, true);
+      }
       playActBriefing(idx);
-      if (idx !== 0) spawnStageDefenders(idx);
+      if (idx !== 0 && idx !== 11) spawnStageDefenders(idx);
     }
 
     function startFromLanding() {
@@ -4010,7 +4576,7 @@
     }
 
     function restartCurrentStage() {
-      jumpToStage(Math.min(stage, 7), { teleport: true, clearEnemies: true });
+      jumpToStage(Math.min(stage, OPEN_WORLD_ACTS.length - 1), { teleport: true, clearEnemies: true });
     }
 
     function hitTarget(t) {
@@ -4097,6 +4663,19 @@
         else {
           subStage = 1;
           world.tactical?.notify?.('🗼 干扰已清除！前往 22 米南角灯塔基座（14, 128）按 [E] 校准聚光透镜！', '🗼 Jammers cleared! Calibrate the 22m Lighthouse lens ([E])!', true, 4.8);
+        }
+      } else if (stage === 8) {
+        if (rem > 0) world.tactical?.notify?.(`⚓ ${t.labelZh}已摧毁！还剩 ${rem} 座！`, `⚓ Boarding jammer down! ${rem} left!`, false, 3.8);
+        else {
+          subStage = 1;
+          holdProgress = 0;
+          world.tactical?.notify?.('🚤 登船干扰全部离线！守住南锚地舷梯（16, 86）10 秒掩护船员登艇！', '🚤 Jammers cleared! Hold South Quay gangway (16, 86) for 10s!', true, 4.8);
+        }
+      } else if (stage === 10) {
+        if (rem > 0) world.tactical?.notify?.(`🚀 ${t.labelZh}已炸毁！还剩 ${rem} 座防空架！`, `🚀 SAM pod destroyed! ${rem} left!`, false, 3.8);
+        else {
+          subStage = 1;
+          world.tactical?.notify?.('✈️ 海岸公路防空威胁已清除！护送车队冲向西北机场入口（-130, -172）！', '✈️ SAM pods cleared! Escort convoy to Airfield Approach!', true, 4.8);
         }
       }
     }
@@ -4394,7 +4973,7 @@
           totalVerts += g.attributes.position.count;
           totalIdx += g.index ? g.index.count : g.attributes.position.count;
         }
-        if (totalVerts === 0 || totalVerts > 65000) continue;
+        if (totalVerts === 0 || totalVerts > 115000) continue;
         const positions = new Float32Array(totalVerts * 3);
         const normals = new Float32Array(totalVerts * 3);
         const uvs = new Float32Array(totalVerts * 2);
@@ -4441,13 +5020,13 @@
         container.add(m);
       }
     }
-    batchStaticGroup(horizonRoot, 140);
-    mergeStaticByMaterial(horizonRoot, 140);
+    batchStaticGroup(horizonRoot, 220);
+    mergeStaticByMaterial(horizonRoot, 220);
     for (const sec of sectors) {
-      batchStaticGroup(sec.shell, 110);
-      mergeStaticByMaterial(sec.shell, 110);
-      batchStaticGroup(sec.detail, 110);
-      mergeStaticByMaterial(sec.detail, 110);
+      batchStaticGroup(sec.shell, 160);
+      mergeStaticByMaterial(sec.shell, 160);
+      batchStaticGroup(sec.detail, 160);
+      mergeStaticByMaterial(sec.detail, 160);
     }
 
     const chunkMgr = WE?.createChunkManager ? WE.createChunkManager({ renderer: world.renderer, sectors: [...sectors, ...parcels], quality: world.quality?.name || world.params?.q || 'high', syncColliders, targetFps: 55, manageResolution: false }) : null;
@@ -4458,7 +5037,7 @@
     let lastMenuHidden = null, lastInteractPrompt = '', interactPromptOn = false, lastObjectiveText = null;
 
     function currentObjectiveInfo() {
-      if (freeRoam || !cityCampaignActive || isMultiplayer() || stage >= 8) {
+      if (freeRoam || !cityCampaignActive || isMultiplayer() || stage >= OPEN_WORLD_ACTS.length) {
         return currentObjectiveInfo._empty || (currentObjectiveInfo._empty = { pos: null, zh: '', en: '' });
       }
       const sub = typeof subStage === 'number' ? subStage : 0;
@@ -4513,7 +5092,30 @@
         }
         return { pos: currentObjectiveInfo._lh || (currentObjectiveInfo._lh = new Vector3(14, .5, 128)), zh: '② 前往 22m 灯塔基座按 [E] 校准光学聚光透镜', en: '2. Calibrate 22m Lighthouse lens ([E])' };
       }
-      if (stage === 7) return { pos: currentObjectiveInfo._af || (currentObjectiveInfo._af = new Vector3(-172, .5, -200)), zh: '穿越跑道炮火，冲入西北机场拱形机库登机撤离', en: 'Race through runway fire to the airfield hangar' };
+      if (stage === 7) return { pos: currentObjectiveInfo._af || (currentObjectiveInfo._af = new Vector3(-172, .5, -200)), zh: '穿越跑道炮火，冲入西北机场拱形机库夺回黑匣子与燃油舱单', en: 'Race through runway fire to secure the airfield hangar manifest' };
+      if (stage === 8) {
+        if (sub === 0) {
+          let next = null, aliveCount = 0;
+          for (let i = 0; i < shootTargets.length; i++) { const t = shootTargets[i]; if (t.stage === 8 && t.alive) { if (!next) next = t; aliveCount++; } }
+          const done = 2 - aliveCount;
+          return { pos: next?.pos, zh: `① 摧毁南港外海锚地登船干扰器 (${done}/2)`, en: `1. Destroy South Quay Boarding Jammers (${done}/2)` };
+        }
+        return { pos: POS_ANCHORAGE_EVAC, zh: `② 守住南港锚地舷梯掩护幸存船员登艇 (${pct}%)`, en: `2. Hold South Quay gangway evacuation (${pct}%)` };
+      }
+      if (stage === 9) {
+        if (sub === 0) return { pos: POS_PRECINCT, zh: '① 返回沿海警务 04 号站按 [E] 破译沃德离岸资金总账', en: '1. Return to Precinct 04 & decrypt Ward’s offshore ledger ([E])' };
+        return { pos: POS_PRECINCT, zh: `② 击退铁砧反扑并坚守警务上行链路 (${pct}%)`, en: `2. Hold Precinct 04 uplink under counter-raid (${pct}%)` };
+      }
+      if (stage === 10) {
+        if (sub === 0) {
+          let next = null, aliveCount = 0;
+          for (let i = 0; i < shootTargets.length; i++) { const t = shootTargets[i]; if (t.stage === 10 && t.alive) { if (!next) next = t; aliveCount++; } }
+          const done = 2 - aliveCount;
+          return { pos: next?.pos, zh: `① 沿北段沿海大道摧毁铁砧防空导弹发射架 (${done}/2)`, en: `1. Destroy North Blvd SAM Pods (${done}/2)` };
+        }
+        return { pos: POS_HIGHWAY_CONVOY, zh: '② 护送搜救车队冲抵西北机场跑道入口', en: '2. Escort rescue convoy to Airfield Approach' };
+      }
+      if (stage === 11) return { pos: currentObjectiveInfo._af || (currentObjectiveInfo._af = new Vector3(-172, .5, -200)), zh: '晴空黎明：前往西北机场拱形机库登上救援运输机', en: 'Dawn over Saltline: board the SAR transport at the airfield hangar' };
       return currentObjectiveInfo._empty || (currentObjectiveInfo._empty = { pos: null, zh: '', en: '' });
     }
 
@@ -4568,7 +5170,17 @@
       if (chunkMgr) {
         const quality = world.quality?.name || world.params?.q;
         if (quality && quality !== chunkMgr.quality) chunkMgr.setQuality(quality);
-        chunkMgr.update(dt, playerPos);
+        const streamAnchor = playerPos ? playerPos.clone() : null;
+        if (streamAnchor && world.vehicle?.isDriving?.() && world.camera) {
+          const fwd = new Vector3();
+          world.camera.getWorldDirection(fwd);
+          fwd.y = 0;
+          if (fwd.lengthSq() > 0.01) {
+            fwd.normalize();
+            streamAnchor.addScaledVector(fwd, 72);
+          }
+        }
+        chunkMgr.update(dt, streamAnchor || playerPos);
       } else {
         for (const sec of sectors) {
           const dist = playerPos ? playerPos.distanceTo(sec.center) : 999;
@@ -4792,8 +5404,34 @@
             }
           }
           if (playerPos.distanceToSquared(POS_AIRFIELD_EXFIL) < 156.25) {
-            owProgress.completeStage(7);
-            stage = 8;
+            world.tactical?.notify?.('📦 已回收机场黑匣子与燃油舱单！南港外海锚地传来船员求救信号！', '📦 Airfield blackbox secured! Distress call from South Quay!', true, 5.2);
+            advanceToStage(8);
+          }
+        } else if (stage === 8 && subStage === 1) {
+          if (playerPos.distanceToSquared(POS_ANCHORAGE_EVAC) < 144) {
+            holdProgress = Math.min(1, holdProgress + dt / 10);
+            if (holdProgress >= 1) {
+              world.tactical?.notify?.('🚤 外海锚地幸存船员已全部登艇撤离！铁砧残部正反扑警务 04 号站！', '🚤 South Quay survivors evacuated! Defend Precinct 04!', true, 5.0);
+              advanceToStage(9);
+            }
+          }
+        } else if (stage === 9 && subStage === 1) {
+          if (playerPos.distanceToSquared(POS_PRECINCT) < 144) {
+            holdProgress = Math.min(1, holdProgress + dt / 10);
+            if (holdProgress >= 1) {
+              world.tactical?.notify?.('📡 沃德离岸资金总账已上传海事检察院！北上清除海岸公路防空架！', '📡 Offshore ledger uploaded! Clear North Blvd SAM pods!', true, 5.0);
+              advanceToStage(10);
+            }
+          }
+        } else if (stage === 10 && subStage === 1) {
+          if (playerPos.distanceToSquared(POS_HIGHWAY_CONVOY) < 225) {
+            world.tactical?.notify?.('🌅 搜救车队已安全抵近西北机场！风暴云层散去，前往机库登机！', '🌅 Convoy reached Airfield! Storm clearing — board at the hangar!', true, 5.2);
+            advanceToStage(11);
+          }
+        } else if (stage === 11) {
+          if (playerPos.distanceToSquared(POS_AIRFIELD_EXFIL) < 156.25) {
+            owProgress.completeStage(11);
+            stage = OPEN_WORLD_ACTS.length;
             storyDirector?.setTracker?.({ active: false });
             world.hud?.setObjective?.('');
             world.hud?.showChapter?.('');
@@ -4802,13 +5440,18 @@
             finaleSpinActive = true;
             world.disasters?.stopAllEvents?.();
             world.disasters?.triggerVictoryFlareBarrage?.(new Vector3(-168, 2.5, -184));
+            const epilogue = window.SALTLINE_CAMPAIGN_STATE?.getEpilogueSummary?.();
+            const copyEl = finaleCard.querySelector('.sl-finale-copy');
+            if (copyEl && epilogue) {
+              copyEl.textContent = `05:31 与 05:34 的伪造时间差、05:50 搜救艇召回令，以及第 17 名失联者托马斯·万斯的原始水文档案已随沃德离岸总账全部回传海事局。${epilogue.branchNote}（共收集线索 ${epilogue.clues}/3，外海锚地与冷库幸存者均已安全获救）。`;
+            }
             const openFinale = () => {
-              try { document.exitPointerLock?.(); } catch {}
               finaleCard.classList.add('open');
+              try { document.exitPointerLock?.(); } catch {}
             };
             const played = storyDirector?.playCutscene?.({
-              id: 'cine-act7-finale',
-              tag: '终章过场 · 真相昭雪',
+              id: 'cine-act12-finale',
+              tag: '第十二幕终章过场 · 真相昭雪',
               title: '盐线港重归黎明',
               subtitle: '救援运输机沿跑道腾空而起，十七个名字重见天日',
               duration: 6.2,
@@ -4837,9 +5480,62 @@
         world.hud?.setObjective?.(objText);
       }
       const beaconTarget = customGpsTarget || info.pos;
+      if (!update._navBeacon) {
+        const g = new Group();
+        g.name = 'ow-destination-beacon';
+        const beamMat = new MeshBasicMaterial({ color: 0x58e8ff, transparent: true, opacity: .24, depthWrite: false });
+        const beam = new Mesh(new CylinderGeometry(.32, .85, 42, 10, 1, true), beamMat);
+        beam.position.y = 21;
+        const ringMat = new MeshBasicMaterial({ color: 0xffd859, transparent: true, opacity: .72, side: THREE.DoubleSide, depthWrite: false });
+        const ring = new Mesh(new THREE.RingGeometry(1.4, 2.0, 24), ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = .25;
+        g.add(beam, ring);
+        g.userData = { beamMat, ring };
+        g.visible = false;
+        root.add(g);
+        update._navBeacon = g;
+      }
+      const navBeacon = update._navBeacon;
+      if (beaconTarget && !isMultiplayer()) {
+        navBeacon.visible = true;
+        navBeacon.position.set(beaconTarget.x, beaconTarget.y || 0, beaconTarget.z);
+        const pulse = 1 + Math.sin(performance.now() * .005) * .16;
+        navBeacon.userData.ring.scale.set(pulse, pulse, 1);
+        navBeacon.userData.beamMat.color.setHex(customGpsTarget ? 0xffd859 : 0x58e8ff);
+      } else if (navBeacon.visible) {
+        navBeacon.visible = false;
+      }
       hudTimer += dt;
       if (hudTimer >= .25) {
         hudTimer = 0;
+
+        if (!isMultiplayer() && typeof world.hud?.setMarkers === 'function') {
+          const markers = [];
+          if (info.pos && !freeRoam) {
+            markers.push({ id: 'ow-mission', short: '★', kind: 'extract', label: '目的地', pos: info.pos });
+          }
+          if (customGpsTarget) {
+            markers.push({ id: 'ow-gps', short: 'GPS', kind: 'relay', label: '导航点', pos: customGpsTarget });
+          }
+          if (playerPos && typeof interactables !== 'undefined') {
+            let bestNpc = null, bestD2 = 42 * 42;
+            for (let i = 0; i < interactables.length; i++) {
+              const it = interactables[i];
+              if (!it.id?.startsWith('npc-talk-')) continue;
+              const d2 = playerPos.distanceToSquared(it.pos);
+              if (d2 < bestD2 && it.getPrompt?.()) { bestD2 = d2; bestNpc = it; }
+            }
+            if (bestNpc) {
+              markers.push({ id: bestNpc.id, short: '💬', kind: 'relay', label: 'NPC', pos: bestNpc.pos });
+            }
+          }
+          for (let i = 0; i < squadAllies.length; i++) {
+            const ally = squadAllies[i];
+            if (ally?.pos) markers.push({ id: 'ow-ally-' + i, short: i === 0 ? '玛' : '凯', kind: 'relay', label: ally.displayName || ally.name, pos: ally.pos });
+          }
+          world.hud.setMarkers(markers);
+        }
 
         if (playerPos) {
           const deg = -((world.player?.yaw ?? 0) * 180 / Math.PI);
@@ -4861,6 +5557,7 @@
 
     function dispose() {
       window.removeEventListener('keydown', onKeyDown, true);
+      for (const ally of squadAllies.splice(0)) ally.dispose?.();
       storyDirector?.dispose?.();
       if (window.SALTLINE_INSPECT_VIEW === jumpInspectView) {
         delete window.SALTLINE_INSPECT_VIEW;
@@ -4916,17 +5613,31 @@
     return {
       update, dispose, toggleMap, jumpToStage, startFromLanding, restartCurrentStage, setFreeRoam, setPhotoMode,
       teleportToSafeStart, resetView,
+      warmUpSync(anchorPos, maxSteps = 260) {
+        const anchor = anchorPos || world.player?.pos || stageStarts[0].pos;
+        return chunkMgr?.warmUpSync?.(anchor, maxSteps) ?? { built: 0, total: 0, loadedCount: 0 };
+      },
+      warmUpAsync(anchorPos, opts = {}) {
+        const anchor = anchorPos || world.player?.pos || stageStarts[0].pos;
+        return chunkMgr?.warmUpAsync?.(anchor, opts) ?? Promise.resolve({ built: 0, total: 0, loadedCount: 0 });
+      },
       cycleSky() { return applySkyPreset(skyIdx + 1); },
+      setSkyPreset(idx, instant = false) { return applySkyPreset(idx, instant); },
       stageStarts, interactables, progress: owProgress,
       rainShelters: blocks.filter(b => b.facility || b.enterable).map(b => ({
         min:new Vector3(b.x0+1.5,.16,b.z0+1.5),max:new Vector3(b.x1-1.5,b.enterable?3.8:7.8,b.z1-1.5)
       })),
       get mapOpen() { return mapOpen; },
+      get tunerOpen() { return Boolean(storyDirector?.isTunerOpen); },
+      get cutsceneActive() { return Boolean(storyDirector?.isPlayingCutscene); },
+      get dialogueOpen() { return Boolean(storyDirector?.isDialogueOpen); },
+      get journalOpen() { return Boolean(storyDirector?.isJournalOpen); },
+      get finaleOpen() { return finaleCard.classList.contains('open'); },
       get freeRoam() { return freeRoam; },
       get activeCampaign() { return cityCampaignActive && !freeRoam && !isMultiplayer(); },
       get stage() { return stage; },
       get currentObjective() { return currentObjectiveInfo(); },
-      get currentStageStart() { return stageStarts[Math.min(stage, 7)] ?? stageStarts[0]; },
+      get currentStageStart() { return stageStarts[Math.min(stage, OPEN_WORLD_ACTS.length - 1)] ?? stageStarts[0]; },
       waypoints: districts.map(d => ({ label: d.nameEn, zh: d.nameZh, pos: d.pos.clone() })),
     };
   };

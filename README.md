@@ -54,7 +54,7 @@ Walk up to marked ammunition crates to top up reserves, including the caches on 
 
 ## Multiplayer
 
-Run `node server/lan.cjs` and open the address printed by the terminal. Open **Multiplayer → LAN staging room** to create a room or join one shared by another computer on the same network. The ready roster supports 2–4 players, host transfer and brief reconnects. Once everyone is ready, the host can start the three-second roster lock countdown. This release provides room preparation. Cooperative movement, combat and shared mission state are still in development. See the [server notes](server/README.md).
+Run `node server/lan.cjs` and open the address printed by the terminal. Open **Multiplayer → LAN Multiplayer Lobby** to create or join a room (up to **8 players**, Protocol v2, 20Hz authoritative WebSocket sync). Choose from **5 playable Saltline theaters** (`coastal_quarter`, `port_rail`, `mountain_forest`, `old_harbor`, `coastal_industrial`) and **5 modes** (`conquest`, `breakthrough`, `coop_rescue`, `coop_campaign`, `sandbox`), with live SVG map preview, mid-match join, 30-second disconnect seat reservation, automatic host migration, and return-to-lobby rematch. See [server/README.md](server/README.md).
 
 ## Developer menu
 

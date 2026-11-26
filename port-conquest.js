@@ -25,25 +25,38 @@
       Math.hypot(position.x - point.x, position.z - point.z) < RADIUS;
   }
 
+  const VALID_MODES = new Set(['conquest', 'breakthrough', 'coop_rescue', 'coop_campaign', 'sandbox']);
+
   window.createPortConquest = (relays, {
     mode = 'conquest', duration = DURATION, startingTickets = START_TICKETS, majorEvents = false,
   } = {}) => {
+    const activeMode = VALID_MODES.has(mode) ? mode : 'conquest';
     if (![180, 240, 360].includes(duration)) duration = DURATION;
     if (![25, 40, 70].includes(startingTickets)) startingTickets = START_TICKETS;
-    const breakthrough = mode === 'breakthrough';
+    const breakthrough = activeMode === 'breakthrough';
+    const coopRescue = activeMode === 'coop_rescue';
+    const coopCampaign = activeMode === 'coop_campaign';
+    const sandbox = activeMode === 'sandbox';
+    const sequential = breakthrough || coopCampaign;
+    const rescueTarget = coopRescue ? Math.max(4, relays.length * 2) : 0;
     const points = relays.map(({ id, short, o }, index) => ({
-      id, short, pos: o.pos, control: breakthrough || index === 0 ? -100 : 0,
-      owner: breakthrough || index === 0 ? 'red' : null, contested: false,
-      locked: breakthrough && index > 0, secured: false
+      id, short, pos: o.pos, control: sequential || index === 0 ? -100 : 0,
+      owner: sequential || index === 0 ? 'red' : null, contested: false,
+      locked: sequential && index > 0, secured: false
     }));
-    const tickets = { blue: startingTickets, red: breakthrough ? points.length : startingTickets };
+    const blueStart = coopCampaign ? startingTickets + 20 : startingTickets;
+    const tickets = {
+      blue: blueStart,
+      red: sequential ? points.length : (coopRescue ? rescueTarget : startingTickets),
+    };
     const support = {
       markUntil: 0, reinforceUntil: 0, supplyUntil: 0, reinforcePosition: null,
       smokeUntil: 0, smokePosition: null, artilleryUntil: 0, artillery: null,
       vehicleUntil: 0, motorcycleUntil: 0, ifvUntil: 0, aaUntil: 0, tankUntil: 0, helicopterUntil: 0, jetUntil: 0,
     };
     let sector = 0;
-    let supportPoints = 3;
+    let rescued = 0;
+    let supportPoints = sandbox ? SUPPORT_CAP : 3;
     let elapsed = 0;
     let localTime = 0;
     let winner = null;
@@ -57,8 +70,15 @@
     const eventSignals = [];
 
     function finish() {
-      if (breakthrough) {
+      if (sandbox) return;
+      if (sequential) {
         if (sector >= points.length) winner = 'blue';
+        else if (!tickets.blue || elapsed >= duration) winner = 'red';
+        return;
+      }
+      if (coopRescue) {
+        tickets.red = Math.max(0, rescueTarget - rescued);
+        if (rescued >= rescueTarget) winner = 'blue';
         else if (!tickets.blue || elapsed >= duration) winner = 'red';
         return;
       }
@@ -80,9 +100,9 @@
     }
 
     function advanceMajorEvent() {
-      if (!majorEvents) return;
+      if (!majorEvents || sandbox) return;
       if (majorEvent) {
-        if (winner || breakthrough && majorEvent.point !== points[sector]) {
+        if (winner || sequential && majorEvent.point !== points[sector]) {
           sendEventSignal('end');
           majorEvent = null;
           nextEventAt = elapsed + EVENT_COOLDOWN;
@@ -109,9 +129,9 @@
         return;
       }
       if (winner || elapsed < nextEventAt) return;
-      // Conquest defenders react to a Blue-held point. Breakthrough always
-      // keeps the pressure on the one sector the player can currently take.
-      const target = breakthrough ? points[sector] : points
+      // Conquest defenders react to a Blue-held point. Sequential modes always
+      // keep the pressure on the one sector the team can currently take.
+      const target = sequential ? points[sector] : points
         .filter(point => point.owner === 'blue')
         .sort((a, b) => Number(b.contested) - Number(a.contested) || a.control - b.control)[0];
       if (!target) {
@@ -134,11 +154,13 @@
     finish();
     return {
       points, tickets, support, supportCosts: SUPPORTS,
-      mode: breakthrough ? 'breakthrough' : 'conquest',
-      get activePoint() { return breakthrough && !winner ? points[sector] ?? null : null; },
+      mode: activeMode,
+      get activePoint() { return sequential && !winner ? points[sector] ?? null : null; },
+      get rescued() { return rescued; },
+      get rescueTarget() { return rescueTarget; },
       get supportPoints() { return supportPoints; },
       get elapsed() { return elapsed; },
-      get remaining() { return Math.max(0, duration - elapsed); },
+      get remaining() { return sandbox ? duration : Math.max(0, duration - elapsed); },
       get winner() { return winner; },
       get deaths() { return deaths; },
       get kills() { return kills; },
@@ -152,15 +174,15 @@
       near(position) { return points.find(point => nearby(position, point.pos)); },
       exportSharedState() {
         return {
-          mode: breakthrough ? 'breakthrough' : 'conquest', elapsed, winner, sector,
+          mode: activeMode, elapsed, winner, sector, rescued, rescueTarget,
           tickets: { ...tickets },
           points: points.map(({ owner, control, contested, locked, secured }) =>
             ({ owner, control, contested, locked, secured })),
         };
       },
       applySharedState(state) {
-        if (!state || state.mode !== (breakthrough ? 'breakthrough' : 'conquest') ||
-          !Number.isFinite(state.elapsed) || state.elapsed < 0 || state.elapsed > duration ||
+        if (!state || state.mode !== activeMode ||
+          !Number.isFinite(state.elapsed) || state.elapsed < 0 || (!sandbox && state.elapsed > duration) ||
           ![null, 'blue', 'red', 'draw'].includes(state.winner) ||
           !Number.isInteger(state.sector) || state.sector < 0 || state.sector > points.length ||
           !state.tickets || !['blue', 'red'].every(team => Number.isFinite(state.tickets[team]) && state.tickets[team] >= 0) ||
@@ -171,6 +193,7 @@
         elapsed = state.elapsed;
         winner = state.winner;
         sector = state.sector;
+        if (Number.isFinite(state.rescued)) rescued = Math.max(0, state.rescued);
         tickets.blue = state.tickets.blue;
         tickets.red = state.tickets.red;
         points.forEach((point, index) => {
@@ -181,8 +204,9 @@
       },
       updateGuest(dt) {
         if (winner || !Number.isFinite(dt) || dt <= 0) return { captures: [], respawn: false };
-        elapsed = Math.min(duration, elapsed + dt);
+        elapsed = sandbox ? elapsed + dt : Math.min(duration, elapsed + dt);
         localTime += dt;
+        if (sandbox) supportPoints = SUPPORT_CAP;
         const respawn = respawnAt !== null && localTime >= respawnAt;
         if (respawn) respawnAt = null;
         return { captures: [], respawn };
@@ -203,8 +227,8 @@
           if (kind === 'smoke') support.smokePosition = point.pos;
           else support.artillery = { position: point.pos, next: elapsed + 5, remaining: 4 };
         }
-        supportPoints -= SUPPORTS[kind];
-        support[durationKey] = elapsed + SUPPORT_DURATION[kind];
+        if (!sandbox) supportPoints -= SUPPORTS[kind];
+        support[durationKey] = elapsed + (sandbox ? Math.min(4, SUPPORT_DURATION[kind]) : SUPPORT_DURATION[kind]);
         return true;
       },
       smokeBlocks(from, to) {
@@ -232,8 +256,8 @@
       casualty({ affectsTickets = true, team = 'blue' } = {}) {
         if (winner || respawnAt !== null) return;
         deaths++;
-        if (affectsTickets && (team === 'blue' || !breakthrough)) {
-          tickets[team] = Math.max(0, tickets[team] - 4);
+        if (!sandbox && affectsTickets && (team === 'blue' || (!sequential && !coopRescue))) {
+          tickets[team] = Math.max(0, tickets[team] - (coopCampaign ? 3 : 4));
           finish();
         }
         respawnAt = localTime + 3;
@@ -242,19 +266,26 @@
         if (winner) return;
         kills++;
         awardSupport(1);
-        if (affectsTickets) {
-          if (!breakthrough) tickets.red = Math.max(0, tickets.red - 1);
+        if (coopRescue && kills % 3 === 0) {
+          rescued = Math.min(rescueTarget, rescued + 1);
+          finish();
+          return;
+        }
+        if (!sandbox && affectsTickets) {
+          if (!sequential && !coopRescue) tickets.red = Math.max(0, tickets.red - 1);
           finish();
         }
       },
       update(dt, player, machines, allies = []) {
         if (winner || !Number.isFinite(dt) || dt <= 0) return { captures: [], respawn: false };
         const previousElapsed = elapsed;
-        dt = Math.min(dt, duration - previousElapsed);
+        dt = sandbox ? dt : Math.min(dt, duration - previousElapsed);
         elapsed += dt;
         localTime += dt;
+        if (sandbox) supportPoints = SUPPORT_CAP;
         const capturedPoints = [];
-        for (const point of breakthrough ? [points[sector]] : points) {
+        for (const point of sequential ? [points[sector]] : points) {
+          if (!point) continue;
           const fullPresence = (player.alive && player.pos && nearby(player.pos, point.pos)) ||
             allies.some(ally => ally.alive && ally.pos && nearby(ally.pos, point.pos));
           const reinforcementTime = support.reinforcePosition === point.pos ?
@@ -272,16 +303,19 @@
           if (point.owner === 'blue' && before !== 'blue') {
             capturedPoints.push(point);
             captures++;
-            awardSupport(3);
-            if (breakthrough) {
+            awardSupport(coopCampaign ? 4 : 3);
+            if (sequential) {
               point.secured = true;
               sector++;
               tickets.red = points.length - sector;
               if (points[sector]) points[sector].locked = false;
+            } else if (coopRescue) {
+              rescued = Math.min(rescueTarget, rescued + 2);
+              tickets.red = Math.max(0, rescueTarget - rescued);
             }
           }
         }
-        if (!breakthrough) {
+        if (!sequential && !coopRescue && !sandbox) {
           const majority = points.reduce((sum, point) => sum + (point.owner === 'blue' ? 1 : point.owner === 'red' ? -1 : 0), 0);
           if (majority > 0) tickets.red = Math.max(0, tickets.red - majority * .85 * dt);
           if (majority < 0) tickets.blue = Math.max(0, tickets.blue + majority * .85 * dt);

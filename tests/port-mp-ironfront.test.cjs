@@ -110,14 +110,47 @@ test('LAN room settings normalization supports IRONFRONT modes, maps, teams, tic
   assert.equal(coop.joinTeam, 'blue');
 });
 
-test('Port Conquest supports IRONFRONT heavy vehicle airdrop requisitions', () => {
+test('Port Conquest implements all 5 multiplayer modes (conquest, breakthrough, coop_rescue, coop_campaign, sandbox)', () => {
   const code = fs.readFileSync(path.join(__dirname, '..', 'port-conquest.js'), 'utf8');
   const sandbox = { window: {} };
   vm.runInNewContext(code, sandbox);
-  const game = sandbox.window.createPortConquest([
+  const relays = [
     { id: 'relay_a', short: 'A', o: { pos: { x: 0, y: 0, z: 0 } } },
     { id: 'relay_b', short: 'B', o: { pos: { x: 20, y: 0, z: 0 } } },
-  ]);
+  ];
+
+  // 1. coop_rescue: capturing relays + kills rescues survivors until rescueTarget -> blue wins
+  const rescue = sandbox.window.createPortConquest(relays, { mode: 'coop_rescue' });
+  assert.equal(rescue.mode, 'coop_rescue');
+  assert.equal(rescue.rescueTarget, 4);
+  for (let t = 0; t < 20; t++) rescue.update(1, { alive: true, pos: { x: 0, y: 0, z: 0 } }, []);
+  assert.equal(rescue.rescued, 2);
+  for (let t = 0; t < 20; t++) rescue.update(1, { alive: true, pos: { x: 20, y: 0, z: 0 } }, []);
+  assert.equal(rescue.rescued, 4);
+  assert.equal(rescue.winner, 'blue');
+
+  // 2. coop_campaign: sequential sectors + bonus tickets (+20) + +4 support on capture
+  const coopCamp = sandbox.window.createPortConquest(relays, { mode: 'coop_campaign', startingTickets: 40 });
+  assert.equal(coopCamp.mode, 'coop_campaign');
+  assert.equal(coopCamp.tickets.blue, 60);
+  assert.equal(coopCamp.points[1].locked, true);
+  for (let t = 0; t < 20; t++) coopCamp.update(1, { alive: true, pos: { x: 0, y: 0, z: 0 } }, []);
+  assert.equal(coopCamp.points[0].secured, true);
+  assert.equal(coopCamp.points[1].locked, false);
+  assert.equal(coopCamp.supportPoints, 7);
+
+  // 3. sandbox: max support points, never ends on timer/casualties
+  const sb = sandbox.window.createPortConquest(relays, { mode: 'sandbox', duration: 180 });
+  assert.equal(sb.mode, 'sandbox');
+  assert.equal(sb.supportPoints, 12);
+  sb.casualty();
+  assert.equal(sb.tickets.blue, 40);
+  sb.update(300, { alive: true, pos: { x: 100, y: 0, z: 100 } }, []);
+  assert.equal(sb.winner, null);
+  assert.equal(sb.supportPoints, 12);
+
+  // 4. conquest heavy vehicle airdrop requisitions
+  const game = sandbox.window.createPortConquest(relays);
   assert.equal(game.supportCosts.tank, 8);
   assert.equal(game.supportCosts.helicopter, 8);
   assert.equal(game.supportCosts.jet, 9);

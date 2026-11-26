@@ -64,7 +64,7 @@
           <label><span data-code-label></span><input name="code" autocomplete="off" maxlength="120" spellcheck="false"></label>
           <fieldset class="port-battle-settings" data-lan-settings style="margin:.6rem 0;display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <label><span data-map-label></span><select name="mapId"></select></label>
-            <label><span data-mode-label></span><select name="mode"><option value="conquest"></option><option value="breakthrough"></option><option value="coop_rescue"></option></select></label>
+            <label><span data-mode-label></span><select name="mode"><option value="conquest"></option><option value="breakthrough"></option><option value="coop_rescue"></option><option value="coop_campaign"></option><option value="sandbox"></option></select></label>
             <label><span data-diff-label></span><select name="difficulty"><option value="easy"></option><option value="normal" selected></option><option value="hard"></option></select></label>
             <label><span data-tickets-label></span><select name="startingTickets"><option value="25">25</option><option value="40" selected>40</option><option value="70">70</option></select></label>
             <label><span data-max-label></span><select name="maxPlayers"><option value="4">4</option><option value="8" selected>8</option></select></label>
@@ -174,6 +174,8 @@
   function modeLabel(mode) {
     if (mode === 'breakthrough') return t('Port Breakthrough', '港口突破');
     if (mode === 'coop_rescue') return t('Co-op Coastal Rescue', '合作海岸搜救');
+    if (mode === 'coop_campaign') return t('Co-op Campaign (2-4P)', '合作战役（2-4人）');
+    if (mode === 'sandbox') return t('Open World Sandbox', '开放世界自由沙盒');
     return t('Port Conquest', '港口征服');
   }
 
@@ -239,6 +241,8 @@
     modeSel.options[0].textContent = modeLabel('conquest');
     modeSel.options[1].textContent = modeLabel('breakthrough');
     modeSel.options[2].textContent = modeLabel('coop_rescue');
+    modeSel.options[3].textContent = modeLabel('coop_campaign');
+    modeSel.options[4].textContent = modeLabel('sandbox');
     find('[data-diff-label]').textContent = t('Difficulty', '难度');
     diffSel.options[0].textContent = t('Easy', '标准');
     diffSel.options[1].textContent = t('Normal', '战术');

@@ -67,11 +67,21 @@ test('all textures and buffers of shipped glTF models resolve locally',()=>{
   const root=path.join(__dirname,'../assets/models');
   for (const entry of fs.readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirectory())) {
     const dir=path.join(root,entry.name);
-    const gltf=JSON.parse(fs.readFileSync(path.join(dir,'scene.gltf')));
-    for (const ref of [...gltf.images,...gltf.buffers]){
-      const file=path.join(dir,ref.uri);
-      assert.ok(fs.statSync(file).size>0,file);
-      if(ref.byteLength) assert.equal(fs.statSync(file).size,ref.byteLength,file);
+    const gltfPath=path.join(dir,'scene.gltf');
+    if (fs.existsSync(gltfPath)) {
+      const gltf=JSON.parse(fs.readFileSync(gltfPath));
+      for (const ref of [...gltf.images,...gltf.buffers]){
+        const file=path.join(dir,ref.uri);
+        assert.ok(fs.statSync(file).size>0,file);
+        if(ref.byteLength) assert.equal(fs.statSync(file).size,ref.byteLength,file);
+      }
+    } else {
+      const glbs=fs.readdirSync(dir).filter(f=>f.endsWith('.glb'));
+      assert.ok(glbs.length>0,dir);
+      for (const g of glbs) {
+        const buf=fs.readFileSync(path.join(dir,g));
+        assert.ok(buf.byteLength>12 && buf.readUInt32LE(0)===0x46546c67,path.join(dir,g));
+      }
     }
   }
 });

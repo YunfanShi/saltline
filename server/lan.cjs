@@ -17,7 +17,7 @@ const ROOT = path.resolve(__dirname, '..');
 const ASSETS = new Set([
   'index.html', 'zh.js', 'saltline-ui.css',
   'port-campaign.js', 'port-commander.js', 'port-conquest.js', 'port-rail-yard.js', 'port-expansion.js', 'port-campaign-events.js',
-  'port-campaign-ui.js', 'port-campaign-ui.css', 'port-campaign-runtime.js',
+  'port-campaign-ui.js', 'port-campaign-ui.css', 'port-npc-models.js', 'port-campaign-runtime.js',
   'port-campaign-continuation-layout.js', 'port-campaign-continuation.js',
   'port-prologue.js', 'port-prologue-layout.js', 'port-prologue-flight.js',
   'port-campaign-berth.js', 'port-campaign-rail.js',
@@ -36,6 +36,7 @@ const ASSETS = new Set([
   'art/campaign-anchorage.jpg', 'art/campaign-return-harbor.jpg', 'art/campaign-night-record.jpg',
   'art/campaign-last-pilot.jpg', 'art/campaign-reopen.jpg',
   'art/port-conquest.jpg', 'art/port-breakthrough.jpg', 'art/port-lan.jpg', 'art/coastal-quarter.jpg',
+  'assets/models/characters/Soldier.glb', 'assets/models/characters/Michelle.glb', 'assets/models/characters/CesiumMan.glb',
 ]);
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -44,6 +45,7 @@ const CONTENT_TYPES = {
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
   '.gltf': 'model/gltf+json',
+  '.glb': 'model/gltf-binary',
   '.bin': 'application/octet-stream',
 };
 
@@ -51,7 +53,7 @@ const PROTOCOL_VERSION = 2;
 const VALID_ROLES = new Set(['medic', 'support', 'recon', 'engineer', 'assault']);
 const VALID_TEAMS = new Set(['blue', 'red']);
 const VALID_MAPS = new Set(['coastal_quarter', 'port_rail', 'mountain_forest', 'old_harbor', 'coastal_industrial']);
-const VALID_MODES = new Set(['conquest', 'breakthrough', 'coop_rescue']);
+const VALID_MODES = new Set(['conquest', 'breakthrough', 'coop_rescue', 'coop_campaign', 'sandbox']);
 
 class RequestError extends Error {
   constructor(status, code) {
@@ -113,8 +115,8 @@ function normalizeSettings(body = {}) {
     difficulty: ['easy', 'normal', 'hard'].includes(body.difficulty) ? body.difficulty : 'normal',
     startingTickets: [25, 40, 70].includes(Number(body.startingTickets)) ? Number(body.startingTickets) : 40,
     duration: [180, 240, 360].includes(Number(body.duration)) ? Number(body.duration) : 240,
-    aiEnabled: mode === 'coop_rescue' ? true : body.aiEnabled !== false,
-    joinTeam: mode === 'coop_rescue' ? 'blue' : (['blue', 'red', 'alternate'].includes(body.joinTeam) ? body.joinTeam : 'blue'),
+    aiEnabled: (mode === 'coop_rescue' || mode === 'coop_campaign') ? true : (mode === 'sandbox' ? false : body.aiEnabled !== false),
+    joinTeam: (mode === 'coop_rescue' || mode === 'coop_campaign' || mode === 'sandbox') ? 'blue' : (['blue', 'red', 'alternate'].includes(body.joinTeam) ? body.joinTeam : 'blue'),
     allowMidJoin: body.allowMidJoin !== false,
   };
 }

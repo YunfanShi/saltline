@@ -289,10 +289,16 @@
     role = 'operator',
     coat = null,
     variation = 0,
+    armed = false,
+    modelType = null,
+    disableGlb = false,
   } = {}) {
-    const { Group, Mesh, CylinderGeometry, SphereGeometry, CapsuleGeometry, TorusGeometry, MeshStandardMaterial } = THREE;
+    const { Group, Mesh, BoxGeometry, CylinderGeometry, SphereGeometry, CapsuleGeometry, TorusGeometry, MeshStandardMaterial, MeshBasicMaterial, Vector3 } = THREE;
     const actor = new Group();
     actor.name = name;
+    const fallbackRig = new Group();
+    fallbackRig.name = 'human-procedural-fallback';
+    actor.add(fallbackRig);
 
     const palette = {
       pilot: { jacket: 0x4b5c52, pants: 0x262d2a, vest: 0xc95524, helmet: 0x2a3331, trim: 0xebe0b5 },
@@ -339,7 +345,7 @@
     const torso = new Group();
     torso.name = 'human-torso';
     torso.position.set(0, .95, 0);
-    actor.add(torso);
+    fallbackRig.add(torso);
 
     // Smoothly lofted anatomical pelvis + tapered waist + chest + rounded trapezius/collar
     add(torso, loftOrganic(THREE, [
@@ -431,19 +437,23 @@
     add(head,sphGeo,lipMat,0,-.047,.103).scale.set(.026,.005,.008);
     add(head,sphGeo,skinMat,0,-.056,.103).scale.set(.022,.008,.010);
     add(head,sphGeo,skinMat,0,-.079,.085).scale.set(.034,.022,.017);
+    const scleraMat = new MeshStandardMaterial({ color: 0xeaeef0, roughness: .22, metalness: .02 });
+    const irisMat = new MeshStandardMaterial({ color: [0x2a2420, 0x223846, 0x3b2c1e][variation % 3], roughness: .15, metalness: .12 });
+    const strobeMat = MeshBasicMaterial ? new MeshBasicMaterial({ color: role === 'medic' ? 0x5ce094 : 0x58e8ff }) : reflectorMat;
     for (const s of [-1, 1]) {
       add(head,sphGeo,skinMat,s*.049,-.013,.087).scale.set(.027,.023,.016);
       const brow = add(head,sphGeo,hairMat,s*.033,.031,.100);
-      brow.scale.set(.022,.005,.007);
+      brow.scale.set(.024,.0055,.007);
       brow.rotation.z = s*.14;
-      add(head,sphGeo,lipMat,s*.032,.014,.102).scale.set(.018,.007,.007);
-      add(head,sphGeo,hairMat,s*.033,.014,.107).scale.set(.009,.005,.005);
+      add(head,sphGeo,scleraMat,s*.032,.014,.101).scale.set(.016,.0075,.0065);
+      add(head,sphGeo,irisMat,s*.032,.014,.1065).scale.set(.0075,.0065,.004);
       add(head,sphGeo,skinMat,s*.086,.002,-.004).scale.set(.014,.028,.018);
     }
     if (role === 'pilot' || role === 'operator') {
-      // Smooth rounded ballistic / HGU flight helmet + curved wrap visor + Peltor headset
+      // Smooth rounded ballistic / HGU flight helmet + NVG shroud + side rails + Peltor headset + IFF strobe
       const shell = add(head, sphGeo, helmetMat, 0, .044, -.006);
       shell.scale.set(.106, .100, .116);
+      add(head, sphGeo, strobeMat, 0, .142, -.024).scale.set(.016, .010, .022);
       if (role === 'pilot') {
         const brow = add(head, sphGeo, gearMat, 0, .072, .042);
         brow.scale.set(.094, .034, .084);
@@ -452,16 +462,18 @@
         const mic = rounded(head, gearMat, .012, .038, .012, .046, -.054, .102);
         mic.rotation.set(0, -.35, Math.PI / 2);
       } else {
-        // CS:GO CT FAST helmet + rounded tactical goggles + balaclava gaiter
         rounded(head, metalMat, .044, .032, .022, 0, .078, .110);
         const goggle = add(head, sphGeo, visorMat, 0, .020, .032);
         goggle.scale.set(.092, .034, .082);
         const gaiter = add(head, sphGeo, gearMat, 0, -.058, .012);
         gaiter.scale.set(.084, .064, .092);
+        const mic = rounded(head, gearMat, .010, .036, .010, .052, -.042, .098);
+        mic.rotation.set(0, -.35, Math.PI / 2);
       }
       for (const s of [-1, 1]) {
         const earcup = add(head, sphGeo, gearMat, s * .106, -.004, -.004);
         earcup.scale.set(.024, .040, .036);
+        rounded(head, metalMat, .012, .042, .016, s * .104, .048, .018);
       }
     } else {
       // Smooth hair + rounded harbor hard-hat / peaked cap
@@ -526,7 +538,7 @@
       const hip = new Group();
       hip.name = 'human-hip';
       hip.position.set(sign * .096, .95, 0);
-      actor.add(hip);
+      fallbackRig.add(hip);
       const hipJoint = add(hip, sphGeo, pantsMat, 0, 0, 0);
       hipJoint.scale.set(.090, .086, .090);
       add(hip, loftOrganic(THREE, [
@@ -559,20 +571,101 @@
       return { shoulder, elbow, hip, knee, sign };
     });
 
-    function pose(mode = 'stand', stride = 0, age = 0, moving = false) {
+    let rifle = null;
+    let muzzleFlash = null;
+    if (armed && BoxGeometry) {
+      rifle = new Group();
+      rifle.name = 'human-tactical-rifle';
+      const gunMat = new MeshStandardMaterial({ color: 0x1e2328, roughness: .38, metalness: .72 });
+      const gripMat = new MeshStandardMaterial({ color: 0x2c302e, roughness: .78, metalness: .12 });
+      add(rifle, new BoxGeometry(.055, .078, .34), gunMat, 0, 0, .10);
+      add(rifle, new BoxGeometry(.044, .052, .22), gripMat, 0, -.004, .34);
+      const brl = add(rifle, cylGeo, metalMat, 0, .006, .49);
+      brl.rotation.x = Math.PI / 2; brl.scale.set(.013, .18, .013);
+      add(rifle, new BoxGeometry(.042, .085, .18), gripMat, 0, -.012, -.14);
+      const mag = add(rifle, new BoxGeometry(.032, .14, .055), gunMat, 0, -.09, .14);
+      mag.rotation.x = .18;
+      add(rifle, new BoxGeometry(.036, .042, .085), gearMat, 0, .058, .09);
+      if (MeshBasicMaterial) {
+        muzzleFlash = new Mesh(sphGeo, new MeshBasicMaterial({ color: 0xffd56a, transparent: true, opacity: .92 }));
+        muzzleFlash.scale.set(.06, .06, .16);
+        muzzleFlash.position.set(0, .006, .62);
+        muzzleFlash.visible = false;
+        rifle.add(muzzleFlash);
+      }
+      rifle.position.set(.02, -.29, .08);
+      rifle.rotation.x = Math.PI / 2;
+      limbs[1].elbow.add(rifle);
+    }
+
+    function flashMuzzle(on = true) {
+      if (muzzleFlash) muzzleFlash.visible = !!on;
+    }
+
+    let glbInstance = null;
+    let lastPoseState = { mode: 'stand', stride: 0, age: 0, moving: false };
+    if (!disableGlb && typeof window !== 'undefined' && window.SaltlineNpcModels?.attachToActor) {
+      const resolvedModelType = modelType || (
+        role === 'medic' ? 'female' :
+        (armed || role === 'pilot' || role === 'operator') ? 'soldier' : 'civilian'
+      );
+      window.SaltlineNpcModels.attachToActor(THREE, actor, {
+        modelType: resolvedModelType,
+        tintHex: coat,
+        onReady(inst) {
+          glbInstance = inst;
+          fallbackRig.visible = false;
+          glbInstance.updatePose(lastPoseState.mode, lastPoseState.stride, lastPoseState.age, lastPoseState.moving, 0.016);
+        },
+      });
+    }
+
+    const tmpHeadWorld = Vector3 ? new Vector3() : { x: 0, y: 1.6, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } };
+    function getHeadWorldPos(outVec) {
+      const target = outVec || tmpHeadWorld;
+      if (glbInstance?.getHeadWorldPos) {
+        return glbInstance.getHeadWorldPos(target);
+      }
+      if (head && typeof head.getWorldPosition === 'function') {
+        actor.updateMatrixWorld(true);
+        head.getWorldPosition(target);
+        target.y += 0.06;
+        return target;
+      }
+      if (typeof actor.getWorldPosition === 'function') {
+        actor.getWorldPosition(target);
+        target.y += 1.58;
+        return target;
+      }
+      target.set(actor.position.x, actor.position.y + 1.58, actor.position.z);
+      return target;
+    }
+
+    function pose(mode = 'stand', stride = 0, age = 0, moving = false, dtOverride = null) {
+      lastPoseState.mode = mode;
+      lastPoseState.stride = stride;
+      lastPoseState.age = age;
+      lastPoseState.moving = moving;
+      if (glbInstance) {
+        glbInstance.updatePose(mode, stride, age, moving, dtOverride);
+        return;
+      }
       const crouched = mode === 'crouch';
       const seated = mode === 'seated';
       const parachute = mode === 'parachute';
-      torso.position.y = crouched ? .65 : seated ? .66 : parachute ? .95 : .95 + Math.abs(Math.sin(stride)) * .022;
+      const talking = mode === 'talk';
+      const aiming = mode === 'aim' || (armed && crouched);
+      const breath = Math.sin(age * 2.2) * .006;
+      torso.position.y = crouched ? .65 : seated ? .66 : parachute ? .95 : .95 + Math.abs(Math.sin(stride)) * .022 + breath;
       torso.rotation.set(
-        crouched ? .18 : seated ? .08 : parachute ? .06 : .03,
-        moving ? Math.sin(stride) * .045 : 0,
+        crouched ? .18 : seated ? .08 : parachute ? .06 : aiming ? .05 : talking ? .04 + Math.sin(age * 2.1) * .02 : .03,
+        aiming ? -.18 : talking ? Math.sin(age * 1.1) * .06 : (moving ? Math.sin(stride) * .045 : 0),
         crouched ? -.04 : Math.sin(age * 1.7) * .01,
       );
       head.rotation.set(
-        crouched ? -.14 : parachute ? -.25 : -.03,
-        Math.sin(age * .8) * .15,
-        0,
+        crouched ? -.14 : parachute ? -.25 : talking ? Math.sin(age * 2.8) * .07 - .02 : -.03,
+        aiming ? .16 : talking ? Math.sin(age * 1.45) * .10 : Math.sin(age * .8) * .15,
+        talking ? Math.sin(age * 1.1) * .05 : 0,
       );
       limbs.forEach(({ shoulder, elbow, hip, knee, sign }, index) => {
         const swing = moving ? Math.sin(stride + index * Math.PI) : 0;
@@ -582,14 +675,27 @@
           hip.position.y = .95;
           hip.rotation.set(-.32, 0, sign * .06);
           knee.rotation.set(.58, 0, 0);
+        } else if (talking) {
+          const gesture = Math.sin(age * 2.4 + index * 1.3);
+          shoulder.rotation.set(-.26 - Math.max(0, gesture) * .28, index === 1 ? -.10 : .10, sign * .10);
+          elbow.rotation.set(-.52 - Math.max(0, gesture) * .42, 0, 0);
+          hip.position.y = .95;
+          hip.rotation.set(0, 0, 0);
+          knee.rotation.set(0, 0, 0);
+        } else if (aiming && armed) {
+          shoulder.rotation.set(index === 1 ? -1.18 : -1.05, index === 1 ? -.12 : .34, sign * .06);
+          elbow.rotation.set(index === 1 ? -.38 : -.68, 0, 0);
+          hip.position.y = crouched ? .65 : .95;
+          hip.rotation.set(crouched ? (index === 0 ? -1.18 : -.45) : -swing * .38, 0, 0);
+          knee.rotation.set(crouched ? (index === 0 ? 1.48 : 1.25) : Math.max(swing, 0) * .64, 0, 0);
         } else {
           shoulder.rotation.set(
-            crouched ? (index === 0 ? -.44 : -.62) : seated ? -.52 : swing * .34 - .05,
+            crouched ? (index === 0 ? -.44 : -.62) : seated ? -.52 : (armed && index === 1 ? -.48 : swing * .34 - .05),
             0,
             sign * .07,
           );
           elbow.rotation.set(
-            crouched ? -.78 : seated ? -.72 : -.18 - Math.max(swing, 0) * .24,
+            crouched ? -.78 : seated ? -.72 : (armed && index === 1 ? -.62 : -.18 - Math.max(swing, 0) * .24),
             0,
             0,
           );
@@ -609,7 +715,10 @@
     }
 
     pose('stand', 0, 0, false);
-    return { actor, torso, head, limbs, pose };
+    return {
+      actor, torso, head, limbs, pose, flashMuzzle, rifle, getHeadWorldPos,
+      get hasGlb() { return !!glbInstance; },
+    };
   }
 
   window.SaltlineHandoffs = handoffs;

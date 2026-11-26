@@ -31,17 +31,20 @@
     const chassis = new Group();
     root.add(chassis);
 
-    // Armored SAR 4x4 Utility Truck Geometry
-    const bodyMat = new MeshStandardMaterial({ color: 0x2c3c42, roughness: .42, metalness: .52 });
+    // Realistic Satin-Metallic SAR 4x4 Tactical Patrol Truck Materials
+    const bodyMat = new MeshStandardMaterial({ color: 0x2a3940, roughness: .30, metalness: .64, envMapIntensity: 1.45 });
     bodyMat.bumpMap = world.mats?.get?.('steel_worn')?.bumpMap ?? null;
-    bodyMat.bumpScale = .008;
-    const trimMat = new MeshStandardMaterial({ color: 0x1c2124, roughness: .58, metalness: .55 });
-    const stripeMat = new MeshStandardMaterial({ color: 0xd95626, roughness: .45, metalness: .22 });
-    const tireMat = new MeshStandardMaterial({ color: 0x181a1b, roughness: .92, metalness: .06 });
-    const rimMat = new MeshStandardMaterial({ color: 0x515a59, roughness: .52, metalness: .78 });
-    const glassMat = new MeshStandardMaterial({ color: 0x6ea4bc, roughness: .12, metalness: .4, transparent: true, opacity: .25, depthWrite: false });
-    const headGlow = new MeshBasicMaterial({ color: 0xfff3d1 });
-    const tailGlow = new MeshBasicMaterial({ color: 0xff3b28 });
+    bodyMat.bumpScale = .006;
+    const trimMat = new MeshStandardMaterial({ color: 0x181c1f, roughness: .62, metalness: .42 });
+    const stripeMat = new MeshStandardMaterial({ color: 0xd95626, roughness: .36, metalness: .28 });
+    const tireMat = new MeshStandardMaterial({ color: 0x151718, roughness: .94, metalness: .04 });
+    const rimMat = new MeshStandardMaterial({ color: 0x747e82, roughness: .28, metalness: .88, envMapIntensity: 1.35 });
+    const glassMat = new MeshStandardMaterial({ color: 0x172936, roughness: .06, metalness: .88, envMapIntensity: 1.6, transparent: true, opacity: .66, depthWrite: false });
+    const smokedLensMat = new MeshStandardMaterial({ color: 0x2b0a09, roughness: .14, metalness: .35 });
+    const headGlow = new MeshBasicMaterial({ color: 0xfff4d8 });
+    const tailGlow = new MeshBasicMaterial({ color: 0xe82c1e });
+    const amberGlow = new MeshBasicMaterial({ color: 0xffa62b });
+    const revGlow = new MeshBasicMaterial({ color: 0xeaf2f6 });
     const blueBar = new MeshBasicMaterial({ color: 0x38a8ff });
     const amberBar = new MeshBasicMaterial({ color: 0xffa828 });
 
@@ -154,17 +157,23 @@
     for(let row=0;row<5;row++) add(chassis,boxGeo,rimMat,1.10,.022,.042,0,.80+row*.053,-2.408);
     add(chassis,boxGeo,trimMat,2.06,.18,.22,0,.64,-2.37);
     add(chassis,boxGeo,rimMat,.64,.105,.08,0,.66,-2.48);
-    // Armored cab roof, A/B/C pillars, sloped windshield & side mirrors
+    // Armored cab roof, A/B/C pillars, sloped windshield, recessed rear cab window & side mirrors
     add(chassis, boxGeo, bodyMat, 1.88, .12, 1.78, 0, 1.82, -.02);
-    add(chassis, boxGeo, bodyMat, 1.90, .68, .14, 0, 1.46, .82); // Rear cab bulkhead
+    add(chassis, boxGeo, bodyMat, 1.90, .20, .14, 0, 1.22, .82);
+    add(chassis, boxGeo, bodyMat, 1.90, .14, .14, 0, 1.74, .82);
+    for (const sx of [-.78, .78]) add(chassis, boxGeo, bodyMat, .34, .46, .14, sx, 1.48, .82);
+    add(chassis, boxGeo, trimMat, 1.28, .44, .06, 0, 1.49, .85);
+    add(chassis, boxGeo, glassMat, 1.18, .36, .04, 0, 1.49, .875);
+    for (const mx of [-.24, .24]) add(chassis, boxGeo, trimMat, .032, .36, .055, mx, 1.49, .88);
+    add(chassis, boxGeo, tailGlow, .34, .045, .04, 0, 1.78, .89);
     for (const sx of [-.90, .90]) {
       const aPillar = add(chassis, boxGeo, trimMat, .09, .72, .09, sx, 1.46, -.82);
       aPillar.rotation.x = .22;
-      add(chassis, boxGeo, trimMat, .10, .68, .12, sx, 1.46, .02); // B-pillar
-      add(chassis, boxGeo, glassMat, .05, .52, 1.48, sx * .98, 1.48, -.02); // Side windows
+      add(chassis, boxGeo, trimMat, .10, .68, .12, sx, 1.46, .02);
+      add(chassis, boxGeo, glassMat, .05, .52, 1.48, sx * .98, 1.48, -.02);
       add(chassis, boxGeo, trimMat, .21, .035, .04, sx * 1.10, 1.36, -.73);
       add(chassis, boxGeo, trimMat, .17, .14, .09, sx * 1.24, 1.41, -.73);
-      add(chassis, boxGeo, rimMat, .13, .105, .012, sx * 1.24, 1.41, -.677); // Side mirrors
+      add(chassis, boxGeo, rimMat, .13, .105, .012, sx * 1.24, 1.41, -.677);
     }
     const windshield = add(chassis, boxGeo, glassMat, 1.76, .58, .06, 0, 1.47, -.88);
     windshield.rotation.x = .22;
@@ -172,19 +181,36 @@
       const blade = add(chassis,boxGeo,trimMat,.53,.016,.016,x,1.29,-.958);
       blade.rotation.z = .07;
     }
-    // Roof rack, whip comms antenna & dual-strobe emergency lightbar
+    // Roof rack, whip comms antenna & slim low-profile emergency lightbar
     for (const side of [-.73,.73]) add(chassis,boxGeo,trimMat,.045,.055,1.37,side,1.93,.02);
     for (const z of [-.57,.04,.6]) add(chassis,boxGeo,trimMat,1.49,.045,.045,0,1.91,z);
+    add(chassis, boxGeo, trimMat, 1.18, .04, .22, 0, 1.91, -.22);
+    add(chassis, boxGeo, glassMat, 1.16, .09, .20, 0, 1.96, -.22);
     add(chassis, cylGeo, trimMat, .052, .12, .052, .78, 1.99, .62);
     add(chassis, cylGeo, rimMat, .012, 1.08, .012, .78, 2.58, .62).name = 'roof-whip';
-    const leftBar = add(chassis, boxGeo, blueBar, .52, .11, .22, -.42, 1.96, -.22);
-    const rightBar = add(chassis, boxGeo, amberBar, .52, .11, .22, .42, 1.96, -.22);
-    // Rear cargo bed, tubular rollbar, mounted spare off-road tire & step bumper
-    for (const sx of [-.94, .94]) add(chassis, boxGeo, bodyMat, .12, .52, 1.54, sx, 1.32, 1.56);
-    add(chassis, boxGeo, bodyMat, 1.98, .50, .12, 0, 1.32, 2.30); // Tailgate
-    add(chassis, boxGeo, trimMat, 1.88, .14, .10, 0, 1.82, .96); // Rollbar top
+    const leftBar = add(chassis, boxGeo, blueBar, .46, .065, .14, -.32, 1.96, -.22);
+    const rightBar = add(chassis, boxGeo, amberBar, .46, .065, .14, .32, 1.96, -.22);
+    // Rear cargo bed, tubular rollbar, sculpted tailgate, handle, license plate, hitch, exhaust & mudflaps
+    for (const sx of [-.94, .94]) {
+      add(chassis, boxGeo, bodyMat, .12, .52, 1.54, sx, 1.32, 1.56);
+      add(chassis, boxGeo, trimMat, .14, .055, 1.56, sx, 1.59, 1.56);
+      add(chassis, boxGeo, trimMat, .32, .34, .035, sx * 1.06, .34, 1.96);
+    }
+    add(chassis, boxGeo, bodyMat, 1.98, .52, .12, 0, 1.32, 2.30);
+    add(chassis, boxGeo, trimMat, 1.98, .055, .15, 0, 1.59, 2.30);
+    add(chassis, boxGeo, trimMat, .34, .09, .05, 0, 1.44, 2.37);
+    add(chassis, boxGeo, trimMat, .48, .22, .04, 0, .94, 2.37);
+    add(chassis, boxGeo, revGlow, .40, .15, .02, 0, .94, 2.392);
+    const rearPlate = world.mats?.label?.('SAR-04', { color: 'black', font: 'stencil', distress: .08 });
+    if (rearPlate) {
+      const plateMesh = new Mesh(new THREE.PlaneGeometry(.36, .13), rearPlate.material);
+      plateMesh.position.set(0, .94, 2.405);
+      chassis.add(plateMesh);
+    }
+    add(chassis, boxGeo, stripeMat, 1.52, .055, .03, 0, 1.18, 2.365);
+    add(chassis, boxGeo, trimMat, 1.88, .12, .10, 0, 1.82, .96);
     for (const sx of [-.86, .86]) add(chassis, boxGeo, trimMat, .10, .62, .10, sx, 1.52, .96);
-    // Roof Remote Weapon Station (RWS) 12.7mm Heavy Machine Gun Turret (Battlefield-style armed 4x4!)
+    // Roof Remote Weapon Station (RWS) 12.7mm Heavy Machine Gun Turret
     const turretMount = new Group();
     turretMount.position.set(0, 1.90, .28);
     add(turretMount, cylGeo, trimMat, .28, .16, .28, 0, .08, 0);
@@ -200,8 +226,15 @@
     const spare = new Mesh(cylGeo, tireMat);
     spare.position.set(0, 1.26, 1.58); spare.rotation.x = .38; spare.scale.set(.38, .26, .38);
     chassis.add(spare);
-    add(chassis, boxGeo, trimMat, 2.12, .22, .22, 0, .62, 2.42); // Rear bumper
-    // Recessed headlights, fog lamps & taillights
+    // Stepped tactical steel rear bumper + hitch receiver + red recovery shackles + chrome exhaust tip
+    add(chassis, boxGeo, trimMat, .72, .20, .22, -.70, .62, 2.42);
+    add(chassis, boxGeo, trimMat, .72, .20, .22, .70, .62, 2.42);
+    add(chassis, boxGeo, trimMat, .70, .14, .20, 0, .59, 2.41);
+    add(chassis, boxGeo, trimMat, .16, .12, .16, 0, .48, 2.44);
+    for (const hx of [-.52, .52]) add(chassis, boxGeo, stripeMat, .07, .12, .11, hx, .54, 2.52);
+    const exhaust = add(chassis, cylGeo, rimMat, .052, .34, .052, .64, .46, 2.38);
+    exhaust.rotation.x = Math.PI / 2;
+    // Recessed headlights, fog lamps & multi-chamber smoked taillights
     for (const sx of [-.76, .76]) {
       add(chassis,boxGeo,trimMat,.47,.23,.09,sx,.94,-2.359);
       for (const dx of [-.096,.096]) {
@@ -209,7 +242,11 @@
         add(chassis,cushionGeo,headGlow,.066,.066,.021,sx+dx,.95,-2.441);
       }
       add(chassis, boxGeo, headGlow, .18, .10, .08, sx * .78, .66, -2.49);
-      add(chassis, boxGeo, tailGlow, .30, .18, .08, sx, .96, 2.38);
+      const tx = Math.sign(sx) * .84;
+      add(chassis, boxGeo, smokedLensMat, .24, .34, .08, tx, 1.24, 2.36);
+      add(chassis, boxGeo, tailGlow, .18, .14, .03, tx, 1.31, 2.40);
+      add(chassis, boxGeo, amberGlow, .18, .06, .03, tx, 1.20, 2.40);
+      add(chassis, boxGeo, revGlow, .18, .055, .03, tx, 1.13, 2.40);
     }
     // Real high-beam headlight SpotLight (starts OFF when parked to save GPU fragment cost!)
     const headlight = new SpotLight(0xfff1d6, 0, 72, .56, .48, 1.15);
@@ -471,6 +508,14 @@
       if (!driving) {
         hud.hidden = true;
         if (Math.abs(speed) > .05) speed *= Math.exp(-dt * 4); else speed = 0;
+        if (typeof physics?.groundHeight === 'function') {
+          const parkedG = physics.groundHeight(pos.x, pos.z, pos.y + 1.25);
+          if (Math.abs(parkedG - pos.y) > 0.02) {
+            pos.y += (parkedG - pos.y) * Math.min(1, dt * 16);
+            root.position.y = pos.y;
+            syncVehicleCollider();
+          }
+        }
         const dist = player?.pos ? player.pos.distanceTo(pos) : 999;
         const near = Boolean(player?.alive && dist <= 5.2);
         promptEl.hidden = !near;
@@ -676,7 +721,10 @@
 
     function setPosition(newPos) {
       if (!newPos) return;
-      pos.copy(newPos);
+      const gy = typeof physics?.groundHeight === 'function'
+        ? physics.groundHeight(newPos.x, newPos.z, Math.max((newPos.y ?? 0) + 1.5, 2.5))
+        : (newPos.y ?? 0);
+      pos.set(newPos.x, gy, newPos.z);
       speed = 0;
       root.position.copy(pos);
       syncVehicleCollider();

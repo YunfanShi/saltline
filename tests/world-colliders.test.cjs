@@ -187,7 +187,8 @@ test('Real Three.js: drivable SAR 4x4 registers parked collider, syncs on setPos
   assert.ok(vBox && !vBox.disabled, 'parked SAR 4x4 must have active collider');
   assert.ok(vBox.min.x < -26 && vBox.max.x > -26 && vBox.min.z < -20 && vBox.max.z > -20);
 
-  veh.setPosition(new THREE.Vector3(-50, 0.16, -60));
+  veh.setPosition(new THREE.Vector3(-50, 18, -60));
+  assert.ok(veh.pos.y <= 1.0, `setPosition must clamp floating vehicle to ground, got y=${veh.pos.y}`);
   assert.ok(vBox.min.x < -50 && vBox.max.x > -50 && vBox.min.z < -60 && vBox.max.z > -60);
 
   veh.setActive(false);
@@ -195,4 +196,25 @@ test('Real Three.js: drivable SAR 4x4 registers parked collider, syncs on setPos
 
   veh.dispose();
   assert.equal(physics.boxes.length, 0, 'dispose() must remove 4x4 collider');
+});
+
+test('Real index.html physics spatial grid covers west open-world (x < -108) buildings & overpass bridge', () => {
+  const physics = scope.createRealPhysics();
+  // West Cold-Storage building collider at x = -214..-196, z = 88..126
+  const westWall = physics.addBox([-214, 0, 88], [-196, 7.4, 126], { surface: 'metal', tag: 'west-cold-storage' });
+  // Overpass bridge deck at x = -150..-124, y = 5.05..5.60, z = -85..-71
+  const bridgeDeck = physics.addBox([-150.2, 5.05, -85.1], [-123.8, 5.60, -70.9], { surface: 'concrete', tag: 'bridge-deck' });
+  physics.build();
+
+  const nearWest = physics.nearby(-205, 0.4);
+  assert.ok(nearWest.includes(westWall), 'west-side building collider (x < -108) must be indexed in spatial columns');
+
+  const p = new THREE.Vector3(-195.5, 0.2, 105);
+  const res = physics.moveCapsule(p, new THREE.Vector3(-12, 0, 0), 0.2, 0.35, 1.8, true);
+  assert.equal(res.hitWall, true, 'player moving into west-side building must collide');
+  assert.ok(p.x >= -196.0, `player must not pass through west wall, got x=${p.x}`);
+
+  const nearBridge = physics.nearby(-137, 0.4);
+  assert.ok(nearBridge.includes(bridgeDeck), 'overpass bridge deck collider must be indexed in spatial columns');
+  assert.ok(Math.abs(physics.groundHeight(-137, -78, 6.5) - 5.60) < 0.01, 'bridge deck groundHeight must return 5.60m');
 });

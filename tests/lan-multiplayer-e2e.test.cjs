@@ -93,7 +93,7 @@ test('Authoritative LAN Server E2E: protocol check, 5 maps, coop_rescue mode, du
     assert.equal(st.status, 200);
     assert.equal(st.json.protocolVersion, 2);
     assert.equal(st.json.maps.length, 5);
-    assert.deepEqual(st.json.modes, ['conquest', 'breakthrough', 'coop_rescue']);
+    assert.deepEqual(st.json.modes, ['conquest', 'breakthrough', 'coop_rescue', 'coop_campaign', 'sandbox']);
 
     // 2. Reject wrong protocol version
     const badProto = await apiRequest(port, 'POST', '/api/lan/rooms', { name: 'OldClient', protocolVersion: 1 });
