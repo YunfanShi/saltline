@@ -7373,29 +7373,58 @@ if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
  const campHost=document.querySelector('[data-s="campaign"]');
  if(campHost&&!campHost.dataset.v2Mounted){
   campHost.dataset.v2Mounted='1';
-  const saveMgr=window.SaltlineCampaignV2.createCampaignSaveManager();
-  const setPieceMgr=window.SaltlineCampaignV2.createChapterSetPieceManager(i);
-  i.campaignV2={saveMgr,setPieceMgr,activeChapter:null};
-  window.mountSaltlineCampaignMenuV2(campHost,{
-   saveMgr,
+  const campaignV2=window.SaltlineCampaignV2.createSaltlineCampaignV2(i);
+  i.campaignV2=campaignV2;
+  let v2InteractCooldown=0;
+  const menuV2=window.mountSaltlineCampaignMenuV2(campHost,{
+   campaignV2,
    onLaunchChapter:(chapterId,opts={})=>{
-    const ch=window.SaltlineCampaignV2.getChapter(chapterId)||window.SaltlineCampaignV2.CHAPTERS[0];
-    i.campaignV2.activeChapter=ch;
-    setPieceMgr?.activateChapter?.(ch.id);
-    window.SALTLINE_OPEN_WORLD_ROAM=(opts.mode==='freeroam');
-    mode='mission';
     cleanupMultiplayerSession();
+    window.SALTLINE_OPEN_WORLD_ROAM=false;
+    window.SALTLINE_CAMPAIGN_V2_ACTIVE=true;
+    currentChapter='berth';
+    mode='mission';
     a(i.audio,'resume');
-    r.requestLock();
+    const started=campaignV2.startChapter(chapterId,opts);
+    const ch=started.chapter;
     U({skipIntro:true});
-    if(i.player?.pos&&ch?.spawn){i.player.pos.set(...ch.spawn);i.player.vel?.set?.(0,0,0);i.openWorld?.warmUpSync?.(i.player.pos);}
-    if(i.openWorld?.setSkyPreset&&Number.isInteger(ch?.skyPreset))i.openWorld.setSkyPreset(ch.skyPreset,true);
-    i.tactical?.notify?.(`📖 ${ch.code} · ${ch.titleZh}`,`📖 ${ch.code} · ${ch.titleEn}`,true,4.5);
+    menuV2?.showTransition?.(ch,()=>{
+     r.requestLock();
+     if(ch?.cutscene?.lines?.length){
+      ch.cutscene.lines.forEach(ln=>setTimeout(()=>{
+       if(window.SALTLINE_CAMPAIGN_V2_ACTIVE)i.tactical?.notify?.(`${ln.speaker}：${ln.line}`,`${ln.speaker}: ${ln.line}`,true,4.2);
+      },Math.round((ln.at||0.5)*1000)));
+     }
+    });
    },
-   onTraining:()=>{document.querySelector('[data-campaign-range]')?.click?.();},
-   onFreeRoam:()=>{document.querySelector('[data-act="openworld"]')?.click?.();},
-   onBack:()=>{document.querySelector('[data-s="campaign"] [data-act="home"]')?.click?.();},
+   onLaunchTraining:()=>{window.SALTLINE_CAMPAIGN_V2_ACTIVE=false;campaignV2.stop();document.querySelector('[data-campaign-range]')?.click?.();},
+   onLaunchFreeRoam:()=>{window.SALTLINE_CAMPAIGN_V2_ACTIVE=false;campaignV2.stop();document.querySelector('[data-act="openworld"]')?.click?.();},
   });
+  i.campaignMenuV2=menuV2;
+  i._v2InteractTick=(dt,playerPos,interactDown)=>{
+   if(v2InteractCooldown>0)v2InteractCooldown=Math.max(0,v2InteractCooldown-dt);
+   const obj=campaignV2.currentObjective;
+   if(!obj||!obj.target||!playerPos){o.setPrompt?.(null);return;}
+   const dist=Math.hypot(obj.target[0]-playerPos.x,obj.target[2]-playerPos.z);
+   if(dist<=7.5){
+    o.setPrompt?.(`[E] ${obj.titleZh}`,0);
+    if(interactDown&&v2InteractCooldown<=0){
+     v2InteractCooldown=1.2;
+     const res=campaignV2.advanceObjective();
+     if(res?.completedChapter){
+      menuV2?.render?.();
+      if(res.nextChapter){
+       const nx=campaignV2.startChapter(res.nextChapter.id);
+       menuV2?.showTransition?.(nx.chapter,()=>r.requestLock());
+      }else{
+       i.tactical?.notify?.('🌅 《盐线危机》全 14 章通关！已解锁自由探索','Saltline Crisis Complete!',true,6);
+      }
+     }else if(res?.objective){
+      i.tactical?.notify?.(`✅ 目标更新：${res.objective.titleZh}`,res.objective.titleZh,true,3.8);
+     }
+    }
+   }else{o.setPrompt?.(null);}
+  };
  }
 }
 let activeLanSession=null;
@@ -7592,7 +7621,11 @@ function U({skipIntro=false,quick=false,keepRetries=false}={}){
  if(mode==="mission"&&currentChapter==="berth"&&i.openWorld){
   e.fade=0;
   T();
-  if(window.SALTLINE_OPEN_WORLD_ROAM){
+  if(window.SALTLINE_CAMPAIGN_V2_ACTIVE&&i.campaignV2?.active){
+   i.openWorld.setFreeRoam(true,false);
+   const sp=i.campaignV2.currentChapter?.spawn;
+   if(sp&&i.player?.pos){i.player.pos.set(sp[0],sp[1],sp[2]);i.player.vel?.set?.(0,0,0);i.openWorld.warmUpSync?.(i.player.pos);}
+  }else if(window.SALTLINE_OPEN_WORLD_ROAM){
    i.openWorld.setFreeRoam(true,false);
    i.openWorld.teleportToSafeStart?.();
   }else{
@@ -7629,6 +7662,9 @@ function T(){
 function D(){
  if(conquest)return conquestText();
  if(campaign===hq&&campaign)return gameText(...hq.objective);
+ if(window.SALTLINE_CAMPAIGN_V2_ACTIVE&&i.campaignV2?.active){
+  return i.campaignV2.currentObjective?.titleZh||"";
+ }
  if(mode==="mission"&&currentChapter==="berth"&&i.openWorld){
   const owInfo=i.openWorld.currentObjective;
   return owInfo?gameText(owInfo.en,owInfo.zh):"";
@@ -7747,6 +7783,13 @@ function ue(dt){
  i.disasters?.update?.(dt,n);
  i.berthSlice?.update?.(dt,{player:n,berthPhase:berthCampaign?.phase});
  const tacBonus=i.tactical?.update?.(dt,{player:n,interact:r.down("interact"),chapterPhase:campaign?.phase,promptProgress:tacticalPromptProgress})??0;
+ if(window.SALTLINE_CAMPAIGN_V2_ACTIVE&&i.campaignV2?.active){
+  i.campaignV2.update(dt);
+  i.campaignMenuV2?.updateHud?.(n.pos);
+  i._v2InteractTick?.(dt,n.pos,r.down("interact"));
+  q();
+  return;
+ }
  if(mode==="mission"&&currentChapter==="berth"&&i.openWorld){
   q();
   return;
