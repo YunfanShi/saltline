@@ -9,10 +9,10 @@
   const WE = (window.WorldEngine = window.WorldEngine || {});
 
   const QUALITY_PRESETS = {
-    low:    { streamMul: 0.72, detailMul: 0.62, maxDprScale: 0.80, minDprScale: 0.62, budgetMs: 2.5 },
-    medium: { streamMul: 0.88, detailMul: 0.80, maxDprScale: 0.92, minDprScale: 0.70, budgetMs: 3.5 },
-    high:   { streamMul: 1.00, detailMul: 1.00, maxDprScale: 1.00, minDprScale: 0.75, budgetMs: 4.5 },
-    ultra:  { streamMul: 1.25, detailMul: 1.25, maxDprScale: 1.00, minDprScale: 0.85, budgetMs: 6.0 },
+    low:    { streamMul: 0.72, detailMul: 0.62, maxDprScale: 0.80, minDprScale: 0.62, budgetMs: 1.5 },
+    medium: { streamMul: 0.88, detailMul: 0.80, maxDprScale: 0.92, minDprScale: 0.70, budgetMs: 2.0 },
+    high:   { streamMul: 1.00, detailMul: 1.00, maxDprScale: 1.00, minDprScale: 0.75, budgetMs: 2.5 },
+    ultra:  { streamMul: 1.25, detailMul: 1.25, maxDprScale: 1.00, minDprScale: 0.85, budgetMs: 3.5 },
   };
 
   function createChunkManager({
@@ -62,7 +62,9 @@
       dormantClock: 0,
       lastDist: 999,
       priority: 0,
+      lastLodKey: '',
     }));
+    const queue = [];
     // Sectors can already be loaded when the manager takes ownership.
     // Register their resources before any of them are unloaded.
     for (const { sec } of chunks) {
@@ -159,7 +161,7 @@
       fpsEma = fpsEma * 0.90 + instFps * 0.10;
       frameMsEma = frameMsEma * 0.90 + (dt * 1000) * 0.10;
 
-      const queue = [];
+      queue.length = 0;
       for (const ch of chunks) {
         const { sec } = ch;
         const dist = playerPos ? playerPos.distanceTo(sec.center) : 999;
@@ -217,25 +219,36 @@
         }
       }
 
-      // Priority-sorted time-sliced incremental activation (prevents frame hitches!)
+      // Priority-sorted time-sliced incremental activation (max 1 heavy onBuild completion per frame to prevent hitches)
       if (queue.length) {
         queue.sort((a, b) => a.priority - b.priority);
         const deadline = t0 + preset.budgetMs;
+        let builtThisFrame = 0;
         for (let i = 0; i < queue.length; i++) {
-          if (activateChunk(queue[i]) === false) {
+          const ch = queue[i];
+          const needsBuild = typeof ch.sec.onBuild === 'function' && !ch.sec._built;
+          if (activateChunk(ch) === false) {
             if (nowMs() >= deadline) break;
             continue;
           }
-          if (queue[i].lastDist <= (queue[i].sec.detailRadius || 195) * preset.detailMul) {
-            queue[i].sec.detailed = true;
-            if (queue[i].sec.detail) queue[i].sec.detail.visible = true;
-            queue[i].lod = 0;
+          if (ch.lastDist <= (ch.sec.detailRadius || 195) * preset.detailMul) {
+            ch.sec.detailed = true;
+            if (ch.sec.detail) ch.sec.detail.visible = true;
+            ch.lod = 0;
           }
+          if (needsBuild && ++builtThisFrame >= 1) break;
           if (nowMs() >= deadline && i >= 0) break;
         }
       }
 
-      for (const ch of chunks) ch.sec.onLodChange?.(ch.sec.loaded, ch.sec.detailed, currentQuality);
+      for (const ch of chunks) {
+        if (!ch.sec.onLodChange) continue;
+        const lodKey = (ch.sec.loaded ? '1' : '0') + (ch.sec.detailed ? '1' : '0') + currentQuality;
+        if (ch.lastLodKey !== lodKey) {
+          ch.lastLodKey = lodKey;
+          ch.sec.onLodChange(ch.sec.loaded, ch.sec.detailed, currentQuality);
+        }
+      }
 
       // Adaptive Dynamic Resolution Scaler (respects user quality preset bounds)
       evalClock += dt;

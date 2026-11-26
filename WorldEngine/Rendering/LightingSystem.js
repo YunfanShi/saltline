@@ -109,6 +109,7 @@
     const dynamicLights = [];
     const emissiveMats = [];
     const mixed = new THREE.Color(), other = new THREE.Color();
+    const sunDir = new THREE.Vector3();
     const blendColor = (a, b, t) => mixed.setHex(a).lerp(other.setHex(b), t).getHex();
 
     function invalidateLightCache() {
@@ -152,6 +153,20 @@
       });
     }
 
+    const envCache = new Map();
+    function applyCachedEnvMap(slotKey, topHex, horizonHex, seaHex, sunHex, sunElev, direction) {
+      if (envCache.has(slotKey)) {
+        const cached = envCache.get(slotKey);
+        if (scene && cached?.texture) scene.environment = cached.texture;
+        return;
+      }
+      buildProceduralEnvMap(topHex, horizonHex, seaHex, sunHex, sunElev, direction);
+      if (envRT) {
+        envCache.set(slotKey, envRT);
+        envRT = null;
+      }
+    }
+
     function setTimeOfDay(hour) {
       timeOfDay = (hour % 24 + 24) % 24;
       let end = dayKeys.findIndex(p => p.hour > timeOfDay);
@@ -169,10 +184,13 @@
       p.hemiInt *= 1 - .08 * rain;
       syncSceneLightCache();
       const az = (timeOfDay - 6) * Math.PI / 12 - Math.PI * .35;
-      const dir = new THREE.Vector3(Math.cos(az) * Math.cos(p.sunElev), Math.sin(p.sunElev), Math.sin(az) * Math.cos(p.sunElev));
+      const cosElev = Math.cos(p.sunElev);
+      const sx = Math.cos(az) * cosElev, sy = Math.sin(p.sunElev), sz = Math.sin(az) * cosElev;
+      if (typeof sunDir.set === 'function') sunDir.set(sx, sy, sz);
+      else { sunDir.x = sx; sunDir.y = sy; sunDir.z = sz; }
       for (const light of lights) {
         if (light.isDirectionalLight) {
-          light.position.copy(dir).multiplyScalar(110);
+          light.position.copy(sunDir).multiplyScalar(110);
           light.color.setHex(p.sun); light.intensity = p.sunInt;
         } else {
           light.color.setHex(p.hemiSky); light.groundColor.setHex(p.hemiGnd); light.intensity = p.hemiInt;
@@ -182,7 +200,9 @@
       for (let i = dynamicLights.length - 1; i >= 0; i--) {
         const dl = dynamicLights[i];
         if (!dl.light.parent) { dynamicLights.splice(i, 1); continue; }
-        dl.light.intensity = dl.dayIntensity + (dl.nightIntensity - dl.dayIntensity) * nightFactor;
+        const nextInt = dl.dayIntensity + (dl.nightIntensity - dl.dayIntensity) * nightFactor;
+        dl.light.intensity = nextInt;
+        if ('visible' in dl.light) dl.light.visible = nextInt > 0.01;
       }
       for (const em of emissiveMats) {
         if ('emissiveIntensity' in em.mat) {
@@ -191,16 +211,17 @@
       }
       for (const u of skyUniforms) {
         u.uZen.value.setHex(p.envTop); u.uHor.value.setHex(p.envHor);
-        u.uHorAway?.value.setHex(p.fog); u.uSunDir?.value.copy(dir); u.uSunCol?.value.setHex(p.sun);
+        u.uHorAway?.value.setHex(p.fog); u.uSunDir?.value.copy(sunDir); u.uSunCol?.value.setHex(p.sun);
       }
       if (scene?.fog) {
         scene.fog.color.setHex(p.fog);
         if ('density' in scene.fog) scene.fog.density = p.density;
       }
       if (renderer) renderer.toneMappingExposure = p.exposure;
-      const slot = Math.floor(timeOfDay * 2);
+      // Coarse 4-band cached PMREM (dawn/day/sunset/night) eliminates periodic 75s GPU cubemap stalls!
+      const slot = timeOfDay < 6.5 || timeOfDay >= 20.5 ? 3 : (timeOfDay < 11.5 ? 0 : (timeOfDay < 16.5 ? 1 : 2));
       if (reflectionSlot !== slot) {
-        buildProceduralEnvMap(p.envTop, p.envHor, p.envSea, p.sun, p.sunElev, dir);
+        applyCachedEnvMap(slot, p.envTop, p.envHor, p.envSea, p.sun, p.sunElev, sunDir);
         reflectionSlot = slot;
       }
       p.nightFactor = nightFactor;
@@ -225,8 +246,18 @@
       dynamicLights.length = 0;
       emissiveMats.length = 0;
       invalidateLightCache();
-      if (scene?.environment === envRT?.texture && scene) scene.environment = previousEnvironment;
+      if (scene) {
+        let ownsEnv = envRT && scene.environment === envRT.texture;
+        if (!ownsEnv) {
+          for (const rt of envCache.values()) {
+            if (rt && scene.environment === rt.texture) { ownsEnv = true; break; }
+          }
+        }
+        if (ownsEnv) scene.environment = previousEnvironment;
+      }
       if (envRT) { envRT.dispose?.(); envRT = null; }
+      for (const rt of envCache.values()) rt?.dispose?.();
+      envCache.clear();
     }
 
     return {

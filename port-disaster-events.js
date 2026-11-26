@@ -147,6 +147,20 @@
     const scorchGeo = CircleGeometry ? new CircleGeometry(2.6, 14) : new PlaneGeometry(4.8, 4.8);
     const fireballGeo = new SphereGeometry(1, 14, 10);
     const shockGeo = new RingGeometry(.72, 1.0, 28);
+    const blastCoreBase = new MeshBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: .95, depthWrite: false });
+    const blastOuterBase = new MeshBasicMaterial({ color: 0xff5a18, transparent: true, opacity: .82, depthWrite: false });
+    const blastShockBase = new MeshBasicMaterial({ color: 0xffb357, transparent: true, opacity: .76, side: DoubleSide, depthWrite: false });
+    const jetHullMat = new MeshStandardMaterial({ color: 0x1d262e, roughness: .42, metalness: .65 });
+    const jetCanopyMat = new MeshStandardMaterial({ color: 0x3b6578, roughness: .15, metalness: .72 });
+    const jetBurnerMat = new MeshBasicMaterial({ color: 0xff8a2b, transparent: true, opacity: .94 });
+    const jetStrobeMat = new MeshBasicMaterial({ color: 0xff3b2f });
+    const jetFuselageGeo = new BoxGeometry(1.35, .82, 8.6);
+    const jetNoseGeo = new BoxGeometry(.82, .56, 2.4);
+    const jetCanopyGeo = new BoxGeometry(.78, .48, 2.1);
+    const jetWingGeo = new BoxGeometry(9.4, .18, 2.6);
+    const jetTailGeo = new BoxGeometry(.16, 1.45, 1.7);
+    const tracerMatOrange = new MeshBasicMaterial({ color: 0xff6229, transparent: true, opacity: .94 });
+    const tracerMatGold = new MeshBasicMaterial({ color: 0xffcf5c, transparent: true, opacity: .94 });
     const tempBolts = [];
     const pendingShells = [];
     const scorchMarks = [];
@@ -158,9 +172,9 @@
     let blastFlashTimer = null;
 
     function spawnFireballExplosion(pos, scale = 1.0) {
-      const coreMat = new MeshBasicMaterial({ color: 0xfff0b8, transparent: true, opacity: .95, depthWrite: false });
-      const outerMat = new MeshBasicMaterial({ color: 0xff5a18, transparent: true, opacity: .82, depthWrite: false });
-      const shockMat = new MeshBasicMaterial({ color: 0xffb357, transparent: true, opacity: .76, side: DoubleSide, depthWrite: false });
+      const coreMat = blastCoreBase.clone();
+      const outerMat = blastOuterBase.clone();
+      const shockMat = blastShockBase.clone();
       const core = new Mesh(fireballGeo, coreMat);
       const outer = new Mesh(fireballGeo, outerMat);
       const shock = new Mesh(shockGeo, shockMat);
@@ -427,31 +441,27 @@
 
     function buildInterceptorJet() {
       const g = new Group();
-      const hullMat = new MeshStandardMaterial({ color: 0x1d262e, roughness: .42, metalness: .65 });
-      const canopyMat = new MeshStandardMaterial({ color: 0x3b6578, roughness: .15, metalness: .72 });
-      const burnerMat = new MeshBasicMaterial({ color: 0xff8a2b, transparent: true, opacity: .94 });
-      const strobeMat = new MeshBasicMaterial({ color: 0xff3b2f });
-      const fuselage = new Mesh(new BoxGeometry(1.35, .82, 8.6), hullMat);
-      const nose = new Mesh(new BoxGeometry(.82, .56, 2.4), hullMat);
+      const fuselage = new Mesh(jetFuselageGeo, jetHullMat);
+      const nose = new Mesh(jetNoseGeo, jetHullMat);
       nose.position.set(0, -.04, 5.1);
-      const canopy = new Mesh(new BoxGeometry(.78, .48, 2.1), canopyMat);
+      const canopy = new Mesh(jetCanopyGeo, jetCanopyMat);
       canopy.position.set(0, .52, 1.8);
-      const wing = new Mesh(new BoxGeometry(9.4, .18, 2.6), hullMat);
+      const wing = new Mesh(jetWingGeo, jetHullMat);
       wing.position.set(0, -.06, -.4);
-      const tailL = new Mesh(new BoxGeometry(.16, 1.45, 1.7), hullMat);
+      const tailL = new Mesh(jetTailGeo, jetHullMat);
       tailL.position.set(-.88, .72, -3.5); tailL.rotation.z = .24;
-      const tailR = new Mesh(new BoxGeometry(.16, 1.45, 1.7), hullMat);
+      const tailR = new Mesh(jetTailGeo, jetHullMat);
       tailR.position.set(.88, .72, -3.5); tailR.rotation.z = -.24;
-      const burnL = new Mesh(fireballGeo, burnerMat);
+      const burnL = new Mesh(fireballGeo, jetBurnerMat);
       burnL.scale.set(.38, .38, 1.35); burnL.position.set(-.42, 0, -4.85);
-      const burnR = new Mesh(fireballGeo, burnerMat);
+      const burnR = new Mesh(fireballGeo, jetBurnerMat);
       burnR.scale.set(.38, .38, 1.35); burnR.position.set(.42, 0, -4.85);
-      const strobeL = new Mesh(fireballGeo, strobeMat);
+      const strobeL = new Mesh(fireballGeo, jetStrobeMat);
       strobeL.scale.setScalar(.22); strobeL.position.set(-4.65, 0, -.6);
-      const strobeR = new Mesh(fireballGeo, strobeMat);
+      const strobeR = new Mesh(fireballGeo, jetStrobeMat);
       strobeR.scale.setScalar(.22); strobeR.position.set(4.65, 0, -.6);
       g.add(fuselage, nose, canopy, wing, tailL, tailR, burnL, burnR, strobeL, strobeR);
-      return { group: g, mats: [hullMat, canopyMat, burnerMat, strobeMat], geos: [fuselage.geometry, nose.geometry, canopy.geometry, wing.geometry, tailL.geometry] };
+      return { group: g };
     }
 
     function spawnSkyTracer(origin, target) {
@@ -459,13 +469,13 @@
       const dist = dir.length();
       if (dist < 1) return;
       dir.divideScalar(dist);
-      const mat = new MeshBasicMaterial({ color: Math.random() > .35 ? 0xff6229 : 0xffcf5c, transparent: true, opacity: .94 });
+      const mat = Math.random() > .35 ? tracerMatOrange : tracerMatGold;
       const mesh = new Mesh(boltGeo, mat);
       mesh.scale.set(.42, 6.5, .42);
       mesh.position.copy(origin);
       mesh.quaternion.setFromUnitVectors(up, dir);
       fxRoot.add(mesh);
-      activeTracers.push({ mesh, mat, vel: dir.multiplyScalar(135), target: target.clone(), age: 0, dur: Math.min(.75, dist / 135) });
+      activeTracers.push({ mesh, vel: dir.multiplyScalar(135), target: target.clone(), age: 0, dur: Math.min(.75, dist / 135) });
     }
 
     function triggerSkyBattlePass({ from, to, strafeTarget, count = 2 } = {}) {
@@ -540,15 +550,8 @@
         if (f.light) fxRoot.remove(f.light);
         f.mat.dispose();
       }
-      for (const j of activeFlyovers.splice(0)) {
-        fxRoot.remove(j.group);
-        j.mats.forEach(m => m.dispose());
-        j.geos.forEach(g => g.dispose());
-      }
-      for (const tr of activeTracers.splice(0)) {
-        fxRoot.remove(tr.mesh);
-        tr.mat.dispose();
-      }
+      for (const j of activeFlyovers.splice(0)) fxRoot.remove(j.group);
+      for (const tr of activeTracers.splice(0)) fxRoot.remove(tr.mesh);
     }
 
     function update(dt, player) {
@@ -579,8 +582,6 @@
         }
         if (j.age >= j.dur) {
           fxRoot.remove(j.group);
-          j.mats.forEach(m => m.dispose());
-          j.geos.forEach(g => g.dispose());
           activeFlyovers.splice(i, 1);
         }
       }
@@ -593,7 +594,6 @@
           fx?.sparks?.(tr.target, up, 12);
           fx?.smoke?.(tr.target, { size: 2.0, life: 1.6, color: 0x26211d, alpha: .55, rise: .9, count: 2 });
           fxRoot.remove(tr.mesh);
-          tr.mat.dispose();
           activeTracers.splice(i, 1);
         }
       }
@@ -821,8 +821,8 @@
       if (disposed) return;
       disposed = true;
       stopAllEvents();
-      const geometries = new Set([boltGeo,ringGeo,scorchGeo,fireballGeo,shockGeo]);
-      const surfaces = new Set([boltMat,ringMat,scorchMat,crateMat,contRed,contBlue]);
+      const geometries = new Set([boltGeo,ringGeo,scorchGeo,fireballGeo,shockGeo,jetFuselageGeo,jetNoseGeo,jetCanopyGeo,jetWingGeo,jetTailGeo]);
+      const surfaces = new Set([boltMat,ringMat,scorchMat,crateMat,contRed,contBlue,blastCoreBase,blastOuterBase,blastShockBase,jetHullMat,jetCanopyMat,jetBurnerMat,jetStrobeMat,tracerMatOrange,tracerMatGold]);
       root.traverse(node => {
         if (node.geometry) geometries.add(node.geometry);
         if (node.material) surfaces.add(node.material);

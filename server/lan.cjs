@@ -30,7 +30,7 @@ const ASSETS = new Set([
   'WorldEngine/Assets/IndustrialGenerator.js', 'WorldEngine/Environment/AtmosphereSystem.js',
   'WorldEngine/Performance/ChunkManager.js',
   'WorldEngine/Terrain/TerrainGenerator.js', 'WorldEngine/Rendering/LightingSystem.js',
-  'port-external-assets.js', 'port-open-world-district.js', 'port-drivable-vehicle.js', 'port-disaster-events.js',
+  'port-external-assets.js', 'port-open-world-cinematics.js', 'port-open-world-district.js', 'port-drivable-vehicle.js', 'port-disaster-events.js',
   'developer-menu.js', 'developer-menu.css',
   'art/campaign-prologue.jpg', 'art/campaign-berth.jpg', 'art/campaign-rail.jpg', 'art/campaign-drydock.jpg', 'art/campaign-tidegate.jpg',
   'art/campaign-anchorage.jpg', 'art/campaign-return-harbor.jpg', 'art/campaign-night-record.jpg',

@@ -864,6 +864,12 @@
     window.addEventListener('mousedown', onMouseDown, { signal: world.chapterSignal });
     window.addEventListener('mouseup', onMouseUp, { signal: world.chapterSignal });
 
+    const tmpA = new Vector3();
+    const tmpB = new Vector3();
+    let lastHudText = '';
+    let lastWarnText = '';
+    let lastPromptText = '';
+
     function update(dt, player, enemies) {
       if (!active || !(dt > 0)) return;
       const conquest = getConquest?.();
@@ -959,19 +965,22 @@
             ? (v.spec.hasMissile ? t('Guided Missile', '制导导弹') : t('Coax MG', '同轴机枪'))
             : t('Primary Cannon', '主武器');
           const cmReady = now >= v.nextFlare ? t('[X] Ready', '[X] 就绪') : `${Math.ceil(v.nextFlare - now)}s`;
-          hud.textContent = `${t(v.spec.name, v.spec.zh)} · HP ${Math.ceil(v.hp)}/${v.maxHp} · ${Math.round(Math.abs(v.speed) * 3.6)} KM/H${v.spec.airborne ? ` · ALT ${Math.round(v.altitude)}m` : ''} · ${weaponName} · CM ${cmReady}`;
+          const nextHud = `${t(v.spec.name, v.spec.zh)} · HP ${Math.ceil(v.hp)}/${v.maxHp} · ${Math.round(Math.abs(v.speed) * 3.6)} KM/H${v.spec.airborne ? ` · ALT ${Math.round(v.altitude)}m` : ''} · ${weaponName} · CM ${cmReady}`;
+          if (nextHud !== lastHudText) { lastHudText = nextHud; hud.textContent = nextHud; }
 
           if (now < v.incomingUntil) {
             warnBanner.hidden = false;
             warnBanner.style.borderColor = '#ff3b28';
             warnBanner.style.color = '#ff5a40';
-            warnBanner.textContent = t('MISSILE INCOMING — PRESS [X] FLARES', '导弹来袭 — 按 [X] 释放热诱弹');
+            const nextWarn = t('MISSILE INCOMING — PRESS [X] FLARES', '导弹来袭 — 按 [X] 释放热诱弹');
+            if (nextWarn !== lastWarnText) { lastWarnText = nextWarn; warnBanner.textContent = nextWarn; }
           } else if (now < v.warningUntil) {
             warnBanner.hidden = false;
             warnBanner.style.borderColor = '#ffb347';
             warnBanner.style.color = '#ffd27d';
-            warnBanner.textContent = t('LOCK WARNING', '正在被雷达锁定');
-          } else {
+            const nextWarn = t('LOCK WARNING', '正在被雷达锁定');
+            if (nextWarn !== lastWarnText) { lastWarnText = nextWarn; warnBanner.textContent = nextWarn; }
+          } else if (!warnBanner.hidden) {
             warnBanner.hidden = true;
           }
         } else {
@@ -992,7 +1001,10 @@
       }
 
       promptEl.hidden = !nearestPrompt;
-      if (nearestPrompt) promptEl.textContent = nearestPrompt;
+      if (nearestPrompt && nearestPrompt !== lastPromptText) {
+        lastPromptText = nearestPrompt;
+        promptEl.textContent = nearestPrompt;
+      }
 
       for (let i = projectiles.length - 1; i >= 0; i--) {
         const p = projectiles[i];
@@ -1003,25 +1015,30 @@
             p.homingTarget = null;
           } else {
             if (tgt.incomingUntil !== undefined) tgt.incomingUntil = now + 0.6;
-            const tgtPos = tgt.pos.clone().add(new Vector3(0, (tgt.altitude ?? 0) + 1.0, 0));
-            const delta = tgtPos.sub(p.pos);
-            if (!guideMissile(p.vel, delta, p.speed, dt)) p.homingTarget = null;
+            tmpA.set(tgt.pos.x - p.pos.x, tgt.pos.y + (tgt.altitude ?? 0) + 1.0 - p.pos.y, tgt.pos.z - p.pos.z);
+            if (!guideMissile(p.vel, tmpA, p.speed, dt)) p.homingTarget = null;
           }
         } else {
           p.vel.y -= p.gravity * dt;
         }
         p.pos.addScaledVector(p.vel, dt);
         p.mesh.position.copy(p.pos);
-        if (p.isMissile) p.mesh.lookAt(p.pos.clone().add(p.vel));
+        if (p.isMissile) {
+          tmpA.copy(p.pos).add(p.vel);
+          p.mesh.lookAt(tmpA);
+        }
 
         const groundY = typeof physics?.groundHeight === 'function' ? physics.groundHeight(p.pos.x, p.pos.z, p.pos.y + 1) : 0;
         let exploded = p.life <= 0 || p.pos.y <= groundY + 0.1;
 
         if (!exploded) {
-          for (const e of [...(enemies ?? [])]) {
+          const hitR = p.isMissile ? 2.2 : 1.5;
+          const hitR2 = hitR * hitR;
+          for (const e of enemies ?? []) {
             if (!e?.alive || !e.pos) continue;
-            if (p.pos.distanceTo(e.pos) < (p.isMissile ? 2.2 : 1.5)) {
-              e.damage?.(p.damage, e.pos, p.vel.clone().normalize(), 'vehicle');
+            if (p.pos.distanceToSquared(e.pos) < hitR2) {
+              tmpB.copy(p.vel).normalize();
+              e.damage?.(p.damage, e.pos, tmpB, 'vehicle');
               exploded = true;
               break;
             }
@@ -1030,8 +1047,9 @@
         if (!exploded) {
           for (const v of vehicles) {
             if (!v.alive || v === playerVehicle) continue;
-            const vc = v.pos.clone().add(new Vector3(0, v.altitude + 1.2, 0));
-            if (p.pos.distanceTo(vc) < v.spec.radius + 0.8) {
+            tmpA.set(v.pos.x, v.pos.y + v.altitude + 1.2, v.pos.z);
+            const vr = v.spec.radius + 0.8;
+            if (p.pos.distanceToSquared(tmpA) < vr * vr) {
               damageVehicle(v, p.damage);
               exploded = true;
               break;
@@ -1042,10 +1060,15 @@
         if (exploded) {
           if (p.blast > 0) {
             fx?.explosion?.(p.pos, Math.min(2.0, p.blast * 0.35));
+            const blast2 = p.blast * p.blast;
             for (const e of [...(enemies ?? [])]) {
               if (!e?.alive || !e.pos) continue;
-              const d = p.pos.distanceTo(e.pos);
-              if (d < p.blast) e.damage?.(p.damage * (1 - d / p.blast), e.pos, e.pos.clone().sub(p.pos).normalize(), 'vehicle-blast');
+              const d2 = p.pos.distanceToSquared(e.pos);
+              if (d2 < blast2) {
+                const d = Math.sqrt(d2);
+                tmpB.subVectors(e.pos, p.pos).normalize();
+                e.damage?.(p.damage * (1 - d / p.blast), e.pos, tmpB, 'vehicle-blast');
+              }
             }
           }
           root.remove(p.mesh);

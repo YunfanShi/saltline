@@ -450,6 +450,13 @@
       return true;
     }
 
+    const goalVec = new Vector3();
+    const eyeVec = new Vector3();
+    const hitDirVec = new Vector3();
+    let lastRecText = '';
+    let lastDownedTitle = '';
+    let lastDownedSub = '';
+
     function update(dt, player, enemies) {
       if (!active || !(dt > 0)) return;
       const conquest = getConquest?.();
@@ -485,13 +492,18 @@
         const rate = spaceHeld ? 4.5 : 1.0;
         bleedoutRemaining = Math.max(0, bleedoutRemaining - dt * rate);
         const pct = Math.max(0, Math.min(100, (bleedoutRemaining / BLEEDOUT_S) * 100));
-        downedTitle.textContent = t(`DOWNED · ${Math.ceil(bleedoutRemaining)}s`, `濒死状态 · 剩余 ${Math.ceil(bleedoutRemaining)} 秒`);
-        downedBar.style.width = pct + '%';
-        downedSub.textContent = medicCalled
+        const nextTitle = t(`DOWNED · ${Math.ceil(bleedoutRemaining)}s`, `濒死状态 · 剩余 ${Math.ceil(bleedoutRemaining)} 秒`);
+        if (nextTitle !== lastDownedTitle) { lastDownedTitle = nextTitle; downedTitle.textContent = nextTitle; }
+        downedBar.style.width = pct.toFixed(1) + '%';
+        const nextSub = medicCalled
           ? t('Medic en route! Hold [Space] to give up.', '医疗兵正在赶来救援！长按 [空格] 放弃并重新部署。')
           : t('Press [H] to call Medic rescue · Hold [Space] to give up', '按 [H] 呼叫医疗兵救援 · 长按 [空格] 加速放弃');
-        btnCallMedic.textContent = t('H Call Medic', 'H 呼叫救援');
-        btnGiveUp.textContent = t('Give up now', '立即放弃');
+        if (nextSub !== lastDownedSub) {
+          lastDownedSub = nextSub;
+          downedSub.textContent = nextSub;
+          btnCallMedic.textContent = t('H Call Medic', 'H 呼叫救援');
+          btnGiveUp.textContent = t('Give up now', '立即放弃');
+        }
         if (world.camera && player?.pos) {
           world.camera.position.y = Math.min(world.camera.position.y, player.pos.y + 0.55);
         }
@@ -510,14 +522,19 @@
         if (e?.alive && e.pos) commander.reportEnemy(conquest.elapsed, e.pos, 'enemy-' + i);
       }
 
-      const aliveMembers = members.filter(m => m.alive);
-      const squadHealth = aliveMembers.length
-        ? aliveMembers.reduce((s, m) => s + m.hp / m.maxHp, 0) / members.length
+      let aliveCount = 0;
+      let hpRatioSum = 0;
+      for (let i = 0; i < members.length; i++) {
+        const m = members[i];
+        if (m.alive) { aliveCount++; hpRatioSum += m.hp / m.maxHp; }
+      }
+      const squadHealth = aliveCount
+        ? hpRatioSum / members.length
         : (player?.alive ? (player.health / player.maxHealth) : 0);
       const assignment = commander.evaluate(
         conquest.elapsed,
         conquest.points,
-        { at: player?.pos ?? { x: 0, z: 0 }, members: aliveMembers.length + (player?.alive ? 1 : 0), health: squadHealth },
+        { at: player?.pos ?? { x: 0, z: 0 }, members: aliveCount + (player?.alive ? 1 : 0), health: squadHealth },
         conquest.tickets.blue,
         conquest.tickets.red
       );
@@ -540,13 +557,17 @@
           RECON_OBJECTIVE: 'Recon',
           REGROUP: 'Regroup at',
         }[rec.mission] || 'Support';
-        recText.textContent = t(
+        const nextRec = t(
           `Commander: ${missionEn} ${rec.short} (${rec.reasonEn})`,
           `指挥官建议：${missionZh} ${rec.short} 点（${rec.reasonZh}）`
         );
-        recAccept.textContent = t('J Accept', 'J 接受');
-        recDismiss.textContent = t('K Dismiss', 'K 忽略');
-      } else {
+        if (nextRec !== lastRecText) {
+          lastRecText = nextRec;
+          recText.textContent = nextRec;
+          recAccept.textContent = t('J Accept', 'J 接受');
+          recDismiss.textContent = t('K Dismiss', 'K 忽略');
+        }
+      } else if (!recEl.hidden) {
         recEl.hidden = true;
       }
 
@@ -562,7 +583,7 @@
 
         if (!m.alive) {
           if (conquest.elapsed >= m.respawnAt) {
-            const sp = getSpawnPos?.() ?? player?.pos ?? new Vector3(0, 0, 0);
+            const sp = getSpawnPos?.() ?? player?.pos ?? goalVec.set(0, 0, 0);
             spawnMember(m, sp);
           }
           continue;
@@ -587,32 +608,34 @@
         m.reviveProgress = 0;
 
         // Priority 2: Move toward assigned objective (with per-member flanking offset)
-        let goal = null;
+        let hasGoal = false;
         if (targetPoint?.pos) {
-          goal = new Vector3(
+          goalVec.set(
             targetPoint.pos.x + m.offset[0] * 1.4,
             targetPoint.pos.y,
             targetPoint.pos.z + m.offset[1] * 1.4
           );
+          hasGoal = true;
         } else if (player?.pos) {
-          goal = new Vector3(player.pos.x + m.offset[0], player.pos.y, player.pos.z + m.offset[1]);
+          goalVec.set(player.pos.x + m.offset[0], player.pos.y, player.pos.z + m.offset[1]);
+          hasGoal = true;
         }
 
         const speed = reinforceBoost ? 5.8 : 4.6;
-        const moving = goal && m.pos.distanceTo(goal) > 2.2 ? steerToward(m, goal, dt, speed) : false;
+        const moving = hasGoal && m.pos.distanceToSquared(goalVec) > 4.84 ? steerToward(m, goalVec, dt, speed) : false;
 
         // Priority 3: Engage nearest visible enemy (respecting smoke screens!)
         let bestEnemy = null;
-        let bestDist = m.role === 'recon' ? 42 : 30;
-        const eye = m.pos.clone().add(new Vector3(0, 1.45, 0));
+        let bestDistSq = m.role === 'recon' ? 1764 : 900;
+        eyeVec.set(m.pos.x, m.pos.y + 1.45, m.pos.z);
         for (const e of enemies) {
           if (!e?.alive || !e.pos) continue;
-          const d = e.pos.distanceTo(m.pos);
-          if (d >= bestDist) continue;
-          if (conquest.smokeBlocks(eye, e.pos)) continue;
-          if (physics?.lineOfSight && !physics.lineOfSight(eye, e.pos)) continue;
+          const dSq = e.pos.distanceToSquared(m.pos);
+          if (dSq >= bestDistSq) continue;
+          if (conquest.smokeBlocks(eyeVec, e.pos)) continue;
+          if (physics?.lineOfSight && !physics.lineOfSight(eyeVec, e.pos)) continue;
           bestEnemy = e;
-          bestDist = d;
+          bestDistSq = dSq;
         }
 
         if (bestEnemy) {
@@ -621,18 +644,19 @@
           m.yaw += diff * Math.min(1, dt * 10);
           if (m.fireCooldown <= 0) {
             m.fireCooldown = m.role === 'recon' ? 1.5 : m.role === 'support' ? 0.75 : 1.05;
-            spawnTracer(eye, bestEnemy.pos);
+            spawnTracer(eyeVec, bestEnemy.pos);
             const dmg = m.role === 'recon' ? 26 : m.role === 'support' ? 15 : 18;
-            bestEnemy.damage?.(dmg, bestEnemy.pos, bestEnemy.pos.clone().sub(eye).normalize(), 'ally');
+            hitDirVec.subVectors(bestEnemy.pos, eyeVec).normalize();
+            bestEnemy.damage?.(dmg, bestEnemy.pos, hitDirVec, 'ally');
             fx?.sparks?.(bestEnemy.pos, up, 4);
-            audio?.play?.('sidearm_shot', { pos: eye, ref: 12, gain: 0.32, jitter: 0.05 });
+            audio?.play?.('sidearm_shot', { pos: eyeVec, ref: 12, gain: 0.32, jitter: 0.05 });
           }
         }
 
         // Enemies near squadmates can chip squadmate HP so squad losses feel real
         for (const e of enemies) {
           if (!e?.alive || !e.pos) continue;
-          if (e.pos.distanceTo(m.pos) < 12 && Math.random() < dt * 0.25) {
+          if (e.pos.distanceToSquared(m.pos) < 144 && Math.random() < dt * 0.25) {
             m.hp -= 12;
             if (m.hp <= 0) {
               m.alive = false;

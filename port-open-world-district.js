@@ -19,66 +19,66 @@
   const OPEN_WORLD_ACTS = Object.freeze([
     {
       id: 'ow-0', stage: 0, art: './art/campaign-berth.jpg',
-      title: ['Act I · Berth 4 Lockdown', '第一幕 · 四号泊位破局'],
+      title: ['Act I · The 05:31 Blackout', '第一幕 · 05:31 停电疑云'],
       description: [
-        'Destroy two Anvil air-defense jammers at Berth 4, survive the gunship ambush & crane collapse, and secure Old Hawke’s 05:31/05:34 discrepancy.',
-        '摧毁四号泊位 2 座铁砧防空干扰塔，触发炮艇空袭与 18 米龙门吊坍塌，锁定老霍克 05:31/05:34 篡改证物。'
+        'Triangulate and decode the hidden Anvil black-box at Berth 4, uncover the 17 missing Petrel crewmen, and break the jammer lockdown.',
+        '在四号泊位追踪加密信标并解码黑匣子，揭开「海燕号」17 名船员被扣真相，摧毁 2 座干扰塔冲破封锁。'
       ]
     },
     {
       id: 'ow-1', stage: 1, art: './art/campaign-return-harbor.jpg',
-      title: ['Act II · Coastal Boulevard Breach', '第二幕 · 沿海大道高速撞卡'],
+      title: ['Act II · Precinct Archive Heist', '第二幕 · 沿海大道冲卡与警务调档'],
       description: [
-        'Summon the SAR 4x4 ([G]/[F]) and smash through Anvil’s downtown highway blockade along Coastal Boulevard.',
-        '按 [G] 召唤并驾驶 SAR 战术四驱车，沿沿海大道向北高速撞穿铁砧城区主干道路障。'
+        'Smash Anvil’s Coastal Boulevard roadblock in the SAR 4x4, then hold the Coastal Precinct Dispatch for 14s to mirror the crew transfer logs.',
+        '驾驶 SAR 四驱车高速撞穿沿海大道封锁线，突入警务调度楼坚守 14 秒镜像下载船员转运档案。'
       ]
     },
     {
       id: 'ow-2', stage: 2, art: './art/campaign-night-record.jpg',
-      title: ['Act III · SW Cryo Depot & Clinic', '第三幕 · 西南冷雾库与雷暴急救'],
+      title: ['Act III · The Seventeenth Name', '第三幕 · 西南冷雾库与第 17 人真相'],
       description: [
-        'Push south into the Southwest Cold-Storage & Field Triage Clinic to destroy two cryo-locks under an incoming coastal lightning storm.',
-        '沿西线内陆大道南下西南冷雾库与战地分诊中心，击毁 2 台冷库锁控箱，在强雷暴中抢出第 17 人档案。'
+        'Follow the cold-chain manifest south, blow the cryo-locks in a lightning storm, and restore Thomas Vance’s damaged recorder at the clinic.',
+        '顺着冷链运单南下西南冷雾库，在雷暴中破除锁控箱，并于战地诊所修复托马斯受损的录音芯片。'
       ]
     },
     {
       id: 'ow-3', stage: 3, art: './art/campaign-rail.jpg',
-      title: ['Act IV · West Rail Freight Yard', '第四幕 · 西区铁路货场截停专列'],
+      title: ['Act IV · Halting the Manifest Train', '第四幕 · 西区铁路货场死线截车'],
       description: [
-        'Storm the West Rail Freight Yard and blow two marshalling signal breakers to halt Anvil’s manifest train amidst a fuel chain blast.',
-        '北上西区铁路编组货场，炸毁 2 处铁路信号主控闸，在油罐连爆冲击中迫停铁砧证物专列。'
+        'Blow two marshalling signal breakers to halt Anvil’s evidence train, then scan the manifest cars under fire to complete the 17-name dossier.',
+        '炸毁西区铁路两处信号主控闸迫停证物专列，随后在车厢旁完成 12 秒货单扫描取证，集齐完整《失联名单》。'
       ]
     },
     {
       id: 'ow-4', stage: 4, art: './art/campaign-last-pilot.jpg',
-      title: ['Act V · Mountain Ridge Comms (+14m)', '第五幕 · 西岸山地卫星站登顶狙击'],
+      title: ['Act V · Hijacking the Maritime Broadcast', '第五幕 · 西岸山顶夺取全城广播'],
       description: [
-        'Climb the West Mountain switchback to the +14m radar bunker and snipe three satellite cooling cores to hijack the broadcast link.',
-        '沿盘山高架公路爬升至 +14m 西岸山顶，狙击 3 个卫星散热芯劫持全城雷达链路。'
+        'Snipe three satellite cooling cores on the +14m ridge, tune the maritime frequency, and hold the uplink for 10s to expose Reed and Ward.',
+        '登顶 +14m 西岸雷达站狙击 3 个散热芯，手动校准海事卫星频段并守住上行链路 10 秒，向全城广播铁证。'
       ]
     },
     {
       id: 'ow-5', stage: 5, art: './art/campaign-tidegate.jpg',
-      title: ['Act VI · 12m East Sea Storm Surge', '第六幕 · 12 米东海海啸高地求生'],
+      title: ['Act VI · Zero-Hour Floodgate', '第六幕 · 零号泄洪与海啸坚守'],
       description: [
-        'Anvil blew the South Tide Gate. Hold the +14m mountain summit for 12 seconds as a 12-meter tsunami engulfs the harbor below.',
-        '铁砧炸毁南防潮闸引发 12 米风暴巨浪——死守 +14m 西岸山顶高地 12 秒，俯瞰巨浪吞没港区。'
+        'Ward detonated the South Tide Gate to erase the port. Survive 15 seconds on the +14m ridge as the 12m surge strikes and contact the rescue fleet.',
+        '沃德狗急跳墙引爆南防潮闸！在 +14m 山顶死守 15 秒熬过 12 米东海巨浪，并接通雾墙外的东海救援舰队。'
       ]
     },
     {
       id: 'ow-6', stage: 6, art: './art/campaign-drydock.jpg',
-      title: ['Act VII · South Drydock & Lighthouse', '第七幕 · 南港船坞炮火点灯'],
+      title: ['Act VII · Beacon Through the Fog', '第七幕 · 南港船坞炮火点灯'],
       description: [
-        'Push through artillery fire into the South Drydock peninsula and destroy two power jammers to relight the 22m headland lighthouse.',
-        '顶着重炮覆盖冲向南港旧船坞与海角，摧毁 2 座电源干扰器，重启 22 米岸角灯塔指引救援舰队。'
+        'Push through coastal artillery to clear two lighthouse power jammers, then calibrate the 22m optical lens to guide the rescue fleet into harbor.',
+        '穿越炮火覆盖清除南港 2 座电源干扰器，随后手动校准 22 米岸角灯塔光学透镜，为救援舰队破雾引航。'
       ]
     },
     {
       id: 'ow-7', stage: 7, art: './art/campaign-reopen.jpg',
-      title: ['Act VIII · Coastal Airfield Exfil', '第八幕 · 海岸应急机场跑道撤离'],
+      title: ['Act VIII · Runway Extraction', '第八幕 · 海岸应急机场绝境撤离'],
       description: [
-        'Race north to the NW Coastal Airfield under runway artillery and drive into the arched rescue hangar to complete the campaign.',
-        '全速北上西北沿海应急机场，沿 110 米跑道穿过炮火冲进拱形机库，完成全城战役撤离。'
+        'Race north under runway artillery to the NW Coastal Airfield hangar and lift off aboard the rescue transport as the truth reaches port.',
+        '顶着跑道重炮与战机拦截全速冲入西北机场拱形机库，乘救援运输机升空撤离，让十七个名字重见天日。'
       ]
     }
   ]);
@@ -358,11 +358,16 @@
       const quality = world.quality?.name;
       return quality === 'low' ? 45 : quality === 'medium' ? 70 : Infinity;
     }
-    updaters.push(() => {
+    let poleCheckT = 0.2;
+    updaters.push(dt => {
+      poleCheckT += dt;
+      if (poleCheckT < 0.2) return;
+      poleCheckT = 0;
       const position = world.camera?.position;
       const radius = streetDetailRange();
+      const rSq = radius * radius;
       for (const pole of utilityPoles) {
-        pole.visible = !position || position.distanceToSquared(pole.position) <= radius * radius;
+        pole.visible = !position || position.distanceToSquared(pole.position) <= rSq;
       }
     });
 
@@ -434,6 +439,7 @@
       m.receiveShadow = true;
       m.matrixAutoUpdate = false;
       m.updateMatrix();
+      m.userData.staticBatchable = true;
       parent.add(m);
       return m;
     }
@@ -446,6 +452,7 @@
       m.receiveShadow = true;
       m.matrixAutoUpdate = false;
       m.updateMatrix();
+      m.userData.staticBatchable = true;
       parent.add(m);
       return m;
     }
@@ -674,26 +681,37 @@
       addBox(parent, M.glassWarm, .52, .07, .20, x + armDir * 1.55, y + 6.02, z, false);
     }
 
+    let sedanBodyGeo = null, sedanCabinGeo = null;
+    function getSedanGeos() {
+      if (sedanBodyGeo && sedanCabinGeo) return [sedanBodyGeo, sedanCabinGeo];
+      function makePanelGeo(outline, width, bevel) {
+        const shape = new THREE.Shape(outline.map(([z, y]) => new THREE.Vector2(-z, y)));
+        const shell = new THREE.ExtrudeGeometry(shape, {
+          depth: width, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel,
+          bevelSegments: 3, steps: 1, curveSegments: 12,
+        });
+        shell.translate(0, 0, -width / 2);
+        shell.rotateY(Math.PI / 2);
+        customGeos.push(shell);
+        return shell;
+      }
+      sedanBodyGeo = makePanelGeo([[-2.05,.36],[-2.08,.66],[-1.75,.76],[-1.22,.79],[-.78,.83],
+        [.85,.82],[1.65,.73],[2.08,.60],[2.09,.39],[1.73,.34],[1.67,.55],
+        [1.51,.70],[1.26,.73],[1.03,.64],[.88,.42],[.84,.31],[-.85,.31],
+        [-.94,.56],[-1.12,.70],[-1.37,.72],[-1.6,.62],[-1.73,.35]], 1.69, .036);
+      sedanCabinGeo = makePanelGeo([[-1.32,.80],[-.73,1.24],[-.45,1.32],[.46,1.31],[.72,1.22],[1.22,.81]], 1.46, .055);
+      return [sedanBodyGeo, sedanCabinGeo];
+    }
     function addParkedSedan(parent, x, y, z, yaw, mat) {
       const g = new Group();
       g.position.set(x, y, z);
       g.rotation.y = yaw;
-      // Shape side profiles in the longitudinal plane; bevel the sill and roof shoulders.
-      function bodyPanel(outline, width, material, bevel) {
-        const shape = new THREE.Shape(outline.map(([z,y]) => new THREE.Vector2(-z,y)));
-        const shell = new THREE.ExtrudeGeometry(shape, {
-          depth: width, bevelEnabled:true, bevelThickness:bevel, bevelSize:bevel,
-          bevelSegments:3, steps:1, curveSegments:12,
-        });
-        shell.translate(0,0,-width/2);
-        shell.rotateY(Math.PI/2);
-        g.add(new Mesh(shell,material));
-      }
-      bodyPanel([[-2.05,.36],[-2.08,.66],[-1.75,.76],[-1.22,.79],[-.78,.83],
-        [.85,.82],[1.65,.73],[2.08,.60],[2.09,.39],[1.73,.34],[1.67,.55],
-        [1.51,.70],[1.26,.73],[1.03,.64],[.88,.42],[.84,.31],[-.85,.31],
-        [-.94,.56],[-1.12,.70],[-1.37,.72],[-1.6,.62],[-1.73,.35]],1.69,mat,.036);
-      bodyPanel([[-1.32,.80],[-.73,1.24],[-.45,1.32],[.46,1.31],[.72,1.22],[1.22,.81]],1.46,smokedPane,.055);
+      const [bodyGeo, cabinGeo] = getSedanGeos();
+      const bodyMesh = new Mesh(bodyGeo, mat);
+      bodyMesh.matrixAutoUpdate = false; bodyMesh.updateMatrix(); bodyMesh.userData.staticBatchable = true;
+      const cabinMesh = new Mesh(cabinGeo, smokedPane);
+      cabinMesh.matrixAutoUpdate = false; cabinMesh.updateMatrix(); cabinMesh.userData.staticBatchable = true;
+      g.add(bodyMesh, cabinMesh);
       addBox(g,mat,1.49,.075,1.07,0,1.355,-.04);
       for (const side of [-1,1]) {
         addBox(g,mat,.04,.49,.09,side*.79,1.07,-.04);
@@ -869,7 +887,7 @@
         addBox(parent, M.steelGalv, w * .72, .16, 2.05, cx, baseY + h + ridgeH + .84, cz);
         for (const tx of [cx - w * .28, cx + w * .28]) {
           addCyl(parent, M.steelGalv, .38, .65, tx, baseY + h + ridgeH + .28, cz);
-          const turb = new Group(); turb.position.set(tx, baseY + h + ridgeH + .74, cz);
+          const turb = new Group(); turb.userData.noBatch = true; turb.position.set(tx, baseY + h + ridgeH + .74, cz);
           addCyl(turb, M.steelGalv, .52, .42, 0, 0, 0);
           addBox(turb, M.steelDark, 1.08, .32, .12, 0, 0, 0);
           addBox(turb, M.steelDark, .12, .32, 1.08, 0, 0, 0);
@@ -1066,7 +1084,7 @@
       let radarBar = null;
       if (hasRadar) {
         addCyl(g, M.steelDark, .38, 1.5, 0, roofY + 1.2, 0);
-        radarBar = new Group(); radarBar.position.set(0, roofY + 2.1, 0);
+        radarBar = new Group(); radarBar.userData.noBatch = true; radarBar.position.set(0, roofY + 2.1, 0);
         addBox(radarBar, M.craneWhite, 4.6, .36, .48, 0, 0, 0);
         addBox(radarBar, M.hazard, 4.7, .12, .52, 0, -.20, 0);
         g.add(radarBar);
@@ -1110,7 +1128,7 @@
         for (let px = -hs; px <= hs; px += 2.6) addBox(g, M.yellowPaint, .08, .96, .08, px, height + 1.2, rz);
       }
       addCyl(g, M.yellowPaint, 1.25, .65, hs + .85, 3.6, -2.5, Math.PI / 2, 0);
-      const trolley = new Group();
+      const trolley = new Group(); trolley.userData.noBatch = true;
       trolley.position.set(0, height - .85, 0);
       addBox(trolley, M.steelDark, 3.2, .95, 3.4, 0, 0, 0);
       addBox(trolley, M.craneWhite, 2.2, 1.75, 2.0, 0, -1.3, 2.2);
@@ -1177,7 +1195,7 @@
         addStay(.3, 33.4, 13.5, 20.2, sz);
         addStay(.3, 33.4, -10.0, 20.2, sz);
       }
-      const stsTrolley = new Group();
+      const stsTrolley = new Group(); stsTrolley.userData.noBatch = true;
       stsTrolley.position.set(12.5, 17.6, 0);
       addBox(stsTrolley, M.craneWhite, 3.2, 2.1, 2.6, 0, 0, 0);
       addBox(stsTrolley, M.glassCyan, 2.8, 1.0, 2.7, 0, -.1, 0);
@@ -1229,7 +1247,7 @@
       for (const fx of [chX - 1.35, chX + 1.35]) {
         for (const fz of [-2.4, 0, 2.4]) {
           addCyl(g, M.steelDark, .82, .45, fx, 4.72, fz);
-          const rotor = new Group(); rotor.position.set(fx, 4.86, fz);
+          const rotor = new Group(); rotor.userData.noBatch = true; rotor.position.set(fx, 4.86, fz);
           addBox(rotor, M.steelGalv, 1.42, .07, .18, 0, 0, 0);
           addBox(rotor, M.steelGalv, .18, .07, 1.42, 0, 0, 0);
           g.add(rotor); fans.push(rotor);
@@ -1561,7 +1579,7 @@
     // LIVE PATROLLING PORT LOGISTICS TRUCKS (2 articulated semi-trucks continuously driving Coastal Blvd!)
     {
       const makeLiveTruck = (laneX, startZ, dir, contMat) => {
-        const tg = new Group();
+        const tg = new Group(); tg.userData.noBatch = true;
         tg.position.set(laneX, .21, startZ);
         tg.rotation.y = dir > 0 ? 0 : Math.PI;
         addBox(tg, M.craneWhite, 2.46, 2.3, 2.4, 0, 1.86, 6.2);
@@ -1611,7 +1629,7 @@
 
     // Armored Multi-HP Tactical Objective Builder
     function spawnShootTarget(parent, { id, stage, labelZh, pos, radius = 1.45, tall = true, maxHp = 3 }) {
-      const g = new Group();
+      const g = new Group(); g.userData.noBatch = true;
       g.position.copy(pos);
       const rotor = new Group();
       if (tall) {
@@ -1920,13 +1938,12 @@
           lot.shell.visible = showFull;
           skyline.visible = !showFull;
         };
-        let architecture = null;
         let buildTask = null;
         lot.onBuild = () => {
-          if (!architecture) {
-            architecture = WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane });
+          if (!buildTask) {
+            const arch = lot._sharedGen || (lot._sharedGen = (window._slSharedLotGen || (window._slSharedLotGen = WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane }))));
             lot.colliderSpecs.length = 0;
-            buildTask = architecture.createCoastalBuildingTask(lot.shell, blk, { colliderTarget: lot.colliderSpecs });
+            buildTask = arch.createCoastalBuildingTask(lot.shell, blk, { colliderTarget: lot.colliderSpecs });
           }
           const done = buildTask.step();
           if (done) skyline.visible = false;
@@ -2163,7 +2180,7 @@
     const dishBase = new Group();
     dishBase.position.set(-198, summitY + 7.2, -78);
     addCyl(dishBase,M.steelDark,.84,3.8,0,1.9,0);
-    const dishHead = new Group(); dishHead.position.y = 4.7;
+    const dishHead = new Group(); dishHead.userData.noBatch = true; dishHead.position.y = 4.7;
     const reflector = new Group(); reflector.rotation.x = .94;
     const profile = Array.from({length:17}, (_,i) => {
       const r=i*4.8/16;
@@ -2252,6 +2269,7 @@
     addBox(airfield.detail, M.glassWarm, 8.0, .2, 1.4, hx, 9.2, hz);
     const parkedAircraft = window.createParkedTransport(THREE);
     const plane = parkedAircraft.root;
+    plane.userData.noBatch = true;
     plane.scale.setScalar(1.8);
     plane.updateMatrixWorld(true);
     const gearBounds = new THREE.Box3().setFromObject(plane, true);
@@ -2437,7 +2455,7 @@
     const crossingGates = [], crossingLamps = [];
     for (const [cx, cz, sign] of [[-151, 115.5, 1], [-122, 128.5, -1]]) {
       addCyl(horizonRoot, M.steelDark, .16, 3.8, cx, 2.0, cz);
-      const armPivot = new Group(); armPivot.position.set(cx, 1.35, cz);
+      const armPivot = new Group(); armPivot.userData.noBatch = true; armPivot.position.set(cx, 1.35, cz);
       for (let seg = 0; seg < 5; seg++) {
         addBox(armPivot, seg % 2 === 0 ? M.craneRed : M.craneWhite, .16, .16, 1.15, 0, 0, sign * (.7 + seg * 1.15));
       }
@@ -2467,7 +2485,7 @@
     railWest.colliderSpecs.push({ min: new Vector3(-148, .16, 141), max: new Vector3(-125, 12.0, 147), surface: 'concrete' });
     // LIVE MOVING ARTICULATED 5-CAR FREIGHT TRAIN on North-South Track 2 (x = -133)
     // Per-car tunnel visibility clipping ensures every car smoothly exits North Tunnel (-115) & enters South Tunnel (+144)!
-    const liveTrain = new Group();
+    const liveTrain = new Group(); liveTrain.userData.noBatch = true;
     liveTrain.position.set(-133, .16, -24);
     const buildTrainLoco = () => {
       const lg = new Group(); lg.rotation.y = -Math.PI / 2;
@@ -2812,13 +2830,21 @@
         return h;
       });
       let npcAge = 0;
+      let npcVisTimer = 0.2;
       updaters.push(dt => {
         npcAge += dt;
-        const position = world.camera?.position;
-        const radius = streetDetailRange();
+        npcVisTimer += dt;
+        const checkVis = npcVisTimer >= 0.2;
+        let position = null, rSq = Infinity;
+        if (checkVis) {
+          npcVisTimer = 0;
+          position = world.camera?.position;
+          const radius = streetDetailRange();
+          rSq = radius * radius;
+        }
         for (let i = 0; i < cityNpcs.length; i++) {
           const npc = cityNpcs[i];
-          npc.actor.visible = !position || position.distanceToSquared(npc.actor.position) <= radius * radius;
+          if (checkVis) npc.actor.visible = !position || position.distanceToSquared(npc.actor.position) <= rSq;
           if (npc.actor.visible) npc.pose('stand', 0, npcAge + i * 1.1, false);
         }
       });
@@ -2932,59 +2958,66 @@
 
     const actScripts = [
       {
+        tag: 'ACT I · 调查开始', sub: '「海燕号」17 名船员离奇失联，先追踪四号泊位的加密黑匣子信标',
         beats: [
-          { at: .2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '林恩，我拿到老霍克 05:34 亲笔签的值班交接条——可里德的封港系统却伪造他在 05:31 就离港了！' },
-          { at: 5.8, speaker: 'REED · PORT DIRECTOR（截获频道）', tone: 'hostile', line: '四号泊位已经封存！沃德，别让 SAR 的人把货单带出码头，干扰塔全功率压制！' },
-          { at: 11.4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '先打爆货场和码头这两座防空干扰塔！打掉它们，我们的救援信号就能冲破封锁！' },
+          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '林恩，凌晨 05:31 全港断电后，「海燕号」17 名船员全部失联——港务局长里德却谎称全员已安全离港。' },
+          { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '我刚截获一条来自四号泊位北侧货箱区的加密微弱信标！跟着左上角信号测向仪靠近，按 [E] 破解它！' },
         ],
         spawns: [['hound', -10, 0, -12], ['hound', 10, 0, 6]],
       },
       {
+        tag: 'ACT II · 城区突围', sub: '铁砧正销毁船员体检记录，撞穿沿海大道封锁线并镜像警务楼档案',
         beats: [
-          { at: .4, speaker: 'WARD · ANVIL COMMANDER（敌方频道）', tone: 'hostile', line: '05:50 搜救艇早已召回！所有单位封死沿海大道十字路口，连人带车给我拦截下来！' },
-          { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '按 [G] 召唤四驱车、[F] 上车！车顶 12.7mm 机枪按左键就能扫射——油门踩到底，直接撞穿前面路障！' },
+          { at: .4, speaker: 'WARD · ANVIL COMMANDER（敌方频道）', tone: 'hostile', line: '黑匣子被破译了！立刻销毁警务调度楼的船员体检单，所有单位封死沿海大道十字路口！' },
+          { at: 6.0, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '按 [G] 召唤四驱车、[F] 登车，高速撞穿沿海大道路障！冲进去后立刻去东侧警务调度楼抢拷档案！' },
         ],
         spawns: [['hound', -22, 0, -68], ['hound', -30, 0, -82], ['gull', -26, 12, -74]],
       },
       {
+        tag: 'ACT III · 冷链疑踪', sub: '警务档案指向西南冷雾库，那里封存着第 17 人托马斯的最后线索',
         beats: [
-          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '我哥托马斯·万斯是名单里被抹掉的第十七人——他生前发现铁砧借冷链集装箱走私军用干扰舱！' },
-          { at: 6.2, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '冷库主控已锁死！切掉西南片区高压配电，让风暴替我们把那批档案彻底封冻！' },
+          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '镜像档案解开了……我哥托马斯·万斯正是被抹掉的第 17 人！他的随身录音笔被封在西南冷雾库！' },
+          { at: 6.2, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '锁死西南冷库外置配电！把那批冷链货箱和录音证物全部冻死在雷暴里！' },
         ],
         spawns: [['hound', -146, 0, 70], ['hound', -144, 0, 96], ['gull', -154, 12, 78]],
       },
       {
+        tag: 'ACT IV · 死线截车', sub: '托马斯遗言揭露原始货单已装上货运专列，炸毁信号闸并登车扫描取证',
         beats: [
-          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '雷暴已经压过来了！铁砧正把四号泊位全部原始货单装上西区货运专列，准备钻进山洞转移！' },
-          { at: 6.2, speaker: 'LIN · SAR-04', tone: 'ally', line: '收到，绝不能让专列出谷！我会炸毁东股道和西塔台两处信号闸，把整列火车逼停在货场里！' },
+          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '托马斯的录音救了我们——铁砧正把四号泊位全部原始货单装上西区货运专列，准备钻进山洞毁尸灭迹！' },
+          { at: 6.2, speaker: 'LIN · SAR-04', tone: 'ally', line: '绝不让专列出谷！先炸毁东西两处铁路信号主控闸把火车逼停，再去车厢旁扫描完整货单！' },
         ],
         spawns: [['hound', -142, 0, -6], ['hound', -184, 0, 12], ['gull', -164, 13, 0]],
       },
       {
+        tag: 'ACT V · 夺取公频', sub: '17 人铁证集齐，登顶 +14m 西岸雷达站校准卫星向全城公开广播',
         beats: [
-          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '油罐连爆把专列彻底截停了！十七人的证物链齐了——开车冲上 +14m 西岸山顶，劫持卫星大锅公开广播！' },
-          { at: 6.4, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '全员死守山顶雷达站！如果他们连上海事局卫星，立刻启动「零号泄洪」，炸毁南防潮闸淹掉整座港区！' },
+          { at: .4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '全部 17 人的签收货单与扣押记录都扫描完毕了！冲上 +14m 西岸山顶，摧毁散热芯并校准卫星大锅公开广播！' },
+          { at: 6.4, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '死守山顶雷达站！一旦他们连上海事局公频，立刻启动「零号泄洪」炸毁南防潮闸！' },
         ],
         spawns: [['hound', -180, 14, -84], ['hound', -182, 14, -70], ['gull', -190, 26, -78]],
       },
       {
+        tag: 'ACT VI · 零号泄洪', sub: '南防潮闸已被引爆，在 +14m 山顶高地死守 15 秒等待东海救援舰队回电',
         beats: [
-          { at: .2, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '引爆南防潮闸！既然证据藏不住了，就让东海把整座盐线港冲干净！' },
-          { at: 5.5, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '名单已经上传完毕！抓紧掩体，12 米风暴潮正在拍碎海堤——在 +14m 山顶撑过这 12 秒！' },
+          { at: .4, speaker: 'WARD · ANVIL COMMANDER', tone: 'hostile', line: '既然藏不住，就让东海 12 米风暴潮把整座盐线港冲个干净！' },
+          { at: 5.4, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '《失联名单》已经发出去了！抓紧山顶掩体撑过这 15 秒，我正在等东海救援舰队的确认回电！' },
         ],
         spawns: [],
       },
       {
+        tag: 'ACT VII · 破雾引航', sub: '救援舰队受困海雾，清除南港干扰器并校准 22 米灯塔透镜指引舰队入港',
         beats: [
-          { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: 'SAR-04，已收到十七人《失联名单》铁证！救援舰队已抵东海雾墙外，但南角灯塔熄灭，请求立刻复明！' },
-          { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '洪峰退了！冲下盘山路直奔南港旧船坞——小心敌舰炮火，炸掉灯塔旁的干扰器点亮海湾！' },
+          { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: 'SAR-04，已收到十七人《失联名单》铁证！舰队已抵雾墙外，但南角灯塔被干扰熄灭，请求立刻复明！' },
+          { at: 6.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '洪峰退了！冲下山道直奔南港旧船坞——清除 2 座电源干扰器，再去灯塔基座手动校准主透镜！' },
         ],
         spawns: [['hound', -14, 0, 118], ['hound', 6, 0, 126], ['gull', 0, 14, 130]],
       },
       {
+        tag: 'ACT VIII · 绝境撤离', sub: '舰队先遣运输机已在西北机场机库起转引擎，穿越跑道炮火登机撤离',
         beats: [
-          { at: .2, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '已目视南角灯塔强光！先遣舰队正进港接管防务，西北机场救援运输机已启动引擎，全速前往机库汇合！' },
-          { at: 6.0, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '托马斯和十七个兄弟不会白白失联了……林恩，把油门踩到底，冲进 110 米跑道尽头的拱形机库！' },
+          { at: .3, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '已目视南角灯塔强光！先遣舰队正进港接管防务，西北机场救援运输机已就位，全速前往拱形机库！' },
+          { at: 6.0, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '托马斯和十七个兄弟终于等到了真相……林恩，把油门踩到底，冲进 110 米跑道尽头的机库！' },
         ],
         spawns: [['hound', -154, 0, -174], ['gull', -168, 14, -182]],
       },
@@ -2994,36 +3027,44 @@
       const act = OPEN_WORLD_ACTS[idx];
       if (freeRoam || !act) return;
       const title = local(...act.title);
-      world.hud?.showChapter?.(title.split(' · ').at(-1));
-      if (actScripts[idx]?.beats) playStorySequence(actScripts[idx].beats);
+      const sc = actScripts[idx];
+      world.hud?.showChapter?.(title.split(' · ').at(-1), sc?.sub || '', sc?.tag || `ACT ${idx + 1}`);
+      if (sc?.beats) playStorySequence(sc.beats);
     }
 
     function spawnStageDefenders(idx) {
       if (freeRoam || world.developer?.flags?.noEnemies) return;
       const sc = actScripts[idx];
       if (!sc?.spawns?.length || typeof world.enemies?.spawn !== 'function') return;
-      for (const [type, x, y, z] of sc.spawns) {
-        try {
-          world.enemies.spawn(type, new Vector3(x, y, z), { state: 'alert', target: world.player?.pos ?? new Vector3(x, y, z) });
-        } catch {}
-      }
+      sc.spawns.forEach(([type, x, y, z], i) => {
+        storyTimers.push(setTimeout(() => {
+          if (freeRoam || !cityCampaignActive || world.developer?.flags?.noEnemies) return;
+          try {
+            world.enemies.spawn(type, new Vector3(x, y, z), { state: 'alert', target: world.player?.pos ?? new Vector3(x, y, z) });
+          } catch {}
+        }, i * 240));
+      });
     }
 
     // =========================================================================
     // DUAL MODE: OPEN WORLD SIGHTSEEING (freeRoam) <-> 8-ACT CITY CAMPAIGN
     // =========================================================================
     const owProgress = createOpenWorldCampaignProgress();
+    const storyDirector = window.createOpenWorldStoryDirector ? window.createOpenWorldStoryDirector(world) : null;
     const isMultiplayer = () => Boolean(world.game?.conquest);
     let freeRoam = !!(window.SALTLINE_OPEN_WORLD_ROAM || world.params?.mode === 'openworld');
     let cityCampaignActive = !freeRoam; // Default to 8-Act Battlefield Open-World Campaign in mission mode!
     let photoMode = false;
-    function syncOpenWorldMissionProps() {
+    let lastMissionPropsVisible = null;
+    function syncOpenWorldMissionProps(force = true) {
       const showProps = cityCampaignActive && !freeRoam && !isMultiplayer();
+      if (!force && showProps === lastMissionPropsVisible) return;
+      lastMissionPropsVisible = showProps;
       jammerRoot.visible = showProps;
       for (const t of shootTargets) t.group.visible = showProps && t.alive;
       for (const rb of roadblockProps) rb.mesh.visible = showProps && rb.intact;
     }
-    syncOpenWorldMissionProps();
+    syncOpenWorldMissionProps(true);
 
     const photoPill = document.createElement('div');
     photoPill.className = 'sl-photo-pill';
@@ -3045,6 +3086,9 @@
       window.SALTLINE_OPEN_WORLD_ROAM = freeRoam;
       if (freeRoam) {
         cityCampaignActive = false;
+        storyDirector?.stopCutscene?.(false);
+        storyDirector?.closeSignalTuner?.(false);
+        storyDirector?.setTracker?.({ active: false });
         world.hud?.setObjective?.('');
         world.hud?.showChapter?.('');
         world.hud?.setMarkers?.([]);
@@ -3392,17 +3436,128 @@
     // =========================================================================
     // 8-ACT CONNECTED COASTAL CITY CAMPAIGN ("盐线市·失联名单")
     // =========================================================================
-    let stage = 0;
+    let stage = 0, subStage = 0, holdProgress = 0, satTuned = false, precinctWaveSpawned = false;
     let tsunamiSurviveClock = 0, runwayArtilleryClock = 0, bridgeBarrageTriggered = false, introActShown = false;
     let act2ChaseTriggered = false, act8RunwayPassTriggered = false;
     const rayOrigin = new Vector3(), rayDir = new Vector3(), toTgt = new Vector3(), up = new Vector3(0, 1, 0);
 
+    const POS_BLACKBOX = new Vector3(-20, .5, -18);
+    const POS_PRECINCT = new Vector3(-10, .5, -56);
+    const POS_CLINIC_REC = new Vector3(-158, .5, 96);
+    const POS_TRAIN_SCAN = new Vector3(-164, .5, 4);
+    const POS_SAT_CONSOLE = new Vector3(-174, 14.5, -78);
+    const POS_LIGHTHOUSE_LENS = new Vector3(14, .5, 128);
+
+    interactables.push(
+      {
+        id: 'story-berth-blackbox', pos: POS_BLACKBOX, radius: 4.5,
+        getPrompt: () => (stage === 0 && subStage === 0 && cityCampaignActive && !freeRoam) ? '按 [E] 启动战术频谱仪解码「海燕号」加密黑匣子' : '',
+        use() {
+          if (!(stage === 0 && subStage === 0 && cityCampaignActive && !freeRoam)) return;
+          const ok = storyDirector?.openSignalTuner?.({
+            title: '解码「海燕号」加密黑匣子',
+            subtitle: '拦截到的港务局加密信标正在跳频，连续锁定 3 次金色频段提取 05:31 扣押令！',
+            locksNeeded: 3, speed: 0.95, zoneWidth: 0.22,
+            onSuccess() {
+              subStage = 1;
+              storyDirector?.setTracker?.({ active: false });
+              world.tactical?.notify?.('🔓 黑匣子解码成功！铁砧已警觉并开启 2 座防空干扰塔，立刻击毁它们！', '🔓 Black-box decoded! Destroy the 2 Berth 4 jammers!', true, 4.8);
+              playStorySequence([
+                { at: .2, speaker: 'REED · PORT DIRECTOR（截获频道）', tone: 'hostile', line: '有人破译了四号泊位加密信标！沃德，全功率启动干扰塔，绝不能让 SAR 把扣押令传出去！' },
+                { at: 5.2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '实锤拿到了！快打爆货场与码头这两座干扰塔，打通频道我们立刻北上追查体检档案！' },
+              ]);
+              spawnStageDefenders(0);
+            },
+          });
+          if (!ok) { subStage = 1; spawnStageDefenders(0); }
+        },
+        cleanup() {},
+      },
+      {
+        id: 'story-clinic-recorder', pos: POS_CLINIC_REC, radius: 5.0,
+        getPrompt: () => (stage === 2 && subStage === 1 && cityCampaignActive && !freeRoam) ? '按 [E] 启动频谱仪修复托马斯的受损录音芯片' : '',
+        use() {
+          if (!(stage === 2 && subStage === 1 && cityCampaignActive && !freeRoam)) return;
+          const ok = storyDirector?.openSignalTuner?.({
+            title: '修复托马斯·万斯的录音芯片',
+            subtitle: '冷库低温导致磁道偏移，连续锁定 3 次频段还原第 17 人的最后留言！',
+            locksNeeded: 3, speed: 1.05, zoneWidth: 0.20,
+            onSuccess() {
+              storyDirector?.setTracker?.({ active: false });
+              world.tactical?.notify?.('🎙️ 托马斯录音已修复！铁砧正用西区货运专列转移全部原始货单！', '🎙️ Recording restored! Manifests are on the West Rail train!', true, 4.8);
+              advanceToStage(3);
+            },
+          });
+          if (!ok) advanceToStage(3);
+        },
+        cleanup() {},
+      },
+      {
+        id: 'story-sat-uplink', pos: POS_SAT_CONSOLE, radius: 5.5,
+        getPrompt: () => (stage === 4 && subStage === 1 && !satTuned && cityCampaignActive && !freeRoam) ? '按 [E] 校准西岸卫星天线频段，准备全城广播《失联名单》' : '',
+        use() {
+          if (!(stage === 4 && subStage === 1 && !satTuned && cityCampaignActive && !freeRoam)) return;
+          const ok = storyDirector?.openSignalTuner?.({
+            title: '海事卫星公频上行校准',
+            subtitle: '散热芯已离线，锁定 3 次卫星同步频段后即可强行向东海救援舰队广播！',
+            locksNeeded: 3, speed: 1.15, zoneWidth: 0.18,
+            onSuccess() {
+              satTuned = true;
+              holdProgress = 0;
+              world.tactical?.notify?.('🛰️ 卫星链路已接通！保持在雷达基座 12m 内守住 10 秒完成广播！', '🛰️ Uplink locked! Hold within 12m for 10s to broadcast!', true, 4.5);
+            },
+          });
+          if (!ok) { satTuned = true; holdProgress = 0; }
+        },
+        cleanup() {},
+      },
+      {
+        id: 'story-lighthouse-lens', pos: POS_LIGHTHOUSE_LENS, radius: 5.5,
+        getPrompt: () => (stage === 6 && subStage === 1 && cityCampaignActive && !freeRoam) ? '按 [E] 手动校准 22 米南角灯塔光学透镜' : '',
+        use() {
+          if (!(stage === 6 && subStage === 1 && cityCampaignActive && !freeRoam)) return;
+          const ok = storyDirector?.openSignalTuner?.({
+            title: '校准 22 米南角灯塔主透镜',
+            subtitle: '风暴震偏了聚光棱镜，锁定 3 次相位让强光穿透东海雾墙！',
+            locksNeeded: 3, speed: 1.12, zoneWidth: 0.19,
+            onSuccess() {
+              lighthouseOverdrive = true;
+              storyDirector?.setTracker?.({ active: false });
+              world.disasters?.triggerVictoryFlareBarrage?.(new Vector3(14, 18, 134));
+              world.tactical?.notify?.('🗼 22 米南角灯塔强光重燃！东海救援舰队已突破风暴线！', '🗼 22m Lighthouse relit! Rescue fleet inbound!', true, 5.2);
+              const played = storyDirector?.playCutscene?.({
+                id: 'cine-act6-lighthouse',
+                tag: '剧情过场 · 破雾引航',
+                title: '南角灯塔重燃',
+                subtitle: '22 米强光穿透海雾，东海救援舰队全速驶入盐线港',
+                duration: 5.2,
+                camFrom: [-10, 12, 112], camTo: [4, 24, 108], lookAt: [14, 19, 134],
+                lines: [
+                  { at: .2, speaker: '东海救援舰队', tone: 'rescue', line: '已目视南角灯塔强光！先遣编队突破雾墙，正在进港接管防务！' },
+                  { at: 2.8, speaker: '玛拉·陈 · SAR-04', tone: 'ally', line: '成功了！西北应急机场的救援运输机已起转引擎，林恩，我们撤离！' },
+                ],
+                onComplete: () => advanceToStage(7),
+              });
+              if (!played) advanceToStage(7);
+            },
+          });
+          if (!ok) { lighthouseOverdrive = true; advanceToStage(7); }
+        },
+        cleanup() {},
+      }
+    );
+
     function advanceToStage(nextStage) {
       if (nextStage > stage) owProgress.completeStage(stage);
       stage = nextStage;
+      subStage = 0;
+      holdProgress = 0;
+      satTuned = false;
+      precinctWaveSpawned = false;
+      storyDirector?.setTracker?.({ active: false });
       if (nextStage < 8) {
         playActBriefing(nextStage);
-        spawnStageDefenders(nextStage);
+        if (nextStage !== 0) spawnStageDefenders(nextStage);
       }
     }
 
@@ -3411,16 +3566,23 @@
       cityCampaignActive = true;
       introActShown = true;
       window.SALTLINE_OPEN_WORLD_ROAM = false;
+      storyDirector?.stopCutscene?.(false);
+      storyDirector?.closeSignalTuner?.(false);
+      storyDirector?.setTracker?.({ active: false });
       if (world.developer?.flags) world.developer.flags.noEnemies = false;
       if (clearEnemies) world.enemies?.clear?.();
       const idx = Math.max(0, Math.min(7, Number(targetStage) || 0));
       stage = idx;
+      subStage = 0;
+      holdProgress = 0;
+      satTuned = false;
+      precinctWaveSpawned = false;
       customGpsTarget = null;
       bridgeBarrageTriggered = false;
       act2ChaseTriggered = false;
       act8RunwayPassTriggered = false;
       resetParkedAircraft();
-      tsunamiSurviveClock = idx === 5 ? 12.0 : 0;
+      tsunamiSurviveClock = idx === 5 ? 15.0 : 0;
       for (const t of shootTargets) {
         t.alive = t.stage >= idx;
         t.hp = t.maxHp;
@@ -3440,10 +3602,11 @@
       }
       if (idx === 6) world.disasters?.triggerArtilleryBarrage?.();
       playActBriefing(idx);
-      spawnStageDefenders(idx);
+      if (idx !== 0) spawnStageDefenders(idx);
     }
 
     function startFromLanding() {
+      storyDirector?.resetPlayed?.();
       jumpToStage(0, { teleport: false, clearEnemies: true });
     }
 
@@ -3453,6 +3616,10 @@
 
     function hitTarget(t) {
       if (!t.alive || freeRoam || !cityCampaignActive) return;
+      if (stage === 0 && subStage === 0) {
+        world.tactical?.notify?.('📡 请先在四号泊位北侧破解「海燕号」黑匣子信标（按 E）！', '📡 Decode the Berth 4 black-box first ([E])!', false, 2.8);
+        return;
+      }
       t.hp--;
       flashHitmarker(t.hp <= 0);
       fx?.sparks?.(t.pos, up, 20);
@@ -3474,28 +3641,62 @@
       const rem = shootTargets.filter(x => x.stage === stage && x.alive).length;
       if (stage === 0) {
         if (rem > 0) world.tactical?.notify?.(`💥 ${t.labelZh}已摧毁！还剩 ${rem} 座干扰塔`, `💥 Jammer down! ${rem} left!`, true, 4.0);
-        else { advanceToStage(1); world.berthSlice?.triggerClimaxSetPiece?.(); }
+        else {
+          world.berthSlice?.triggerClimaxSetPiece?.();
+          const played = storyDirector?.playCutscene?.({
+            id: 'cine-act1-breach',
+            tag: '剧情过场 · 封锁瓦解',
+            title: '四号泊位突围',
+            subtitle: '防空干扰已清除，铁砧紧急封锁沿海大道并企图销毁城区档案',
+            duration: 5.0,
+            camFrom: [-18, 12, -16], camTo: [-26, 15, -46], lookAt: [-26, 2.5, -76],
+            lines: [
+              { at: .2, speaker: '沃德 · 铁砧指挥官', tone: 'hostile', line: '干扰塔全毁！封死沿海大道十字路口，立刻清空警务调度楼里的船员体检记录！' },
+              { at: 2.6, speaker: '玛拉·陈 · SAR-04', tone: 'ally', line: '林恩，按 [G] 召唤四驱车、[F] 登车，冲破前面路障去警务调度楼抢回档案！' },
+            ],
+            onComplete: () => advanceToStage(1),
+          });
+          if (!played) advanceToStage(1);
+        }
       } else if (stage === 2) {
         if (rem > 0) world.tactical?.notify?.(`❄️ ${t.labelZh}已击毁！还剩 ${rem} 台！`, `❄️ Cryo-lock down! ${rem} left!`, false, 3.8);
-        else { advanceToStage(3); world.disasters?.triggerLightningStorm?.(); }
+        else {
+          subStage = 1;
+          world.disasters?.triggerLightningStorm?.();
+          world.tactical?.notify?.('❄️ 冷库气密锁已解除！快去西南战地诊所（-158, 96）按 [E] 修复托马斯录音芯片！', '❄️ Cryo-locks broken! Repair Thomas’s recorder at SW Clinic ([E])!', true, 5.0);
+        }
       } else if (stage === 3) {
         if (rem > 0) world.tactical?.notify?.(`🚂 ${t.labelZh}已炸毁！还剩 ${rem} 处！`, `🚂 Rail breaker down! ${rem} left!`, false, 3.8);
-        else { advanceToStage(4); world.disasters?.triggerFuelChainBlast?.(); }
+        else {
+          subStage = 1;
+          holdProgress = 0;
+          world.disasters?.triggerFuelChainBlast?.();
+          storyDirector?.playCutscene?.({
+            id: 'cine-act3-train',
+            tag: '剧情过场 · 专列迫停',
+            title: '铁轨死线截车',
+            subtitle: '油罐连爆迫停了铁砧证物专列，趁混乱靠近车厢扫描 17 人原始货单',
+            duration: 4.8,
+            camFrom: [-144, 14, -22], camTo: [-166, 10, 18], lookAt: [-164, 2.5, 4],
+            lines: [
+              { at: .2, speaker: '玛拉·陈 · SAR-04', tone: 'ally', line: '漂亮！信号闸瘫痪触发了紧急制动，整列货车都被逼停在编组站里了！' },
+              { at: 2.5, speaker: '林恩 · SAR-04', tone: 'ally', line: '我这就靠近专列车厢扫描原始货单，把 17 个人的完整名单带出来！' },
+            ],
+          });
+        }
       } else if (stage === 4) {
         if (rem > 0) world.tactical?.notify?.(`🎯 ${t.labelZh}已击毁！还剩 ${rem} 个！`, `🎯 Cooling core down! ${rem} left!`, false, 3.8);
         else {
-          tsunamiSurviveClock = 12.0;
-          world.disasters?.triggerTideGateDemolition?.();
-          world.disasters?.triggerTsunami?.();
-          advanceToStage(5);
+          subStage = 1;
+          satTuned = false;
+          holdProgress = 0;
+          world.tactical?.notify?.('🛰️ 散热芯全部离线！靠近山顶雷达主控台按 [E] 校准卫星公频！', '🛰️ Cooling cores down! Tune the satellite dish console ([E])!', true, 4.8);
         }
       } else if (stage === 6) {
         if (rem > 0) world.tactical?.notify?.(`🚨 ${t.labelZh}已摧毁！还剩 ${rem} 座！`, `🚨 Lighthouse jammer down! ${rem} left!`, false, 3.8);
         else {
-          lighthouseOverdrive = true;
-          world.disasters?.triggerVictoryFlareBarrage?.(new Vector3(14, 18, 134));
-          world.tactical?.notify?.('🗼 22 米南角灯塔强光重燃！东海救援舰队已突破风暴线！', '🗼 22m Lighthouse relit! Rescue fleet inbound!', true, 5.2);
-          advanceToStage(7);
+          subStage = 1;
+          world.tactical?.notify?.('🗼 干扰已清除！前往 22 米南角灯塔基座（14, 128）按 [E] 校准聚光透镜！', '🗼 Jammers cleared! Calibrate the 22m Lighthouse lens ([E])!', true, 4.8);
         }
       }
     }
@@ -3696,60 +3897,173 @@
         for (const b of sec.activeColliders.splice(0)) physics.removeBox(b);
       }
     }
+
+    // Spatially-chunked InstancedMesh batching for static addBox/addCyl/sedan meshes (cuts draw calls while preserving frustum culling & UVs)
+    function batchStaticGroup(container, cellSize = 64) {
+      if (!container || typeof THREE.InstancedMesh !== 'function' || typeof THREE.Matrix4 !== 'function') return;
+      container.updateMatrixWorld(true);
+      const invContainer = new THREE.Matrix4().copy(container.matrixWorld).invert();
+      const geoIds = new WeakMap();
+      const matIds = new WeakMap();
+      let nextGeoId = 1, nextMatId = 1;
+      const buckets = new Map();
+      const collect = node => {
+        if (!node || node.userData?.noBatch === true) return;
+        if (node.isMesh && node.userData?.staticBatchable === true && node.geometry && node.material && !Array.isArray(node.material)) {
+          let gId = geoIds.get(node.geometry);
+          if (!gId) { gId = nextGeoId++; geoIds.set(node.geometry, gId); }
+          let mId = matIds.get(node.material);
+          if (!mId) { mId = nextMatId++; matIds.set(node.material, mId); }
+          const localMat = new THREE.Matrix4().multiplyMatrices(invContainer, node.matrixWorld);
+          const cx = Math.floor(localMat.elements[12] / cellSize);
+          const cz = Math.floor(localMat.elements[14] / cellSize);
+          const key = `${gId}|${mId}|${node.castShadow ? 1 : 0}|${node.receiveShadow ? 1 : 0}|${cx}|${cz}`;
+          let b = buckets.get(key);
+          if (!b) {
+            b = { geo: node.geometry, mat: node.material, castShadow: !!node.castShadow, receiveShadow: !!node.receiveShadow, items: [] };
+            buckets.set(key, b);
+          }
+          b.items.push({ mesh: node, matrix: localMat });
+          return;
+        }
+        const children = node.children;
+        if (children && children.length) {
+          for (let i = 0; i < children.length; i++) collect(children[i]);
+        }
+      };
+      collect(container);
+      for (const b of buckets.values()) {
+        if (b.items.length < 2) continue;
+        const inst = new THREE.InstancedMesh(b.geo, b.mat, b.items.length);
+        inst.castShadow = b.castShadow;
+        inst.receiveShadow = b.receiveShadow;
+        inst.matrixAutoUpdate = false;
+        for (let i = 0; i < b.items.length; i++) {
+          inst.setMatrixAt(i, b.items[i].matrix);
+          const orig = b.items[i].mesh;
+          if (orig.parent) orig.parent.remove(orig);
+        }
+        inst.instanceMatrix.needsUpdate = true;
+        inst.updateMatrix();
+        inst.computeBoundingSphere?.();
+        container.add(inst);
+      }
+    }
+    batchStaticGroup(horizonRoot, 64);
+    for (const sec of sectors) {
+      batchStaticGroup(sec.shell, 64);
+      batchStaticGroup(sec.detail, 64);
+    }
+
     const chunkMgr = WE?.createChunkManager ? WE.createChunkManager({ renderer: world.renderer, sectors: [...sectors, ...parcels], quality: world.quality?.name || world.params?.q || 'high', syncColliders, targetFps: 55, manageResolution: false }) : null;
 
+    const POS_ROADBLOCK_HIT = new Vector3(-26, 0, -76);
+    const POS_AIRFIELD_EXFIL = new Vector3(-172, .2, -200);
+    let cachedMenuEl = null, cachedDevMenuEl = null;
+    let lastMenuHidden = null, lastInteractPrompt = '', interactPromptOn = false, lastObjectiveText = null;
+
     function currentObjectiveInfo() {
-      if (freeRoam || !cityCampaignActive || isMultiplayer() || stage >= 8) return { pos: null, zh: '', en: '' };
-      if (stage === 0) {
-        const next = shootTargets.find(t => t.stage === 0 && t.alive);
-        const done = 2 - shootTargets.filter(t => t.stage === 0 && t.alive).length;
-        return { pos: next?.pos, zh: `击毁四号泊位干扰塔 (${done}/2)`, en: `Destroy Berth Jammers (${done}/2)` };
+      if (freeRoam || !cityCampaignActive || isMultiplayer() || stage >= 8) {
+        return currentObjectiveInfo._empty || (currentObjectiveInfo._empty = { pos: null, zh: '', en: '' });
       }
-      if (stage === 1) return { pos: new Vector3(-26, .5, -76), zh: '北门按 [F] 开四驱车撞穿城区路障', en: 'Smash City Roadblock in 4x4 (F)' };
+      const sub = typeof subStage === 'number' ? subStage : 0;
+      const tuned = typeof satTuned === 'boolean' ? satTuned : false;
+      const pct = typeof holdProgress === 'number' ? Math.min(100, Math.round(holdProgress * 100)) : 0;
+      if (stage === 0) {
+        if (sub === 0) return { pos: currentObjectiveInfo._bb || (currentObjectiveInfo._bb = new Vector3(-20, .5, -18)), zh: '① 追踪四号泊位加密信标，靠近按 [E] 解码黑匣子', en: '1. Locate & decode the Berth 4 black-box ([E])' };
+        let next = null, aliveCount = 0;
+        for (let i = 0; i < shootTargets.length; i++) { const t = shootTargets[i]; if (t.stage === 0 && t.alive) { if (!next) next = t; aliveCount++; } }
+        const done = 2 - aliveCount;
+        return { pos: next?.pos, zh: `② 击毁四号泊位防空干扰塔 (${done}/2)`, en: `2. Destroy Berth 4 Jammers (${done}/2)` };
+      }
+      if (stage === 1) {
+        if (sub === 0) return { pos: currentObjectiveInfo._rb || (currentObjectiveInfo._rb = new Vector3(-26, .5, -76)), zh: '① 按 [G]/[F] 驾四驱车沿沿海大道撞穿路障', en: '1. Smash Coastal Blvd roadblock in 4x4 ([G]/[F])' };
+        return { pos: currentObjectiveInfo._pr || (currentObjectiveInfo._pr = new Vector3(-10, .5, -56)), zh: `② 坚守沿海警务调度楼镜像船员档案 (${pct}%)`, en: `2. Hold Coastal Precinct to mirror logs (${pct}%)` };
+      }
       if (stage === 2) {
-        const next = shootTargets.find(t => t.stage === 2 && t.alive);
-        const done = 2 - shootTargets.filter(t => t.stage === 2 && t.alive).length;
-        return { pos: next?.pos, zh: `攻入西南冷雾库击毁锁控箱 (${done}/2)`, en: `Break SW Cryo-Locks (${done}/2)` };
+        if (sub === 0) {
+          let next = null, aliveCount = 0;
+          for (let i = 0; i < shootTargets.length; i++) { const t = shootTargets[i]; if (t.stage === 2 && t.alive) { if (!next) next = t; aliveCount++; } }
+          const done = 2 - aliveCount;
+          return { pos: next?.pos, zh: `① 攻入西南冷雾库击毁外部锁控箱 (${done}/2)`, en: `1. Break SW Cryo-Locks (${done}/2)` };
+        }
+        return { pos: currentObjectiveInfo._cl || (currentObjectiveInfo._cl = new Vector3(-158, .5, 96)), zh: '② 前往西南战地诊所按 [E] 修复托马斯录音芯片', en: '2. Repair Thomas’s recorder at SW Clinic ([E])' };
       }
       if (stage === 3) {
-        const next = shootTargets.find(t => t.stage === 3 && t.alive);
-        const done = 2 - shootTargets.filter(t => t.stage === 3 && t.alive).length;
-        return { pos: next?.pos, zh: `西区铁路货场炸毁信号闸 (${done}/2)`, en: `Blow West Rail Breakers (${done}/2)` };
+        if (sub === 0) {
+          let next = null, aliveCount = 0;
+          for (let i = 0; i < shootTargets.length; i++) { const t = shootTargets[i]; if (t.stage === 3 && t.alive) { if (!next) next = t; aliveCount++; } }
+          const done = 2 - aliveCount;
+          return { pos: next?.pos, zh: `① 炸毁西区铁路两处信号主控闸迫停专列 (${done}/2)`, en: `1. Blow West Rail Breakers (${done}/2)` };
+        }
+        return { pos: currentObjectiveInfo._tr || (currentObjectiveInfo._tr = new Vector3(-164, .5, 4)), zh: `② 靠近停驶货运专列扫描 17 人原始货单 (${pct}%)`, en: `2. Scan manifest train cars (${pct}%)` };
       }
       if (stage === 4) {
-        const next = shootTargets.find(t => t.stage === 4 && t.alive);
-        const done = 3 - shootTargets.filter(t => t.stage === 4 && t.alive).length;
-        return { pos: next?.pos, zh: `登 +14m 西岸山顶狙击卫星散热芯 (${done}/3)`, en: `Snipe Mountain Cores (${done}/3)` };
+        if (sub === 0) {
+          let next = null, aliveCount = 0;
+          for (let i = 0; i < shootTargets.length; i++) { const t = shootTargets[i]; if (t.stage === 4 && t.alive) { if (!next) next = t; aliveCount++; } }
+          const done = 3 - aliveCount;
+          return { pos: next?.pos, zh: `① 登 +14m 西岸山顶狙击卫星散热芯 (${done}/3)`, en: `1. Snipe Mountain Cores (${done}/3)` };
+        }
+        if (!tuned) return { pos: currentObjectiveInfo._sm || (currentObjectiveInfo._sm = new Vector3(-174, 14.5, -78)), zh: '② 前往山顶雷达主控台按 [E] 校准卫星公频', en: '2. Tune satellite broadcast dish ([E])' };
+        return { pos: currentObjectiveInfo._sm || (currentObjectiveInfo._sm = new Vector3(-174, 14.5, -78)), zh: `③ 守住山顶雷达链路广播《失联名单》 (${pct}%)`, en: `3. Hold satellite uplink broadcast (${pct}%)` };
       }
-      if (stage === 5) return { pos: new Vector3(-174, 14.5, -78), zh: `12米东海海啸袭港！山顶避险 (${Math.ceil(tsunamiSurviveClock)}s)`, en: `Survive Tsunami (${Math.ceil(tsunamiSurviveClock)}s)` };
+      if (stage === 5) return { pos: currentObjectiveInfo._sm || (currentObjectiveInfo._sm = new Vector3(-174, 14.5, -78)), zh: `12米东海海啸袭港！死守山顶高地 (${Math.ceil(tsunamiSurviveClock)}s)`, en: `Hold mountain summit during tsunami (${Math.ceil(tsunamiSurviveClock)}s)` };
       if (stage === 6) {
-        const next = shootTargets.find(t => t.stage === 6 && t.alive);
-        const done = 2 - shootTargets.filter(t => t.stage === 6 && t.alive).length;
-        return { pos: next?.pos, zh: `南港岸角重启 22m 海湾灯塔 (${done}/2)`, en: `Restore South Lighthouse (${done}/2)` };
+        if (sub === 0) {
+          let next = null, aliveCount = 0;
+          for (let i = 0; i < shootTargets.length; i++) { const t = shootTargets[i]; if (t.stage === 6 && t.alive) { if (!next) next = t; aliveCount++; } }
+          const done = 2 - aliveCount;
+          return { pos: next?.pos, zh: `① 清除南港岸角灯塔电源干扰器 (${done}/2)`, en: `1. Destroy Lighthouse Jammers (${done}/2)` };
+        }
+        return { pos: currentObjectiveInfo._lh || (currentObjectiveInfo._lh = new Vector3(14, .5, 128)), zh: '② 前往 22m 灯塔基座按 [E] 校准光学聚光透镜', en: '2. Calibrate 22m Lighthouse lens ([E])' };
       }
-      if (stage === 7) return { pos: new Vector3(-172, .5, -200), zh: '撤离至西北机场机库', en: 'Extract at the airfield hangar' };
-      return { pos: null, zh: '', en: '' };
+      if (stage === 7) return { pos: currentObjectiveInfo._af || (currentObjectiveInfo._af = new Vector3(-172, .5, -200)), zh: '穿越跑道炮火，冲入西北机场拱形机库登机撤离', en: 'Race through runway fire to the airfield hangar' };
+      return currentObjectiveInfo._empty || (currentObjectiveInfo._empty = { pos: null, zh: '', en: '' });
     }
 
     function update(dt, playerPos) {
       if (!(dt > 0)) return;
-      const menuOpen = Boolean(document.querySelector('.menu.open') || document.querySelector('.developer-menu[open]'));
+      if (!cachedMenuEl || !cachedMenuEl.isConnected) cachedMenuEl = document.querySelector('.menu');
+      if (!cachedDevMenuEl || !cachedDevMenuEl.isConnected) cachedDevMenuEl = document.querySelector('.developer-menu');
+      const menuOpen = Boolean((cachedMenuEl && cachedMenuEl.classList.contains('open')) || (cachedDevMenuEl && cachedDevMenuEl.hasAttribute('open')));
       const inGame = !menuOpen && !isMultiplayer() && (!world.game || world.game.state === 'playing');
       if (world.backdrop?.skyline?.visible) world.backdrop.skyline.visible = false;
       if (world.backdrop?.lamps?.visible) world.backdrop.lamps.visible = false;
-      minimap.classList.toggle('sl-menu-hidden', !inGame);
+      const hideMinimap = !inGame;
+      if (hideMinimap !== lastMenuHidden) {
+        lastMenuHidden = hideMinimap;
+        minimap.classList.toggle('sl-menu-hidden', hideMinimap);
+      }
       if (!inGame) {
-        interactPrompt.classList.remove('on');
+        if (interactPromptOn) {
+          interactPromptOn = false;
+          interactPrompt.classList.remove('on');
+        }
         return;
       }
       atmosphereSys?.syncDaylight(lightingSys?.advance(dt));
       aliveClock += dt;
       for (const fn of updaters) fn(dt);
+      storyDirector?.update?.(dt);
 
-      syncOpenWorldMissionProps();
-      if (!introActShown && cityCampaignActive && !freeRoam && aliveClock > 1.8) {
+      syncOpenWorldMissionProps(false);
+      if (!introActShown && cityCampaignActive && !freeRoam && aliveClock > 1.2) {
         introActShown = true;
-        playActBriefing(0);
+        const played = storyDirector?.playCutscene?.({
+          id: 'cine-act0-intro',
+          tag: '序幕过场 · 盐线港 05:31',
+          title: '《失联名单》',
+          subtitle: '四号泊位突发全港停电，「海燕号」17 名船员神秘失踪',
+          duration: 5.6,
+          camFrom: [16, 15, 22], camTo: [-16, 10, -8], lookAt: [-20, 2.5, -18],
+          lines: [
+            { at: .2, speaker: '玛拉·陈 · SAR-04', tone: 'ally', line: '凌晨 05:31 全港断电，「海燕号」17 名船员集体失联，港务局长里德却强行封港称全员已离港。' },
+            { at: 2.9, speaker: '林恩 · SAR-04', tone: 'ally', line: '老霍克 05:34 的交接条证明他在撒谎。北侧货箱区有加密信标——先去破解它，找出真相！' },
+          ],
+          onComplete: () => playActBriefing(0),
+        });
+        if (!played) playActBriefing(0);
       }
 
       if (chunkMgr) {
@@ -3776,20 +4090,23 @@
       // Check proximity to Interactive Doors, Medical Stations, Armory & Evidence Consoles ([E])
       activeInteractable = null;
       if (playerPos && !mapOpen && !photoMode) {
-        let bestD = Infinity;
-        for (const it of interactables) {
-          const d = playerPos.distanceTo(it.pos);
-          if (d <= it.radius && d < bestD) { bestD = d; activeInteractable = it; }
+        let bestDSq = Infinity;
+        for (let i = 0; i < interactables.length; i++) {
+          const it = interactables[i];
+          const dSq = playerPos.distanceToSquared(it.pos);
+          if (dSq <= it.radius * it.radius && dSq < bestDSq) { bestDSq = dSq; activeInteractable = it; }
         }
       }
-      if (activeInteractable) {
-        interactPrompt.textContent = activeInteractable.getPrompt();
-        interactPrompt.classList.add('on');
-      } else {
+      const pText = activeInteractable ? activeInteractable.getPrompt() : '';
+      if (pText) {
+        if (pText !== lastInteractPrompt) { lastInteractPrompt = pText; interactPrompt.textContent = pText; }
+        if (!interactPromptOn) { interactPromptOn = true; interactPrompt.classList.add('on'); }
+      } else if (interactPromptOn) {
+        interactPromptOn = false;
         interactPrompt.classList.remove('on');
       }
 
-      if (customGpsTarget && playerPos && playerPos.distanceTo(customGpsTarget) < 12) {
+      if (customGpsTarget && playerPos && playerPos.distanceToSquared(customGpsTarget) < 144) {
         customGpsTarget = null;
       }
 
@@ -3797,8 +4114,9 @@
         supportState.supplyCd = Math.max(0, supportState.supplyCd - dt);
         supportState.artilleryCd = Math.max(0, supportState.artilleryCd - dt);
         supportState.smokeCd = Math.max(0, supportState.smokeCd - dt);
-        for (const op of outposts) {
-          if (!op.captured && playerPos && playerPos.distanceTo(op.pos) < 13) {
+        for (let i = 0; i < outposts.length; i++) {
+          const op = outposts[i];
+          if (!op.captured && playerPos && playerPos.distanceToSquared(op.pos) < 169) {
             op.progress = Math.min(100, op.progress + dt * 30);
             if (op.progress >= 100) {
               op.captured = true;
@@ -3825,19 +4143,121 @@
           }
           world.tactical?.notify?.('✈️ 敌方拦截机低空掠过沿海大道！追击无人机已锁定四驱车！', '✈️ Hostile jets overhead! Pursuit drones inbound!', true, 4.5);
         }
-        if (stage === 1 && playerPos && playerPos.distanceTo(new Vector3(-26, 0, -76)) < 7.5) {
+        if (stage === 0 && subStage === 0 && playerPos) {
+          const dist = playerPos.distanceTo(POS_BLACKBOX);
+          const strength = Math.max(0.08, Math.min(1, 1 - dist / 55));
+          storyDirector?.setTracker?.({
+            active: true,
+            label: '📡 加密信标测向',
+            value: dist <= 4.5 ? '已锁定 · 按 [E]' : `${Math.round(dist)}m`,
+            detail: dist <= 4.5 ? '目标黑匣子就在身旁，按 [E] 启动频谱解码仪' : '跟随信号强度增强方向搜索四号泊位北侧货箱区',
+            progress: strength,
+            accent: dist <= 4.5 ? 'green' : 'amber',
+          });
+        } else if (stage === 1 && subStage === 0 && playerPos && playerPos.distanceToSquared(POS_ROADBLOCK_HIT) < 56.25) {
           for (const rb of roadblockProps) { rb.intact = false; rb.mesh.visible = false; }
           const hitPos = new Vector3(-26, 1.0, -76);
           world.disasters?.triggerHighwayAmbush?.(hitPos);
-          advanceToStage(2);
-        }
-        if (stage === 5) {
+          subStage = 1;
+          holdProgress = 0;
+          world.tactical?.notify?.('💥 路障已撞穿！立刻前往东侧警务调度楼（-10, -56）坚守 14 秒镜像下载档案！', '💥 Roadblock breached! Hold Coastal Precinct for 14s to mirror logs!', true, 5.0);
+        } else if (stage === 1 && subStage === 1 && playerPos) {
+          const dSq = playerPos.distanceToSquared(POS_PRECINCT);
+          const inside = dSq <= 100;
+          if (inside) {
+            holdProgress = Math.min(1, holdProgress + dt / 14);
+            if (!precinctWaveSpawned && holdProgress >= 0.42) {
+              precinctWaveSpawned = true;
+              if (!world.developer?.flags?.noEnemies && typeof world.enemies?.spawn === 'function') {
+                try {
+                  world.enemies.spawn('gull', new Vector3(-20, 12, -48), { state: 'alert', target: playerPos });
+                  world.enemies.spawn('hound', new Vector3(-24, 0, -58), { state: 'alert', target: playerPos });
+                } catch {}
+              }
+              world.tactical?.notify?.('⚠️ 铁砧反侦察无人机正在逼近调度楼！守住信号圈！', '⚠️ Anvil drones closing on precinct! Hold the zone!', true, 3.8);
+            }
+          }
+          storyDirector?.setTracker?.({
+            active: true,
+            label: '💾 警务档案镜像下载',
+            value: `${Math.round(holdProgress * 100)}%`,
+            detail: inside ? '正在高速拷取船员体检与冷链转运单，保持在信号圈内！' : '请靠近沿海警务调度楼（-10, -56）恢复镜像下载',
+            progress: holdProgress,
+            accent: inside ? 'green' : 'amber',
+          });
+          if (holdProgress >= 1) {
+            storyDirector?.setTracker?.({ active: false });
+            world.tactical?.notify?.('✅ 警务档案镜像完成！发现托马斯的冷链运单指向西南冷雾库！', '✅ Logs mirrored! Manifest points to SW Cryo Depot!', true, 4.8);
+            advanceToStage(2);
+          }
+        } else if (stage === 3 && subStage === 1 && playerPos) {
+          const dSq = playerPos.distanceToSquared(POS_TRAIN_SCAN);
+          const inside = dSq <= 144;
+          if (inside) holdProgress = Math.min(1, holdProgress + dt / 12);
+          storyDirector?.setTracker?.({
+            active: true,
+            label: '🚂 货运专列货单扫描',
+            value: `${Math.round(holdProgress * 100)}%`,
+            detail: inside ? '正在扫描车厢内 17 名船员的原始签收单，注意警戒周围！' : '请靠近西区停驶的货运专列（-164, 4）继续扫描',
+            progress: holdProgress,
+            accent: inside ? 'green' : 'amber',
+          });
+          if (holdProgress >= 1) {
+            storyDirector?.setTracker?.({ active: false });
+            world.tactical?.notify?.('✅ 17 人《失联名单》原始铁证集齐！立刻冲上 +14m 西岸山顶劫持卫星广播！', '✅ Full 17-name manifest secured! Climb to the +14m ridge!', true, 5.0);
+            advanceToStage(4);
+          }
+        } else if (stage === 4 && subStage === 1 && satTuned && playerPos) {
+          const dSq = playerPos.distanceToSquared(POS_SAT_CONSOLE);
+          const inside = dSq <= 144;
+          if (inside) holdProgress = Math.min(1, holdProgress + dt / 10);
+          storyDirector?.setTracker?.({
+            active: true,
+            label: '🛰️ 海事公频广播上行',
+            value: `${Math.round(holdProgress * 100)}%`,
+            detail: inside ? '正在向东海海事局与全城公频广播铁证，守住雷达站！' : '请回到山顶卫星天线 12m 内维持上行链路！',
+            progress: holdProgress,
+            accent: inside ? 'green' : 'amber',
+          });
+          if (holdProgress >= 1) {
+            storyDirector?.setTracker?.({ active: false });
+            tsunamiSurviveClock = 15.0;
+            world.disasters?.triggerTideGateDemolition?.();
+            world.disasters?.triggerTsunami?.();
+            const played = storyDirector?.playCutscene?.({
+              id: 'cine-act5-tsunami',
+              tag: '剧情过场 · 零号泄洪',
+              title: '12 米东海海啸袭港',
+              subtitle: '《失联名单》已向全城公频广播——沃德引爆南防潮闸企图毁灭整座港区',
+              duration: 5.5,
+              camFrom: [-142, 26, -54], camTo: [-88, 22, 34], lookAt: [-26, 5, 96], lookAtEnd: [26, 6, 10],
+              lines: [
+                { at: .2, speaker: '沃德 · 铁砧指挥官', tone: 'hostile', line: '引爆南防潮闸！让 12 米东海风暴潮把整座盐线港冲个干净！' },
+                { at: 2.8, speaker: '玛拉·陈 · SAR-04', tone: 'ally', line: '名单已经发给救援舰队了！林恩，死守 +14m 山顶高地 15 秒，千万别下山！' },
+              ],
+              onComplete: () => advanceToStage(5),
+            });
+            if (!played) advanceToStage(5);
+          }
+        } else if (stage === 5) {
           tsunamiSurviveClock -= dt;
+          storyDirector?.setTracker?.({
+            active: true,
+            label: '🌊 东海海啸高地求生',
+            value: `${Math.max(0, Math.ceil(tsunamiSurviveClock))}s`,
+            detail: '保持在 +14m 西岸山顶等待洪峰退去并接收救援舰队回电',
+            progress: Math.max(0, Math.min(1, 1 - tsunamiSurviveClock / 15)),
+            accent: 'amber',
+          });
           if (tsunamiSurviveClock <= 0) {
+            storyDirector?.setTracker?.({ active: false });
             bridgeBarrageTriggered = false;
             advanceToStage(6);
           }
+        } else {
+          storyDirector?.setTracker?.({ active: false });
         }
+
         if (stage === 6 && !bridgeBarrageTriggered && playerPos && playerPos.z > 62) {
           bridgeBarrageTriggered = true;
           world.disasters?.triggerArtilleryBarrage?.();
@@ -3872,9 +4292,10 @@
               world.player?.addShake?.(.46);
             }
           }
-          if (playerPos.distanceTo(new Vector3(-172, .2, -200)) < 12.5) {
+          if (playerPos.distanceToSquared(POS_AIRFIELD_EXFIL) < 156.25) {
             owProgress.completeStage(7);
             stage = 8;
+            storyDirector?.setTracker?.({ active: false });
             world.hud?.setObjective?.('');
             world.hud?.showChapter?.('');
             world.hud?.setMarkers?.([]);
@@ -3882,20 +4303,40 @@
             finaleSpinActive = true;
             world.disasters?.stopAllEvents?.();
             world.disasters?.triggerVictoryFlareBarrage?.(new Vector3(-168, 2.5, -184));
-            playStorySequence([
-              { at: .2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '我们做到了，林恩！运输机螺旋桨已经起转，十七个人的名字一个都不会被抹掉！' },
-              { at: 4.4, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '全港区已由救援舰队接管，里德与沃德的通缉令已下达。欢迎归队，SAR-04。' },
-            ]);
-            storyTimers.push(setTimeout(() => {
+            const openFinale = () => {
               try { document.exitPointerLock?.(); } catch {}
               finaleCard.classList.add('open');
-            }, 5200));
+            };
+            const played = storyDirector?.playCutscene?.({
+              id: 'cine-act7-finale',
+              tag: '终章过场 · 真相昭雪',
+              title: '盐线港重归黎明',
+              subtitle: '救援运输机沿跑道腾空而起，十七个名字重见天日',
+              duration: 6.2,
+              camFrom: [-144, 6, -166], camTo: [-128, 20, -142], lookAt: [-172, 4, -184], lookAtEnd: [-192, 16, -184],
+              lines: [
+                { at: .3, speaker: '玛拉·陈 · SAR-04', tone: 'ally', line: '我们做到了，林恩！运输机螺旋桨已经起转，十七个人的名字一个都不会被抹掉！' },
+                { at: 3.1, speaker: '东海救援舰队', tone: 'rescue', line: '全港区已由救援舰队接管，里德与沃德的通缉令已下达。欢迎归队，SAR-04。' },
+              ],
+              onComplete: openFinale,
+            });
+            if (!played) {
+              playStorySequence([
+                { at: .2, speaker: 'MARA CHEN · SAR-04', tone: 'ally', line: '我们做到了，林恩！运输机螺旋桨已经起转，十七个人的名字一个都不会被抹掉！' },
+                { at: 4.4, speaker: 'MARITIME RESCUE FLEET · 东海救援舰队', tone: 'rescue', line: '全港区已由救援舰队接管，里德与沃德的通缉令已下达。欢迎归队，SAR-04。' },
+              ]);
+              storyTimers.push(setTimeout(openFinale, 5200));
+            }
           }
         }
       }
 
       const info = currentObjectiveInfo();
-      world.hud?.setObjective?.(local(info.en, info.zh));
+      const objText = local(info.en, info.zh);
+      if (objText !== lastObjectiveText) {
+        lastObjectiveText = objText;
+        world.hud?.setObjective?.(objText);
+      }
       const beaconTarget = customGpsTarget || info.pos;
       hudTimer += dt;
       if (hudTimer >= .25) {
@@ -3921,6 +4362,7 @@
 
     function dispose() {
       window.removeEventListener('keydown', onKeyDown, true);
+      storyDirector?.dispose?.();
       if (window.SALTLINE_INSPECT_VIEW === jumpInspectView) {
         delete window.SALTLINE_INSPECT_VIEW;
         delete window.SALTLINE_INSPECT_VIEWS;

@@ -264,7 +264,9 @@
 
     // 4-Corner Oriented Bumper Envelope Check (0.62m climb clearance prevents ramp/curb snags)
     const hitsPoint = (px, py, pz, r = .30) => {
-      const boxes = physics?.boxes;
+      // Spatial column lookup (8m cells) keeps this O(nearby) instead of O(all boxes);
+      // physics.nearby clamps out-of-range coords to the edge column, so results stay a superset.
+      const boxes = typeof physics?.nearby === 'function' ? physics.nearby(px, r) : physics?.boxes;
       if (!Array.isArray(boxes)) return false;
       for (let i = 0; i < boxes.length; i++) {
         const b = boxes[i];
