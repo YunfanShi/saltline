@@ -6926,6 +6926,8 @@ function enterHarbor(){
 function descendIntoHarbor(){
  const story=i.prologueDeploy==="story";
  arrivalState="descending";
+ // Immediately hide the descend prompt/button the moment descent begins
+ o.setPrompt?.("",0);
  const gloves=window.createSaltlineHandoffVisual?.(i,"descent",{glove:Vv,layer:zc});
  let cleaned=false;
  function releaseGloves(){
@@ -6934,12 +6936,17 @@ function descendIntoHarbor(){
   gloves?.dispose();
  }
  dispose(releaseGloves);
+ let cue1=false,cue2=false,cue3=false;
  const started=runCinematic("berth-descent",insertion.descentSeconds,(time,dt)=>{
   insertion.descend(time,dt,setFilmCamera);
   gloves?.update(time,insertion.descentSeconds);
+  if(!cue1&&time>0.35){cue1=true;filmDialogue({english:"Line clear! Wind 22 knots—fast-rope in, SAR-04!",chinese:"绳索净空！阵风 22 节，抓稳滑降，SAR-04！"});}
+  if(!cue2&&time>3.1){cue2=true;filmDialogue({english:"Thermal picks up Anvil patrols around MV Kittiwake. Weapons hot on touchdown.",chinese:"热成像在「海燕号」旁发现铁砧巡逻队，落地立刻戒备！"});}
+  if(!cue3&&time>5.9){cue3=true;filmDialogue({english:"Three meters—brace for deck impact!",chinese:"距地面三米——准备着陆！"});}
  },reason=>{
   arrivalState=null;
   releaseGloves();
+  o.setPrompt?.("",0);
   if(reason==="cancel")return;
   insertion.hide();
   i.prologueDeploy=null;
@@ -6949,6 +6956,8 @@ function descendIntoHarbor(){
   }
   n.reset({pos:landing,yaw:berth.playerStart.yaw});
   n.enabled=true;
+  n.addShake?.(.34);
+  i.audio?.play?.("rail_touchdown",{pos:landing,ref:18,gain:.68,jitter:.05});
   r.setGameplay(true);
   a(i.weapon,"setVisible",!i.params.noweapon);
   o.show(true);
@@ -6961,7 +6970,7 @@ function descendIntoHarbor(){
   }else{
    updateCampaignPresentation(false);
   }
-  storyRadio(["Control, boots on the ground. Moving in.","指挥部，已落地。正在进港。"],5);
+  storyRadio(["SAR-04, boots on deck at Berth 4. Radio blackout confirmed—moving in.","SAR-04 已在四号泊位着陆，确认全港无线电封锁——开始渗透。"],5.5);
  },{handoff:true});
  if(!started)releaseGloves();
 }

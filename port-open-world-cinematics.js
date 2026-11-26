@@ -59,7 +59,11 @@
       .sl-tuner-btn{padding:9px 18px;border:1px solid rgba(242,196,90,.55);background:#26332f;color:#faf6ea;font:700 13px/1 system-ui,sans-serif;cursor:pointer}
       .sl-tuner-btn.primary{background:#c89835;color:#0b1114;border-color:#ffe08a}
       .sl-tuner-btn:hover{filter:brightness(1.12)}
-      @media (max-width:760px){.sl-tracker{top:calc(206px + var(--sat, 0px));width:min(280px,68vw)}}
+      .sl-cod-stamp{position:fixed;left:28px;bottom:calc(12vh + 16px);z-index:44;pointer-events:none;font:700 13px/1.68 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.08em;color:#d6f5d6;text-shadow:0 1px 10px rgba(0,0,0,.95),0 0 12px rgba(92,224,148,.35);opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease}
+      .sl-cod-stamp.on{opacity:1;transform:translateY(0)}
+      .sl-cod-stamp-line{display:block;white-space:pre-wrap}
+      .sl-cod-stamp-line:first-child{color:#f2c45a;font-size:14px;letter-spacing:.14em}
+      @media (max-width:760px){.sl-tracker{top:calc(206px + var(--sat, 0px));width:min(280px,68vw)}.sl-cod-stamp{left:14px;bottom:10vh;font-size:11px}}
     `;
     document.head.appendChild(style);
   }
@@ -135,6 +139,43 @@
     const tuStatus = tunerBg.querySelector('.sl-tuner-status');
     const tuLockBtn = tunerBg.querySelector('[data-tuner-lock]');
     const tuCancelBtn = tunerBg.querySelector('[data-tuner-cancel]');
+
+    // 4. Call of Duty Tactical Typewriter Mission Stamp DOM
+    const stampEl = document.createElement('div');
+    stampEl.className = 'sl-cod-stamp';
+    document.body.appendChild(stampEl);
+    let stampTimer = null, stampFadeTimer = null;
+
+    function clearCodStamp() {
+      clearInterval(stampTimer); clearTimeout(stampFadeTimer);
+      stampTimer = stampFadeTimer = null;
+      stampEl.classList.remove('on');
+    }
+
+    function showCodStamp(lines = [], holdMs = 5200) {
+      if (!Array.isArray(lines) || !lines.length || document.body.classList.contains('audit-clean')) return;
+      clearCodStamp();
+      stampEl.innerHTML = '';
+      const els = lines.map(() => {
+        const s = document.createElement('span');
+        s.className = 'sl-cod-stamp-line';
+        stampEl.appendChild(s);
+        return s;
+      });
+      stampEl.classList.add('on');
+      let li = 0, ci = 0;
+      stampTimer = setInterval(() => {
+        if (li >= lines.length) {
+          clearInterval(stampTimer); stampTimer = null;
+          stampFadeTimer = setTimeout(() => stampEl.classList.remove('on'), holdMs);
+          return;
+        }
+        const target = lines[li];
+        ci += 2;
+        els[li].textContent = target.slice(0, ci) + (ci < target.length ? '▌' : '');
+        if (ci >= target.length) { li++; ci = 0; }
+      }, 26);
+    }
 
     // State
     let activeCine = null;
@@ -377,11 +418,13 @@
 
     function dispose() {
       window.removeEventListener('keydown', onKeyDown, true);
+      clearCodStamp();
       stopCutscene(false);
       closeSignalTuner(false);
       cineRoot.remove();
       trackerEl.remove();
       tunerBg.remove();
+      stampEl.remove();
     }
 
     return {
@@ -390,6 +433,8 @@
       openSignalTuner,
       closeSignalTuner,
       setTracker,
+      showCodStamp,
+      clearCodStamp,
       resetPlayed,
       update,
       dispose,

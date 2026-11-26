@@ -14,14 +14,17 @@
     function sampleHeight(x, z) {
       const fbm = Math.sin(x * 0.045 + z * 0.032) * 1.65 +
         Math.cos(x * 0.11 - z * 0.085) * 0.82 +
-        Math.sin(x * 0.23 + z * 0.19) * 0.34;
+        Math.sin(x * 0.23 + z * 0.19) * 0.34 +
+        Math.cos(x * 0.41 + z * 0.37) * 0.16;
       const ridge = 1.0 - Math.abs(Math.sin(z * 0.025 + x * 0.018));
-      const erosion = Math.max(0, Math.sin(z * 0.14) * Math.cos(x * 0.09)) * 0.85;
-      // Western highland escarpment rises smoothly west of x = -216
+      const erosion = Math.max(0, Math.sin(z * 0.14) * Math.cos(x * 0.09)) * 0.92 +
+        Math.pow(Math.max(0, Math.sin(z * 0.27 - x * 0.16)), 2) * 0.38;
+      // Western highland escarpment rises smoothly west of x = -216 with geological strata benches
       const westSlope = Math.max(0, Math.min(1, (-216 - x) / 16));
       const smoothWest = westSlope * westSlope * (3 - 2 * westSlope);
+      const strataBench = Math.sin(smoothWest * Math.PI * 3.0) * 0.26 * (1 - smoothWest * 0.5);
       const baseEscarp = 12.5 - 1.7 * Math.tanh((z - 6) / 46);
-      return 0.16 + smoothWest * (baseEscarp + fbm + ridge * 1.4 - erosion);
+      return 0.16 + smoothWest * (baseEscarp + fbm + ridge * 1.45 - erosion) + strataBench * smoothWest;
     }
 
     const regions = [
@@ -76,8 +79,15 @@
         const grade = Math.min(1,Math.hypot(sampleHeight(x+.5,z)-sampleHeight(x-.5,z),
           sampleHeight(x,z+.5)-sampleHeight(x,z-.5)));
         const inland = Math.min(1,Math.max(0,(-x-210)/12));
-        const sod = inland*(1-grade)*(.81+.13*Math.sin(x*.53+z*.34));
-        colors.push(1-.66*sod-.28*grade,1-.44*sod-.25*grade,1-.75*sod-.26*grade);
+        const coastalEdge = Math.min(1,Math.max(0,(x-18)/7));
+        const microNoise = 0.5 + 0.5 * Math.sin(x * 0.53 + z * 0.34) * Math.cos(x * 0.21 - z * 0.47);
+        const sod = inland * (1 - Math.min(1, grade * 1.35)) * (0.76 + 0.24 * microNoise);
+        const soil = inland * Math.max(0, 1 - Math.abs(grade - 0.38) * 3.2) * 0.45;
+        const rock = Math.max(0, (grade - 0.35) / 0.65);
+        const r = 0.96 - 0.62 * sod - 0.24 * soil - 0.44 * rock - 0.14 * coastalEdge;
+        const g = 0.96 - 0.40 * sod - 0.30 * soil - 0.42 * rock - 0.12 * coastalEdge;
+        const b = 0.94 - 0.70 * sod - 0.42 * soil - 0.40 * rock - 0.10 * coastalEdge;
+        colors.push(Math.max(0.14, r), Math.max(0.16, g), Math.max(0.14, b));
         if (i && j) {
           const d = j*(nx+1)+i, c=d-1,b=d-nx-1,a=b-1;
           indices.push(a,c,b,b,c,d);
@@ -218,7 +228,7 @@
       }
 
       const dummy = new Object3D();
-      const buildSpecies = (list, geo, mat, hasTrunk) => {
+      const buildSpecies = (list, geo, mat, hasTrunk, { scaleXZ = 1.0, scaleY = 1.0 } = {}) => {
         if (!list.length) return null;
         const cInst = new InstancedMesh(geo, mat, list.length);
         const tInst = hasTrunk ? new InstancedMesh(trunkGeo, trunkMat, list.length) : null;
@@ -226,12 +236,12 @@
           const [px, py, pz, sc] = list[i];
           dummy.position.set(px, py, pz);
           dummy.rotation.set(0, (i * 1.73) % 6.28, 0);
-          dummy.scale.setScalar(sc);
+          dummy.scale.set(sc * scaleXZ, sc * scaleY, sc * scaleXZ);
           dummy.updateMatrix();
           cInst.setMatrixAt(i, dummy.matrix);
           if (tInst) {
-            dummy.position.set(px, py + 2.3 * sc, pz);
-            dummy.scale.set(0.14 * sc, 4.6 * sc, 0.14 * sc);
+            dummy.position.set(px, py + 2.3 * sc * scaleY, pz);
+            dummy.scale.set(0.14 * sc, 4.6 * sc * scaleY, 0.14 * sc);
             dummy.updateMatrix();
             tInst.setMatrixAt(i, dummy.matrix);
           }
@@ -242,20 +252,20 @@
         return cInst;
       };
 
-      const pineInst = buildSpecies(pines, foliage, pineMat, true);
-      const cypressInst = buildSpecies(cypresses, foliage, pineMat, true);
-      const shrubInst = buildSpecies(shrubs.map(([x, y, z, size]) => [x, y, z, size * .34]), foliage, pineMat, false);
+      const pineInst = buildSpecies(pines, foliage, pineMat, true, { scaleXZ: 1.05, scaleY: 1.0 });
+      const cypressInst = buildSpecies(cypresses, foliage, pineMat, true, { scaleXZ: 0.62, scaleY: 1.38 });
+      const shrubInst = buildSpecies(shrubs.map(([x, y, z, size]) => [x, y, z, size * .42]), foliage, pineMat, false, { scaleXZ: 1.35, scaleY: 0.58 });
 
       // Natural hillside fractured granite outcrops & slope-aligned fallen timber logs (ZERO floating saucers/logs!)
       let rockInst = null, logInst = null;
       if (typeof DodecahedronGeometry === 'function' && positions.length) {
-        const rockGeo = new DodecahedronGeometry(1, 0);
+        const rockGeo = new DodecahedronGeometry(1, 1);
         const rPos = rockGeo.attributes?.position;
         if (rPos) {
           for (let v = 0; v < rPos.count; v++) {
             const vx = rPos.getX(v), vy = rPos.getY(v), vz = rPos.getZ(v);
-            const jag = 0.84 + 0.30 * Math.abs(Math.sin(vx * 5.3 + vy * 3.7 + vz * 4.1));
-            rPos.setXYZ(v, vx * jag, vy * jag, vz * jag);
+            const jag = 0.86 + 0.18 * Math.sin(vx * 3.9 + vz * 3.1) + 0.12 * Math.cos(vy * 4.7 - vx * 2.3);
+            rPos.setXYZ(v, vx * jag, vy * jag * 0.78, vz * jag);
           }
           rockGeo.computeVertexNormals();
         }
@@ -268,12 +278,12 @@
           const rz = pz + Math.cos(i * 2.41) * 3.0;
           if (rx > -217.5) continue;
           const ry = sampleHeight(rx, rz);
-          const sx = 0.75 + (i % 4) * 0.32;
-          const sy = 0.65 + (i % 3) * 0.28;
-          const sz = 0.72 + ((i * 3) % 4) * 0.28;
+          const sx = 0.82 + (i % 4) * 0.30;
+          const sy = 0.58 + (i % 3) * 0.22;
+          const sz = 0.78 + ((i * 3) % 4) * 0.26;
           const dhx = sampleHeight(rx + 1.0, rz) - sampleHeight(rx - 1.0, rz);
           const dhz = sampleHeight(rx, rz + 1.0) - sampleHeight(rx, rz - 1.0);
-          rockList.push([rx, ry - sy * 0.42, rz, sx, sy, sz, Math.atan2(dhz, 2.0), i * 1.13, -Math.atan2(dhx, 2.0)]);
+          rockList.push([rx, ry - sy * 0.52, rz, sx, sy, sz, Math.atan2(dhz, 2.0), i * 1.13, -Math.atan2(dhx, 2.0)]);
         }
         if (rockList.length) {
           rockInst = new InstancedMesh(rockGeo, rockMat, rockList.length);
@@ -295,12 +305,12 @@
           const [px, , pz] = positions[i];
           const lx = px + 1.8, lz = pz + 1.5;
           if (lx > -218.0) continue;
-          const len = 2.6 + (i % 3) * 0.55;
+          const len = 2.4 + (i % 3) * 0.45;
           const yA = sampleHeight(lx, lz - len * 0.45);
           const yB = sampleHeight(lx, lz + len * 0.45);
-          const yMid = Math.min(sampleHeight(lx, lz), (yA + yB) * 0.5) + 0.04;
+          const yMid = Math.min(sampleHeight(lx, lz), yA, yB) - 0.02;
           const pitch = Math.atan2(yB - yA, len * 0.9);
-          logList.push([lx, yMid, lz, 0.16 + (i % 3) * 0.03, len, pitch]);
+          logList.push([lx, yMid, lz, 0.15 + (i % 3) * 0.025, len, pitch]);
         }
         if (logList.length) {
           logInst = new InstancedMesh(trunkGeo, trunkMat, logList.length);

@@ -40,7 +40,7 @@
     const unitCyl = new CylinderGeometry(1, 1, 1, 12);
     const createdGeos = [unitBox, unitCyl];
 
-    function extrudeShape(pts2D, depth, { bevel = 0.08, rotX = 0, rotY = 0, centerZ = true } = {}) {
+    function extrudeShape(pts2D, depth, { bevel = 0.08, rotX = 0, rotY = 0, centerZ = true, geoBucket = null } = {}) {
       if (typeof THREE.Shape !== 'function' || typeof THREE.ExtrudeGeometry !== 'function') {
         return unitBox;
       }
@@ -59,16 +59,16 @@
       geo.computeVertexNormals();
       if (matLib?.applyWorldUV) matLib.applyWorldUV(geo, 3.0);
       geo.userData.streamOwned = true;
-      createdGeos.push(geo);
+      (geoBucket || createdGeos).push(geo);
       return geo;
     }
 
-    function makePipeCurve(pts, radius, mat) {
+    function makePipeCurve(pts, radius, mat, geoBucket = null) {
       if (typeof THREE.TubeGeometry === 'function' && typeof THREE.CatmullRomCurve3 === 'function') {
         const curve = new THREE.CatmullRomCurve3(pts.map(p => new Vector3(p[0], p[1], p[2])));
         const geo = new THREE.TubeGeometry(curve, Math.max(10, pts.length * 4), radius, 7, false);
         geo.userData.streamOwned = true;
-        createdGeos.push(geo);
+        (geoBucket || createdGeos).push(geo);
         const m = new Mesh(geo, mat);
         m.matrixAutoUpdate = false; m.updateMatrix();
         return m;
@@ -97,17 +97,24 @@
         arr.push(dummy.matrix.clone());
         opCount++;
       };
+      const prewarm = () => {
+        for (const material of batches.keys()) matLib.forInstancedBoxes(material);
+      };
       const flush = () => {
         if (typeof InstancedMesh === 'function') {
           for (const [material, matrices] of batches) {
             const batch = new InstancedMesh(unitBox, matLib.forInstancedBoxes(material), matrices.length);
             for (let i = 0; i < matrices.length; i++) batch.setMatrixAt(i, matrices[i]);
+            if (batch.instanceMatrix) batch.instanceMatrix.needsUpdate = true;
+            batch.computeBoundingSphere?.();
             batch.receiveShadow = true;
             g.add(batch);
           }
         }
+        batches.clear();
       };
-      return { push, flush, get ops() { return opCount; } };
+      const clear = () => { batches.clear(); };
+      return { push, prewarm, flush, clear, get ops() { return opCount; } };
     }
 
     // Architectural facade planner separated cleanly into masonry/pilaster articulation vs window openings vs attachments!
@@ -192,21 +199,23 @@
             const winW = fp.pitch * widthRatio;
             const jambW = (fp.pitch - winW) / 2;
             for (const sgn of [-1, 1]) {
-              place(wallMat, jambW, winH, 0.40, u + sgn * (fp.pitch - jambW) / 2, wy, 0.19);
-              place(steelDark, 0.08, winH + 0.04, 0.24, u + sgn * (winW / 2 - 0.04), wy, 0.30);
+              place(wallMat, jambW, winH, 0.44, u + sgn * (fp.pitch - jambW) / 2, wy, 0.20);
+              place(steelDark, 0.085, winH + 0.04, 0.28, u + sgn * (winW / 2 - 0.04), wy, 0.32);
             }
-            // Deeply recessed window glazing with varied occupancy (lit / blind / reflective)
+            // Recessed window head soffit (crevice AO shadow under lintel) + deep glazing
+            place(steelDark, winW + 0.06, 0.09, 0.32, u, fy + sillH + winH - 0.03, 0.28);
             const rv = rng();
-            const pane = rv < 0.24 ? litGlass : (rv < 0.38 ? blindGlass : officeGlass);
-            place(pane, winW, winH, 0.05, u, wy, 0.37);
+            const pane = rv < 0.26 ? litGlass : (rv < 0.42 ? blindGlass : officeGlass);
+            place(pane, winW, winH, 0.05, u, wy, 0.39);
             // Mullion & transom bars
-            place(steelDark, 0.065, winH, 0.11, u, wy, 0.29);
-            place(steelDark, winW, 0.065, 0.11, u, wy + winH * 0.22, 0.29);
-            // Projecting stone sill + lintel
-            place(trimMat, winW + 0.24, 0.14, 0.54, u, fy + sillH - 0.02, 0.09);
-            place(trimMat, winW + (corbelLintels ? 0.34 : 0.18), corbelLintels ? 0.22 : 0.13, 0.48, u, fy + sillH + winH + 0.07, 0.13);
+            place(steelDark, 0.065, winH, 0.12, u, wy, 0.30);
+            place(steelDark, winW, 0.065, 0.12, u, wy + winH * 0.22, 0.30);
+            // Projecting stone sill + recessed drip-edge + lintel
+            place(trimMat, winW + 0.26, 0.15, 0.58, u, fy + sillH - 0.02, 0.08);
+            place(steelDark, winW + 0.22, 0.05, 0.48, u, fy + sillH - 0.10, 0.13);
+            place(trimMat, winW + (corbelLintels ? 0.36 : 0.20), corbelLintels ? 0.24 : 0.14, 0.52, u, fy + sillH + winH + 0.08, 0.11);
             if (corbelLintels) {
-              place(trimMat, 0.20, 0.28, 0.52, u, fy + sillH + winH + 0.10, 0.11); // Keystone accent
+              place(trimMat, 0.22, 0.30, 0.56, u, fy + sillH + winH + 0.11, 0.09); // Keystone accent
             }
           }
         }
@@ -277,14 +286,17 @@
     // TRUE 8-STAGE PHASED BUILDING TASK (Measured per-phase execution time!)
     // =========================================================================
     function createCoastalBuildingTask(parent, spec, { colliderTarget = null } = {}) {
-      const { cx, cz, width, depth, height, seed = 1, styleName, labelZh, labelEn } = spec;
+      const { cx, cz, width, depth, height, seed = 1, styleName, labelZh, labelEn, variant: explicitVariant } = spec;
       const rng = matLib.mulberry32(seed * 7919 + 31);
       const archetype = ARCHETYPE_MAP[styleName] || ARCHETYPE_LIST[seed % ARCHETYPE_LIST.length];
+      const variant = Number.isInteger(explicitVariant) ? Math.abs(explicitVariant) % 3 : Math.abs(seed) % 3;
 
       const g = new Group();
       g.name = `building-${archetype}-${seed}`;
       const batcher = createBatcher(g);
-      const { push, flush } = batcher;
+      const { push, prewarm, flush } = batcher;
+      const taskGeos = [];
+      const extrudeLocal = (pts2D, d, opts = {}) => extrudeShape(pts2D, d, { ...opts, geoBucket: taskGeos });
       const baseY = 0.16;
 
       // Material palette resolved once on task creation (cached in MaterialLibrary)
@@ -326,7 +338,7 @@
       const st = {
         faceSpecs: [],
         colliders: [],
-        params: {},
+        params: { variant },
       };
 
       // Precompute archetype proportions (lightweight arithmetic only)
@@ -418,20 +430,25 @@
           name: 'structure',
           run() {
             const p = st.params;
+            // Ground contact-shadow / ambient-occlusion reveal anchoring plinth to pavement
+            push(mats.steelDark, width + 0.95, 0.07, depth + 0.95, cx, baseY + 0.035, cz);
             if (archetype === 'coastal_residence') {
               push(mats.granite, p.mainW + 0.8, 0.72, p.mainD + 0.8, p.mx, baseY + 0.36, p.mz);
               push(mats.granite, p.wingW + 0.7, 0.72, p.wingD + 0.7, p.wx, baseY + 0.36, p.wz);
               push(mats.steelDark, p.mainW - 0.75, p.eaveH - 0.3, p.mainD - 0.75, p.mx, baseY + p.eaveH / 2, p.mz);
               push(mats.steelDark, p.wingW - 0.75, p.wingH - 0.3, p.wingD - 0.75, p.wx, baseY + p.wingH / 2, p.wz);
+              if (variant === 1) {
+                push(mats.granite, p.mainW + 1.8, 0.45, 1.4, p.mx, baseY + 0.22, p.mz + p.mainD / 2 + 1.1);
+              }
             } else if (archetype === 'modern_office') {
-              const ch = 2.4;
+              const ch = variant === 2 ? 1.4 : 2.4;
               const podPts = [
                 [-width / 2 + ch, -depth / 2], [width / 2 - ch, -depth / 2],
                 [width / 2, -depth / 2 + ch], [width / 2, depth / 2 - ch],
                 [width / 2 - ch, depth / 2], [-width / 2 + ch, depth / 2],
                 [-width / 2, depth / 2 - ch], [-width / 2, -depth / 2 + ch],
               ];
-              const podGeo = extrudeShape(podPts, 0.55, { bevel: 0.09, rotX: Math.PI / 2 });
+              const podGeo = extrudeLocal(podPts, 0.55, { bevel: 0.09, rotX: Math.PI / 2 });
               addMesh(podGeo, mats.concreteAged, cx, baseY + p.podH, cz);
               addMesh(podGeo, mats.granite, cx, baseY + 0.30, cz);
               for (const sx of [-1, 1]) {
@@ -581,14 +598,42 @@
               push(mats.granite, 4.4, p.groundH + 0.2, 0.65, cx, baseY + p.groundH / 2, p.spineZ + p.spineD / 2 + 0.15);
               push(mats.litGlass, 2.8, 2.5, 0.14, cx, baseY + 1.45, p.spineZ + p.spineD / 2 + 0.36);
             } else if (archetype === 'commercial_arcade') {
-              push(mats.litGlass, width - 2.8, 2.6, depth - 2.8, cx, baseY + 1.65, cz);
+              // Realistic framed storefront glazing with dark steel mullions, transoms & granite kickplate
+              const sw = width - 2.8, sd = depth - 2.8;
+              push(mats.granite, sw + 0.08, 0.56, sd + 0.08, cx, baseY + 0.52, cz);
+              push(mats.officeGlass, sw, 2.35, sd, cx, baseY + 1.98, cz);
+              push(mats.steelDark, sw + 0.12, 0.12, sd + 0.12, cx, baseY + 2.68, cz);
+              push(mats.steelDark, sw + 0.12, 0.14, sd + 0.12, cx, baseY + 3.22, cz);
+              for (let i = 0; i <= p.xPiers; i++) {
+                const mx = cx - sw / 2 + (i / p.xPiers) * sw;
+                for (const mz of [cz - sd / 2, cz + sd / 2]) push(mats.steelDark, 0.14, 2.75, 0.16, mx, baseY + 1.98, mz);
+              }
+              for (let j = 1; j < p.zPiers; j++) {
+                const mz = cz - sd / 2 + (j / p.zPiers) * sd;
+                for (const mx of [cx - sw / 2, cx + sw / 2]) push(mats.steelDark, 0.16, 2.75, 0.14, mx, baseY + 1.98, mz);
+              }
             } else if (archetype === 'stepped_mixed_use') {
-              // Double-height glazed corner shopfront recessed into granite base
-              push(mats.litGlass, width * 0.62, 2.9, 0.12, cx, baseY + 1.85, cz + depth / 2 - 0.14);
-              push(mats.officeGlass, 0.12, 2.9, depth * 0.62, cx + width / 2 - 0.14, baseY + 1.85, cz);
+              // Framed glazed shopfront with granite kickplate & mullions (no flat glowing yellow billboard)
+              const shopW = width * 0.64, shopD = depth * 0.64;
+              push(mats.granite, shopW + 0.2, 0.55, 0.26, cx, baseY + 0.52, cz + depth / 2 - 0.12);
+              push(mats.officeGlass, shopW, 2.45, 0.12, cx, baseY + 2.02, cz + depth / 2 - 0.18);
+              push(mats.steelDark, shopW + 0.16, 0.12, 0.24, cx, baseY + 2.72, cz + depth / 2 - 0.14);
+              for (let m = -2; m <= 2; m++) push(mats.steelDark, 0.14, 2.55, 0.22, cx + m * (shopW / 4), baseY + 2.02, cz + depth / 2 - 0.14);
+              push(mats.officeGlass, 0.12, 2.45, shopD, cx + width / 2 - 0.18, baseY + 2.02, cz);
+              for (let m = -2; m <= 2; m++) push(mats.steelDark, 0.22, 2.55, 0.14, cx + width / 2 - 0.14, baseY + 2.02, cz + m * (shopD / 4));
+              // Art-Deco corner watch turret articulation: belt courses, vertical slit windows & framed watchroom
               const tx = cx + width / 2 - p.turretW / 2 + 0.15, tz = cz + depth / 2 - p.turretD / 2 + 0.15;
-              push(mats.litGlass, p.turretW * 0.52, 1.8, p.turretD + 0.08, tx, baseY + p.topH + 0.65, tz);
-              push(mats.litGlass, p.turretW + 0.08, 1.8, p.turretD * 0.52, tx, baseY + p.topH + 0.65, tz);
+              for (let ty = p.baseH; ty < p.topH; ty += 3.2) {
+                push(mats.granite, p.turretW + 0.24, 0.20, p.turretD + 0.24, tx, baseY + ty, tz);
+                push(mats.officeGlass, p.turretW * 0.34, 1.85, p.turretD + 0.08, tx, baseY + ty + 1.55, tz);
+                push(mats.officeGlass, p.turretW + 0.08, 1.85, p.turretD * 0.34, tx, baseY + ty + 1.55, tz);
+                push(mats.steelDark, 0.10, 1.92, p.turretD + 0.14, tx, baseY + ty + 1.55, tz);
+                push(mats.steelDark, p.turretW + 0.14, 1.92, 0.10, tx, baseY + ty + 1.55, tz);
+              }
+              push(mats.officeGlass, p.turretW * 0.56, 1.65, p.turretD + 0.08, tx, baseY + p.topH + 0.65, tz);
+              push(mats.officeGlass, p.turretW + 0.08, 1.65, p.turretD * 0.56, tx, baseY + p.topH + 0.65, tz);
+              push(mats.steelDark, 0.10, 1.72, p.turretD + 0.16, tx, baseY + p.topH + 0.65, tz);
+              push(mats.steelDark, p.turretW + 0.16, 1.72, 0.10, tx, baseY + p.topH + 0.65, tz);
             } else if (archetype === 'bonded_warehouse') {
               // Deeply recessed cargo loading doors at plinth level
               for (const ox of [-width * 0.24, 0, width * 0.24]) {
@@ -619,60 +664,92 @@
           run() {
             const p = st.params;
             if (archetype === 'coastal_residence') {
-              const gableGeo = extrudeShape([
+              const roofMat = variant === 1 ? mats.slateRoof : mats.tileRoof;
+              const gableGeo = extrudeLocal([
                 [-p.mainD / 2 - 0.75, 0], [0, p.ridgeH], [p.mainD / 2 + 0.75, 0],
                 [p.mainD / 2 + 0.55, -0.22], [0, p.ridgeH - 0.28], [-p.mainD / 2 - 0.55, -0.22],
               ], p.mainW + 1.1, { bevel: 0.06, rotY: Math.PI / 2 });
-              addMesh(gableGeo, mats.tileRoof, p.mx, baseY + p.eaveH + 0.05, p.mz);
-              const gableWallGeo = extrudeShape([[-p.mainD / 2, 0], [0, p.ridgeH - 0.15], [p.mainD / 2, 0]], p.mainW - 0.1, { bevel: 0, rotY: Math.PI / 2 });
+              addMesh(gableGeo, roofMat, p.mx, baseY + p.eaveH + 0.05, p.mz);
+              const gableWallGeo = extrudeLocal([[-p.mainD / 2, 0], [0, p.ridgeH - 0.15], [p.mainD / 2, 0]], p.mainW - 0.1, { bevel: 0, rotY: Math.PI / 2 });
               addMesh(gableWallGeo, p.wallMat, p.mx, baseY + p.eaveH, p.mz);
-              const wingRoofGeo = extrudeShape([[-p.wingW / 2 - 0.6, 0], [0, p.ridgeH * 0.68], [p.wingW / 2 + 0.6, 0]], p.wingD + 0.9, { bevel: 0.05 });
-              addMesh(wingRoofGeo, mats.tileRoof, p.wx, baseY + p.wingH + 0.05, p.wz);
-              push(p.wallMat, 2.6, 1.8, 2.2, p.mx, baseY + p.eaveH + p.ridgeH * 0.42, p.mz + p.mainD * 0.26);
-              push(mats.litGlass, 1.5, 1.1, 0.08, p.mx, baseY + p.eaveH + p.ridgeH * 0.42, p.mz + p.mainD * 0.26 + 1.12);
-              push(mats.tileRoof, 3.0, 0.24, 2.6, p.mx, baseY + p.eaveH + p.ridgeH * 0.42 + 0.96, p.mz + p.mainD * 0.26);
+              const wingRoofGeo = extrudeLocal([[-p.wingW / 2 - 0.6, 0], [0, p.ridgeH * 0.68], [p.wingW / 2 + 0.6, 0]], p.wingD + 0.9, { bevel: 0.05 });
+              addMesh(wingRoofGeo, roofMat, p.wx, baseY + p.wingH + 0.05, p.wz);
+              const dormerOffsets = variant === 2 ? [-p.mainW * 0.22, p.mainW * 0.22] : [0];
+              for (const dx of dormerOffsets) {
+                push(p.wallMat, 2.5, 1.8, 2.2, p.mx + dx, baseY + p.eaveH + p.ridgeH * 0.42, p.mz + p.mainD * 0.26);
+                push(mats.litGlass, 1.45, 1.1, 0.08, p.mx + dx, baseY + p.eaveH + p.ridgeH * 0.42, p.mz + p.mainD * 0.26 + 1.12);
+                push(roofMat, 2.9, 0.24, 2.6, p.mx + dx, baseY + p.eaveH + p.ridgeH * 0.42 + 0.96, p.mz + p.mainD * 0.26);
+              }
             } else if (archetype === 'modern_office') {
-              const crownGeo = extrudeShape([
+              const crownGeo = extrudeLocal([
                 [-p.towerW / 2 - 0.7, -p.towerD / 2 - 0.7], [p.towerW / 2 + 0.7, -p.towerD / 2 - 0.7],
                 [p.towerW / 2 + 0.7, p.towerD / 2 + 0.7], [-p.towerW / 2 - 0.7, p.towerD / 2 + 0.7],
               ], 0.48, { bevel: 0.08, rotX: Math.PI / 2 });
               addMesh(crownGeo, mats.steelDark, cx, baseY + p.topH + 0.24, cz);
-              const atriumGeo = extrudeShape([
-                [-p.towerD * 0.34, 0], [-p.towerD * 0.18, 2.4], [p.towerD * 0.34, 0.45], [p.towerD * 0.34, 0],
-              ], p.towerW * 0.62, { bevel: 0.05, rotY: Math.PI / 2 });
-              addMesh(atriumGeo, mats.officeGlass, cx, baseY + p.topH + 0.48, cz);
-              push(mats.steelGalv, p.towerW * 0.66, 0.18, 0.18, cx, baseY + p.topH + 2.9, cz - p.towerD * 0.18);
+              if (variant === 1) {
+                push(mats.concreteAged, p.towerW * 0.56, 2.8, p.towerD * 0.54, cx - p.towerW * 0.14, baseY + p.topH + 1.65, cz - p.towerD * 0.10);
+                push(mats.officeGlass, p.towerW * 0.92, 1.15, 0.08, cx, baseY + p.topH + 0.95, cz + p.towerD / 2 - 0.12);
+                push(mats.steelGalv, p.towerW * 0.94, 0.09, 0.12, cx, baseY + p.topH + 1.54, cz + p.towerD / 2 - 0.12);
+              } else if (variant === 2) {
+                for (let b = -3; b <= 3; b++) {
+                  push(mats.steelGalv, p.towerW + 1.4, 0.12, 0.36, cx, baseY + p.topH + 0.72, cz + b * (p.towerD * 0.14));
+                }
+                push(mats.steelDark, p.towerW * 0.64, 2.1, p.towerD * 0.58, cx, baseY + p.topH + 1.5, cz);
+              } else {
+                const atriumGeo = extrudeLocal([
+                  [-p.towerD * 0.34, 0], [-p.towerD * 0.18, 2.4], [p.towerD * 0.34, 0.45], [p.towerD * 0.34, 0],
+                ], p.towerW * 0.62, { bevel: 0.05, rotY: Math.PI / 2 });
+                addMesh(atriumGeo, mats.officeGlass, cx, baseY + p.topH + 0.48, cz);
+                push(mats.steelGalv, p.towerW * 0.66, 0.18, 0.18, cx, baseY + p.topH + 2.9, cz - p.towerD * 0.18);
+              }
               push(mats.redBeacon, 0.28, 0.32, 0.28, cx + p.towerW * 0.34, baseY + p.topH + 3.1, cz - p.towerD * 0.18);
             } else if (archetype === 'harbor_apartment') {
-              const mansardGeo = extrudeShape([
+              const mansardGeo = extrudeLocal([
                 [-p.spineD / 2 - 0.45, 0], [-p.spineD / 2 + 1.0, p.mansardH],
                 [p.spineD / 2 - 1.0, p.mansardH], [p.spineD / 2 + 0.45, 0],
               ], width + 0.8, { bevel: 0.06, rotY: Math.PI / 2 });
-              addMesh(mansardGeo, mats.slateRoof, cx, baseY + p.eaveH, p.spineZ);
+              addMesh(mansardGeo, variant === 1 ? mats.tileRoof : mats.slateRoof, cx, baseY + p.eaveH, p.spineZ);
               for (const sgn of [-1, 1]) {
                 const wx = cx + sgn * (width / 2 - p.wingW / 2);
-                push(mats.granite, p.wingW + 0.35, 0.26, p.wingD + 0.35, wx, baseY + p.eaveH + 0.14, p.wingZ);
-                push(p.wallMat, p.wingW, 0.68, 0.32, wx, baseY + p.eaveH + 0.52, p.wingZ + p.wingD / 2 - 0.16);
+                if (variant === 1) {
+                  const wingGable = extrudeLocal([[-p.wingW / 2 - 0.35, 0], [0, 1.9], [p.wingW / 2 + 0.35, 0]], p.wingD + 0.5, { bevel: 0.05 });
+                  addMesh(wingGable, mats.tileRoof, wx, baseY + p.eaveH + 0.05, p.wingZ);
+                } else {
+                  push(mats.granite, p.wingW + 0.35, 0.26, p.wingD + 0.35, wx, baseY + p.eaveH + 0.14, p.wingZ);
+                  push(p.wallMat, p.wingW, 0.68, 0.32, wx, baseY + p.eaveH + 0.52, p.wingZ + p.wingD / 2 - 0.16);
+                }
               }
             } else if (archetype === 'commercial_arcade') {
-              const corniceGeo = extrudeShape([
+              const corniceGeo = extrudeLocal([
                 [-width / 2 - 0.55, -depth / 2 - 0.55], [width / 2 + 0.55, -depth / 2 - 0.55],
                 [width / 2 + 0.55, depth / 2 + 0.55], [-width / 2 - 0.55, depth / 2 + 0.55],
               ], 0.45, { bevel: 0.10, rotX: Math.PI / 2 });
               addMesh(corniceGeo, mats.concreteAged, cx, baseY + p.topH + 0.22, cz);
-              push(p.wallMat, width + 0.2, 0.88, 0.36, cx, baseY + p.topH + 0.84, cz + depth / 2 - 0.18);
-              push(p.wallMat, width + 0.2, 0.88, 0.36, cx, baseY + p.topH + 0.84, cz - depth / 2 + 0.18);
-              push(mats.granite, width + 0.45, 0.16, 0.50, cx, baseY + p.topH + 1.32, cz + depth / 2 - 0.18);
-              push(mats.granite, width + 0.45, 0.16, 0.50, cx, baseY + p.topH + 1.32, cz - depth / 2 + 0.18);
+              if (variant === 2) {
+                const mansGeo = extrudeLocal([
+                  [-depth / 2 - 0.2, 0], [-depth / 2 + 1.1, 2.2],
+                  [depth / 2 - 1.1, 2.2], [depth / 2 + 0.2, 0],
+                ], width + 0.4, { bevel: 0.06, rotY: Math.PI / 2 });
+                addMesh(mansGeo, mats.slateRoof, cx, baseY + p.topH + 0.42, cz);
+              } else {
+                push(p.wallMat, width + 0.2, 0.88, 0.36, cx, baseY + p.topH + 0.84, cz + depth / 2 - 0.18);
+                push(p.wallMat, width + 0.2, 0.88, 0.36, cx, baseY + p.topH + 0.84, cz - depth / 2 + 0.18);
+                push(mats.granite, width + 0.45, 0.16, 0.50, cx, baseY + p.topH + 1.32, cz + depth / 2 - 0.18);
+                push(mats.granite, width + 0.45, 0.16, 0.50, cx, baseY + p.topH + 1.32, cz - depth / 2 + 0.18);
+                if (variant === 1) {
+                  const pedG = extrudeLocal([[-3.4, 0], [-2.2, 1.5], [0, 2.3], [2.2, 1.5], [3.4, 0]], 0.55, { bevel: 0.06 });
+                  addMesh(pedG, mats.granite, cx, baseY + p.topH + 1.1, cz + depth / 2 - 0.16);
+                }
+              }
             } else if (archetype === 'civic_customs') {
               const portW = Math.min(width * 0.62, 14.0), portZ = cz + depth / 2 + 1.85;
               for (let c = 0; c < 4; c++) {
                 const colX = cx - portW / 2 + 0.9 + (c / 3) * (portW - 1.8);
                 addMesh(unitCyl, mats.granite, colX, baseY + p.plinthH + (p.upperH - p.plinthH) * 0.46, portZ, 0, 0, 0, 0.42, (p.upperH - p.plinthH) * 0.92, 0.42);
               }
-              const pedGeo = extrudeShape([[-portW / 2 - 0.5, 0], [0, 2.35], [portW / 2 + 0.5, 0]], 2.8, { bevel: 0.08 });
+              const pedGeo = extrudeLocal([[-portW / 2 - 0.5, 0], [0, 2.35], [portW / 2 + 0.5, 0]], 2.8, { bevel: 0.08 });
               addMesh(pedGeo, mats.granite, cx, baseY + p.upperH - 0.2, portZ - 0.7);
-              const entabGeo = extrudeShape([
+              const entabGeo = extrudeLocal([
                 [-width / 2 - 0.6, -depth / 2 - 0.6], [width / 2 + 0.6, -depth / 2 - 0.6],
                 [width / 2 + 0.6, depth / 2 + 0.6], [-width / 2 - 0.6, depth / 2 + 0.6],
               ], 0.72, { bevel: 0.12, rotX: Math.PI / 2 });
@@ -681,51 +758,54 @@
               push(mats.granite, cupW, 2.2, cupW, cx, baseY + p.upperH + 1.8, cz);
               push(mats.litGlass, cupW - 0.8, 1.35, cupW + 0.12, cx, baseY + p.upperH + 1.85, cz);
               push(mats.litGlass, cupW + 0.12, 1.35, cupW - 0.8, cx, baseY + p.upperH + 1.85, cz);
-              const cupRoof = extrudeShape([[-cupW / 2 - 0.4, 0], [0, 1.8], [cupW / 2 + 0.4, 0]], cupW + 0.8, { bevel: 0.05 });
+              const cupRoof = extrudeLocal([[-cupW / 2 - 0.4, 0], [0, 1.8], [cupW / 2 + 0.4, 0]], cupW + 0.8, { bevel: 0.05 });
               addMesh(cupRoof, mats.zincRoof, cx, baseY + p.upperH + 2.9, cz);
             } else if (archetype === 'stepped_mixed_use') {
-              // Stepped terrace parapets + Art-Deco zinc spire cap on corner turret
               push(mats.granite, width + 0.4, 0.34, depth + 0.4, cx, baseY + p.midH + 0.17, cz);
               push(mats.granite, p.setbackW + 0.45, 0.34, p.setbackD + 0.45, cx, baseY + p.topH + 0.17, cz);
               push(mats.zincRoof, p.setbackW - 0.2, 0.22, p.setbackD - 0.2, cx, baseY + p.topH + 0.38, cz);
               const tx = cx + width / 2 - p.turretW / 2 + 0.15, tz = cz + depth / 2 - p.turretD / 2 + 0.15;
-              const capGeo = extrudeShape([[-p.turretW / 2 - 0.25, 0], [0, 2.6], [p.turretW / 2 + 0.25, 0]], p.turretD + 0.5, { bevel: 0.05 });
+              const capGeo = extrudeLocal([[-p.turretW / 2 - 0.25, 0], [0, variant === 1 ? 3.4 : 2.6], [p.turretW / 2 + 0.25, 0]], p.turretD + 0.5, { bevel: 0.05 });
               addMesh(capGeo, mats.zincRoof, tx, baseY + p.topH + 2.2, tz);
-              push(mats.redBeacon, 0.26, 0.34, 0.26, tx, baseY + p.topH + 4.95, tz);
+              push(mats.redBeacon, 0.26, 0.34, 0.26, tx, baseY + p.topH + (variant === 1 ? 5.75 : 4.95), tz);
             } else if (archetype === 'bonded_warehouse') {
-              const gableGeo = extrudeShape([
+              const gableGeo = extrudeLocal([
                 [-depth / 2 - 0.65, 0], [0, p.ridgeH], [depth / 2 + 0.65, 0],
                 [depth / 2 + 0.45, -0.22], [0, p.ridgeH - 0.26], [-depth / 2 - 0.45, -0.22],
               ], width + 0.9, { bevel: 0.05, rotY: Math.PI / 2 });
               addMesh(gableGeo, mats.slateRoof, cx, baseY + p.wallH + 0.05, cz);
-              const gableEnd = extrudeShape([[-depth / 2, 0], [0, p.ridgeH - 0.12], [depth / 2, 0]], width - 0.15, { bevel: 0, rotY: Math.PI / 2 });
+              const gableEnd = extrudeLocal([[-depth / 2, 0], [0, p.ridgeH - 0.12], [depth / 2, 0]], width - 0.15, { bevel: 0, rotY: Math.PI / 2 });
               addMesh(gableEnd, mats.brickCoastal, cx, baseY + p.wallH, cz);
-              // Central projecting hoist dormer gable over loading bays
-              const hoistGable = extrudeShape([[-2.4, 0], [0, 2.2], [2.4, 0]], 2.6, { bevel: 0.05 });
+              const hoistGable = extrudeLocal([[-2.4, 0], [0, 2.2], [2.4, 0]], 2.6, { bevel: 0.05 });
               addMesh(hoistGable, mats.brickCoastal, cx, baseY + p.wallH - 0.2, cz + depth / 2 + 0.2);
-              const hoistRoof = extrudeShape([[-2.7, 0], [0, 2.35], [2.7, 0], [2.5, -0.18], [0, 2.15], [-2.5, -0.18]], 3.1, { bevel: 0.04 });
+              const hoistRoof = extrudeLocal([[-2.7, 0], [0, 2.35], [2.7, 0], [2.5, -0.18], [0, 2.15], [-2.5, -0.18]], 3.1, { bevel: 0.04 });
               addMesh(hoistRoof, mats.slateRoof, cx, baseY + p.wallH - 0.12, cz + depth / 2 + 0.25);
+              if (variant === 2) {
+                push(mats.steelDark, width * 0.62, 1.35, 3.2, cx, baseY + p.wallH + p.ridgeH + 0.35, cz);
+                push(mats.litGlass, width * 0.56, 0.72, 3.3, cx, baseY + p.wallH + p.ridgeH + 0.35, cz);
+              }
             } else if (archetype === 'waterfront_rowhouses') {
               for (const u of p.units) {
                 if (u.roofKind === 'tile_gable') {
-                  const gGeo = extrudeShape([[-u.ud / 2 - 0.45, 0], [0, 2.3], [u.ud / 2 + 0.45, 0]], u.uw + 0.3, { bevel: 0.05, rotY: Math.PI / 2 });
+                  const gGeo = extrudeLocal([[-u.ud / 2 - 0.45, 0], [0, 2.3], [u.ud / 2 + 0.45, 0]], u.uw + 0.3, { bevel: 0.05, rotY: Math.PI / 2 });
                   addMesh(gGeo, mats.tileRoof, u.ux, baseY + u.uh, u.uz);
                 } else if (u.roofKind === 'zinc_shed') {
-                  const sGeo = extrudeShape([[-u.ud / 2 - 0.35, 0.1], [-u.ud / 2 - 0.35, 1.9], [u.ud / 2 + 0.35, 0.3], [u.ud / 2 + 0.35, 0]], u.uw + 0.2, { bevel: 0.04, rotY: Math.PI / 2 });
+                  const sGeo = extrudeLocal([[-u.ud / 2 - 0.35, 0.1], [-u.ud / 2 - 0.35, 1.9], [u.ud / 2 + 0.35, 0.3], [u.ud / 2 + 0.35, 0]], u.uw + 0.2, { bevel: 0.04, rotY: Math.PI / 2 });
                   addMesh(sGeo, mats.zincRoof, u.ux, baseY + u.uh, u.uz);
                 } else {
-                  const mGeo = extrudeShape([[-u.ud / 2 - 0.3, 0], [-u.ud / 2 + 0.8, 1.75], [u.ud / 2 - 0.8, 1.75], [u.ud / 2 + 0.3, 0]], u.uw + 0.2, { bevel: 0.04, rotY: Math.PI / 2 });
+                  const mGeo = extrudeLocal([[-u.ud / 2 - 0.3, 0], [-u.ud / 2 + 0.8, 1.75], [u.ud / 2 - 0.8, 1.75], [u.ud / 2 + 0.3, 0]], u.uw + 0.2, { bevel: 0.04, rotY: Math.PI / 2 });
                   addMesh(mGeo, mats.slateRoof, u.ux, baseY + u.uh, u.uz);
                 }
               }
             } else {
-              const sawSpan = depth / p.sawCount;
+              const sawCount = variant === 1 ? 4 : p.sawCount;
+              const sawSpan = depth / sawCount;
               const sawPts = [[-depth / 2, 0]];
-              for (let s = 0; s < p.sawCount; s++) {
+              for (let s = 0; s < sawCount; s++) {
                 const z0 = -depth / 2 + s * sawSpan;
                 sawPts.push([z0 + sawSpan * 0.15, 2.35], [z0 + sawSpan, 0]);
               }
-              const sawGeo = extrudeShape(sawPts, width + 0.6, { bevel: 0.04, rotY: Math.PI / 2 });
+              const sawGeo = extrudeLocal(sawPts, width + 0.6, { bevel: 0.04, rotY: Math.PI / 2 });
               addMesh(sawGeo, mats.corrugated, cx, baseY + p.wallH, cz);
             }
           },
@@ -780,13 +860,12 @@
               addMesh(unitCyl, mats.steelGalv, cx + width / 2 + 1.1, baseY + p.wallH * 0.72, cz - depth * 0.2, 0, 0, 0, 0.68, p.wallH * 1.45, 0.68);
             }
 
-            // Rainwater downspout pipe
-            g.add(makePipeCurve([
-              [cx - width / 2 - 0.08, baseY + Math.min(height, 10) - 0.2, cz - depth / 2 + 0.45],
-              [cx - width / 2 - 0.18, baseY + Math.min(height, 10) - 0.7, cz - depth / 2 + 0.45],
-              [cx - width / 2 - 0.18, baseY + 0.65, cz - depth / 2 + 0.45],
-              [cx - width / 2 - 0.32, baseY + 0.22, cz - depth / 2 + 0.45],
-            ], 0.085, mats.steelGalv));
+            // Rainwater downspout pipe batched cleanly into InstancedMesh (zero TubeGeometry allocation spike!)
+            const pipeH = Math.min(height, 10) - 0.85;
+            const px = cx - width / 2 - 0.16, pz = cz - depth / 2 + 0.45;
+            push(mats.steelGalv, 0.14, pipeH, 0.14, px, baseY + 0.65 + pipeH / 2, pz);
+            push(mats.steelGalv, 0.24, 0.14, 0.14, px + 0.06, baseY + 0.65 + pipeH, pz);
+            push(mats.steelGalv, 0.28, 0.14, 0.14, px - 0.08, baseY + 0.42, pz, 0, 0, 0.45);
 
             if (labelZh) {
               const decalMat = matLib.createDecalMaterial(labelZh, labelEn || 'SALTLINE COASTAL DISTRICT');
@@ -800,21 +879,32 @@
         },
 
         // =====================================================================
-        // STAGE 6: VISIBLE GROUND-FLOOR INTERIOR STRUCTURE
+        // STAGE 6: VISIBLE GROUND-FLOOR INTERIOR STRUCTURE & RECESSED VESTIBULES
         // =====================================================================
         {
           name: 'interior',
           run() {
             const p = st.params;
             if (archetype === 'modern_office' || archetype === 'commercial_arcade' || archetype === 'stepped_mixed_use') {
-              // Recessed lobby stone floor, reception desk & warm illuminated ceiling baffle visible through shopfront glass
-              const iw = width * 0.52, id = depth * 0.46;
+              const iw = width * 0.60, id = depth * 0.52;
               push(mats.granite, iw, 0.18, id, cx, baseY + 0.32, cz);
-              push(mats.timber, Math.min(4.2, iw * 0.45), 1.05, 0.92, cx, baseY + 0.88, cz + id * 0.22);
-              push(mats.litGlass, iw * 0.72, 0.08, 0.48, cx, baseY + 3.25, cz + id * 0.15);
+              push(mats.timber, Math.min(4.6, iw * 0.46), 1.08, 0.96, cx, baseY + 0.88, cz + id * 0.18);
+              push(mats.plasterCream, iw * 0.56, 3.1, 0.26, cx, baseY + 1.85, cz - id * 0.24);
+              for (const sx of [-1, 1]) {
+                push(mats.concreteAged, 0.42, 3.25, 0.42, cx + sx * iw * 0.34, baseY + 1.88, cz + id * 0.10);
+              }
+              for (const lz of [-id * 0.12, id * 0.18]) {
+                push(mats.litGlass, iw * 0.72, 0.08, 0.46, cx, baseY + 3.32, cz + lz);
+              }
+            } else if (archetype === 'civic_customs' || archetype === 'harbor_apartment') {
+              const entrZ = archetype === 'harbor_apartment' ? p.spineZ + p.spineD / 2 : cz + depth / 2;
+              push(mats.granite, 4.2, 0.20, 2.4, cx, baseY + (archetype === 'civic_customs' ? p.plinthH : 0.25), entrZ - 0.8);
+              push(mats.timber, 2.1, 2.55, 0.16, cx, baseY + (archetype === 'civic_customs' ? p.plinthH + 1.3 : 1.48), entrZ - 0.22);
+              push(mats.litGlass, 3.0, 0.10, 1.4, cx, baseY + (archetype === 'civic_customs' ? p.plinthH + 3.05 : 2.95), entrZ - 0.85);
             } else if (archetype === 'waterfront_rowhouses') {
               for (const u of p.units) {
-                push(mats.timber, 1.4, 0.16, 1.2, u.ux, baseY + 0.82, u.uz + u.ud / 2 - 0.65);
+                push(mats.timber, 1.8, 0.16, 1.6, u.ux, baseY + 0.82, u.uz + u.ud / 2 - 0.72);
+                push(mats.litGlass, 1.2, 0.08, 0.45, u.ux, baseY + 2.95, u.uz + u.ud / 2 - 0.75);
               }
             }
           },
@@ -857,6 +947,7 @@
         {
           name: 'activate',
           run() {
+            prewarm();
             flush();
             parent.add(g);
           },
@@ -864,11 +955,13 @@
       ];
 
       let phaseIdx = 0;
+      let cancelled = false;
       const phaseTimings = [];
 
       return {
         phaseNames: phases.map(p => p.name),
         step() {
+          if (cancelled) return true;
           if (phaseIdx >= phases.length) return true;
           const ph = phases[phaseIdx];
           const opsBefore = batcher.ops;
@@ -880,16 +973,26 @@
           if (phaseIdx >= phases.length) {
             const totalMs = Number(phaseTimings.reduce((s, r) => s + r.ms, 0).toFixed(3));
             const maxPhaseMs = Number(Math.max(...phaseTimings.map(r => r.ms)).toFixed(3));
-            recordBuildTiming({ id: g.name, archetype, totalMs, maxPhaseMs, phases: phaseTimings });
+            recordBuildTiming({ id: g.name, archetype, variant, totalMs, maxPhaseMs, phases: phaseTimings });
             return true;
           }
           return false;
+        },
+        cancel() {
+          if (cancelled) return;
+          cancelled = true;
+          batcher.clear();
+          g.traverse?.(node => { if (node.isInstancedMesh) node.dispose?.(); });
+          for (const geo of taskGeos.splice(0)) geo.dispose?.();
+          g.clear?.();
+          g.removeFromParent?.();
         },
         get phaseIndex() { return phaseIdx; },
         get totalPhases() { return phases.length; },
         get phaseTimings() { return phaseTimings; },
         get colliders() { return st.colliders; },
         get archetype() { return archetype; },
+        get variant() { return variant; },
         get group() { return g; },
       };
     }

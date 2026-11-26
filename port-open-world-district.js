@@ -1582,10 +1582,14 @@
         const tg = new Group(); tg.userData.noBatch = true;
         tg.position.set(laneX, .21, startZ);
         tg.rotation.y = dir > 0 ? 0 : Math.PI;
-        addBox(tg, M.craneWhite, 2.46, 2.3, 2.4, 0, 1.86, 6.2);
+        addBox(tg, M.steelClad, 2.46, 2.3, 2.4, 0, 1.86, 6.2);
+        addBox(tg, M.steelDark, 1.85, .62, .12, 0, 1.24, 7.42);
+        addBox(tg, M.steelDark, 2.52, .26, .24, 0, .74, 7.44);
         addBox(tg, smokedPane, 2.2, .9, .10, 0, 2.34, 7.42);
         addBox(tg, M.glassWarm, .36, .18, .08, -.9, .92, 7.45);
         addBox(tg, M.glassWarm, .36, .18, .08, .9, .92, 7.45);
+        addBox(tg, M.redCore, .32, .16, .08, -.92, 1.08, -7.06);
+        addBox(tg, M.redCore, .32, .16, .08, .92, 1.08, -7.06);
         addBox(tg, M.steelDark, 2.42, .32, 12.2, 0, 1.12, -.95);
         addBox(tg, contMat, 2.42, 2.55, 11.8, 0, 2.55, -1.05);
         for (const wz of [6.3, 3.8, -4.6, -5.9]) {
@@ -1736,6 +1740,43 @@
           addBox(city.detail, curbStoneMat, .72, .44, 3.0, pcx - .6, .50, bz);
           addBox(city.detail, M.wood, .56, .08, 2.8, pcx - .6, .76, bz);
         }
+      } else if (plaza.kind === 'civic_plaza') {
+        // North Civic Clock Plaza: stepped granite monument obelisk + illuminated lantern crown + benches
+        addBox(city.detail, curbStoneMat, 4.4, .34, 4.4, pcx, .44, pcz);
+        addBox(city.detail, curbStoneMat, 2.8, .52, 2.8, pcx, .86, pcz);
+        addBox(city.detail, M.concrete, 1.35, 5.4, 1.35, pcx, 3.82, pcz);
+        addBox(city.detail, M.glassWarm, 1.05, .95, 1.42, pcx, 6.15, pcz);
+        addBox(city.detail, M.glassWarm, 1.42, .95, 1.05, pcx, 6.15, pcz);
+        addBox(city.detail, M.steelDark, 1.65, .28, 1.65, pcx, 6.76, pcz);
+        for (const bx of [pcx - 6.2, pcx + 6.2]) {
+          addBox(city.detail, curbStoneMat, 3.4, .44, .78, bx, .50, pcz);
+          addBox(city.detail, M.wood, 3.2, .08, .60, bx, .76, pcz);
+        }
+      } else if (plaza.kind === 'waterfront_promenade') {
+        // Continuous coastal boardwalk: timber deck inlay, seawall steel railing & overlook benches
+        addBox(city.detail, M.wood, pw - 1.2, .05, pd - 2.0, pcx, .30, pcz);
+        addBox(city.detail, M.steelDark, .12, .10, pd - 1.0, plaza.x1 - .25, 1.24, pcz);
+        addBox(city.detail, M.steelDark, .08, .06, pd - 1.0, plaza.x1 - .25, .78, pcz);
+        for (let bz = plaza.z0 + 4; bz <= plaza.z1 - 4; bz += 8) {
+          addCyl(city.detail, M.steelDark, .07, 1.02, plaza.x1 - .25, .74, bz);
+          if (Math.round(bz) % 16 === 0) {
+            addBox(city.detail, curbStoneMat, .72, .44, 2.8, pcx - .8, .50, bz);
+            addBox(city.detail, M.wood, .56, .08, 2.6, pcx - .8, .76, bz);
+          }
+        }
+      }
+    }
+    for (const park of (quarter.parks || [])) {
+      const pw = park.x1 - park.x0, pd = park.z1 - park.z0;
+      const pcx = (park.x0 + park.x1) / 2, pcz = (park.z0 + park.z1) / 2;
+      addBox(city.shell, coastalGrassMat, pw, .14, pd, pcx, .22, pcz);
+      addBox(city.detail, paverMat, 3.2, .08, pd - 4.0, pcx + 1.5, .28, pcz);
+      addBox(city.detail, curbStoneMat, pw + .4, .22, .32, pcx, .27, park.z0);
+      addBox(city.detail, curbStoneMat, pw + .4, .22, .32, pcx, .27, park.z1);
+      for (const bz of [pcz - 16, pcz, pcz + 16]) {
+        addBox(city.detail, curbStoneMat, .75, .44, 2.8, pcx + 4.2, .48, bz);
+        addBox(city.detail, M.wood, .58, .08, 2.6, pcx + 4.2, .74, bz);
+        addBox(city.detail, M.concrete, 1.6, .85, 1.4, pcx - 5.2, .62, bz + 4);
       }
     }
     for (const gs of (quarter.greenSpaces || [])) {
@@ -1941,21 +1982,19 @@
         let buildTask = null;
         lot.onBuild = () => {
           if (!buildTask) {
-            const arch = lot._sharedGen || (lot._sharedGen = (window._slSharedLotGen || (window._slSharedLotGen = WE.createBuildingGenerator(THREE, matLib, { ...M, smokedPane, blindPane }))));
             lot.colliderSpecs.length = 0;
-            buildTask = arch.createCoastalBuildingTask(lot.shell, blk, { colliderTarget: lot.colliderSpecs });
+            buildTask = buildingGen.createCoastalBuildingTask(lot.shell, blk, { colliderTarget: lot.colliderSpecs });
           }
           const done = buildTask.step();
           if (done) skyline.visible = false;
           return done;
         };
         lot.onUnload = () => {
+          buildTask?.cancel?.();
+          buildTask = null;
           lot.shell.traverse(node => { if (node.isInstancedMesh) node.dispose(); });
           lot.shell.clear();
           lot.colliderSpecs.length = 0;
-          architecture?.dispose?.();
-          architecture = null;
-          buildTask = null;
           skyline.visible = true;
         };
       }
@@ -2812,20 +2851,25 @@
     spawnShootTarget(swClinic.shell, { id: 'cryo-lock-1', stage: 2, labelZh: '1 号冷雾库锁控箱', pos: new Vector3(-152, 0, 64), tall: false, maxHp: 3 });
     spawnShootTarget(swClinic.shell, { id: 'cryo-lock-2', stage: 2, labelZh: '2 号冷雾库锁控箱', pos: new Vector3(-152, 0, 88), tall: false, maxHp: 3 });
 
-    // Station High-Precision Realistic Human NPCs (createSaltlineHuman) across all Coastal City Districts
+    // Station & Patrol High-Precision Realistic Human NPCs (createSaltlineHuman) across all Coastal City Districts
     if (typeof window.createSaltlineHuman === 'function') {
       const npcSpecs = [
-        { parent: horizonRoot, name: 'city-npc-dock', role: 'worker', pos: [-31, 0, -21], yaw: .6, variation: 0 },
-        { parent: city.shell, name: 'city-npc-precinct', role: 'operator', pos: [-14.5, .16, -52], yaw: -1.4, variation: 1 },
-        { parent: swClinic.shell, name: 'city-npc-nurse', role: 'medic', pos: [-152, 0, 118], yaw: 1.5, variation: 2 },
-        { parent: railWest.shell, name: 'city-npc-rail', role: 'engineer', pos: [-196, 0, 7.5], yaw: 1.2, variation: 0 },
+        { parent: horizonRoot, name: 'city-npc-dock', role: 'worker', pos: [-31, 0, -21], yaw: .6, variation: 0, patrol: [0, 8] },
+        { parent: city.shell, name: 'city-npc-precinct', role: 'operator', pos: [-16.8, .16, -50], yaw: -1.4, variation: 1, patrol: [0, -14] },
+        { parent: city.shell, name: 'city-npc-plaza', role: 'worker', pos: [-6, .28, -149], yaw: 1.57, variation: 2, patrol: [12, 0] },
+        { parent: city.shell, name: 'city-npc-promenade', role: 'operator', pos: [19.8, .30, -112], yaw: 0, variation: 0, patrol: [0, -24] },
+        { parent: swClinic.shell, name: 'city-npc-nurse', role: 'medic', pos: [-152, 0, 118], yaw: 1.5, variation: 2, patrol: [0, -8] },
+        { parent: railWest.shell, name: 'city-npc-rail', role: 'engineer', pos: [-196, 0, 7.5], yaw: 1.2, variation: 0, patrol: [8, 0] },
         { parent: mountain.shell, name: 'city-npc-comms', role: 'engineer', pos: [-185, summitY, -75], yaw: 1.6, variation: 1 },
         { parent: southHarbor.shell, name: 'city-npc-keeper', role: 'worker', pos: [7.5, 0, 131], yaw: -2.2, variation: 2 },
       ];
-      const cityNpcs = npcSpecs.map(sp => {
+      const cityNpcs = npcSpecs.map((sp, idx) => {
         const h = window.createSaltlineHuman(THREE, { name: sp.name, role: sp.role, variation: sp.variation });
         h.actor.position.set(sp.pos[0], sp.pos[1], sp.pos[2]);
         h.actor.rotation.y = sp.yaw;
+        h._baseX = sp.pos[0]; h._baseZ = sp.pos[2];
+        h._patrol = sp.patrol || null;
+        h._phase = idx * 1.7;
         sp.parent.add(h.actor);
         return h;
       });
@@ -2845,7 +2889,30 @@
         for (let i = 0; i < cityNpcs.length; i++) {
           const npc = cityNpcs[i];
           if (checkVis) npc.actor.visible = !position || position.distanceToSquared(npc.actor.position) <= rSq;
-          if (npc.actor.visible) npc.pose('stand', 0, npcAge + i * 1.1, false);
+          if (!npc.actor.visible) continue;
+          if (npc._patrol) {
+            const [dx, dz] = npc._patrol;
+            const dist = Math.max(1, Math.hypot(dx, dz));
+            const cycle = (npcAge * 1.15 / dist + npc._phase) % 2.4;
+            if (cycle < 1.0) {
+              npc.actor.position.x = npc._baseX + dx * cycle;
+              npc.actor.position.z = npc._baseZ + dz * cycle;
+              npc.actor.rotation.y = Math.atan2(dx, dz);
+              npc.pose('walk', 1.15, npcAge + i * 1.1, false);
+            } else if (cycle < 1.2) {
+              npc.pose('stand', 0, npcAge + i * 1.1, false);
+            } else if (cycle < 2.2) {
+              const back = 1.0 - (cycle - 1.2);
+              npc.actor.position.x = npc._baseX + dx * back;
+              npc.actor.position.z = npc._baseZ + dz * back;
+              npc.actor.rotation.y = Math.atan2(-dx, -dz);
+              npc.pose('walk', 1.15, npcAge + i * 1.1, false);
+            } else {
+              npc.pose('stand', 0, npcAge + i * 1.1, false);
+            }
+          } else {
+            npc.pose('stand', 0, npcAge + i * 1.1, false);
+          }
         }
       });
     }
@@ -3023,12 +3090,23 @@
       },
     ];
 
+    const COD_STAMPS = [
+      ['行动代号：失联名单 // OP: MISSING MANIFEST', '地点：盐线港四号泊位 · 「海燕号」货轮北侧', '时间：05:54:12 · 强风阵雨', '执行：林恩 · SAR-04 搜救特勤'],
+      ['行动阶段 II // 沿海大道高速突围', '地点：盐线市主干道 → 沿海警务调度楼 04', '时间：06:11:40 · 铁砧全面封锁', '目标：撞穿路障并抢拷船员转运档案'],
+      ['行动阶段 III // 第十七个名字', '地点：西南冷雾库 · 战地分诊中心', '时间：06:34:05 · 超级雷暴迫近', '目标：破除冷库锁控并修复托马斯录音芯片'],
+      ['行动阶段 IV // 死线截停专列', '地点：西区铁路编组货场', '时间：07:02:18 · 货运专列已发车', '目标：炸毁信号闸并扫描 17 人原始货单'],
+      ['行动阶段 V // 夺取海事公频', '地点：西岸高地雷达站 (+14m)', '时间：07:28:50 · 全城通讯静默', '目标：狙击散热芯并校准卫星公开广播'],
+      ['紧急事态 // 零号泄洪协议已触发', '地点：西岸山顶高地 (+14m)', '时间：07:41:09 · 12米东海风暴潮袭港', '目标：坚守高地 15 秒并接通救援舰队'],
+      ['行动阶段 VII // 破雾引航', '地点：南港旧船坞 → 22m 岸角灯塔', '时间：08:05:30 · 敌舰重炮覆盖', '目标：清除电源干扰并校准灯塔主透镜'],
+      ['终章行动 // 绝境跑道撤离', '地点：西北海岸应急机场 · 110m 主跑道', '时间：08:29:44 · 救援运输机引擎已起转', '目标：突破炮火冲入拱形机库登机撤离'],
+    ];
     function playActBriefing(idx) {
       const act = OPEN_WORLD_ACTS[idx];
       if (freeRoam || !act) return;
       const title = local(...act.title);
       const sc = actScripts[idx];
       world.hud?.showChapter?.(title.split(' · ').at(-1), sc?.sub || '', sc?.tag || `ACT ${idx + 1}`);
+      if (COD_STAMPS[idx]) storyDirector?.showCodStamp?.(COD_STAMPS[idx], 5400);
       if (sc?.beats) playStorySequence(sc.beats);
     }
 
