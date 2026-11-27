@@ -7387,6 +7387,7 @@ if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
     a(i.audio,'resume');
     const started=campaignV2.startChapter(chapterId,opts);
     const ch=started.chapter;
+    i.vehicle?.setActive?.(true);
     U({skipIntro:true});
     menuV2?.showTransition?.(ch,()=>{
      r.requestLock();

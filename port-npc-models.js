@@ -360,7 +360,10 @@
         ? skDef.inverses.map(m => m.clone())
         : undefined;
       const skeleton = new THREE.Skeleton(bones, inverses);
-      mesh.bind(skeleton, mesh.matrixWorld);
+      mesh.normalizeSkinWeights?.();
+      // glTF 2.0 skins define inverseBindMatrices in mesh-local space; bindMatrix MUST be identity
+      // so modelMatrix * bindMatrixInverse cancels cleanly even after inner scale/yaw normalization.
+      mesh.bind(skeleton, new THREE.Matrix4());
     }
 
     // Normalize orientation (+Z forward), height (~1.74m), and ground flush to y=0

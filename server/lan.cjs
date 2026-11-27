@@ -37,6 +37,9 @@ const ASSETS = new Set([
   'art/campaign-anchorage.jpg', 'art/campaign-return-harbor.jpg', 'art/campaign-night-record.jpg',
   'art/campaign-last-pilot.jpg', 'art/campaign-reopen.jpg',
   'art/port-conquest.jpg', 'art/port-breakthrough.jpg', 'art/port-lan.jpg', 'art/coastal-quarter.jpg',
+  'art/v2-street.jpg', 'art/v2-facade.jpg', 'art/v2-entrance.jpg', 'art/v2-interior.jpg',
+  'art/v2-rooftop.jpg', 'art/v2-alley.jpg', 'art/v2-plaza.jpg', 'art/v2-skyline.jpg',
+  'art/v2-industrial.jpg', 'art/v2-terrain.jpg', 'art/v2-coastline.jpg', 'art/v2-night.jpg',
   'assets/models/characters/Soldier.glb', 'assets/models/characters/Michelle.glb', 'assets/models/characters/CesiumMan.glb',
 ]);
 const CONTENT_TYPES = {

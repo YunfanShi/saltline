@@ -146,7 +146,7 @@
       gameplayTagsZh: ['城市生活探索', '角色互动', '自然操作教学'],
       locationZh: '盐线现代沿海城区 · 公共交通站 · 应急行动总部',
       locationEn: 'Coastal City Center · Transit Station · Emergency HQ',
-      art: './art/coastal-quarter.jpg',
+      art: './art/v2-street.jpg',
       skyPreset: 1, weather: 'clear_morning',
       landmarkZh: '晨光中的沿海钟楼广场与警务应急总部',
       spawn: [-26, 0.25, -42],
@@ -181,7 +181,7 @@
       gameplayTagsZh: ['港口现场调查', '角色陪同勘察', '设施检修'],
       locationZh: '四号泊位大型港区 · 港务大楼 · 仓库与海岸道路',
       locationEn: 'Expanded Berth 4 · Harbor Authority · Warehouses',
-      art: './art/campaign-berth.jpg',
+      art: './art/v2-coastline.jpg',
       skyPreset: 0, weather: 'overcast_mist',
       landmarkZh: '四号泊位双层港务指挥楼与停摆的巨型岸桥',
       spawn: [-26, 0.25, -24],
@@ -216,7 +216,7 @@
       gameplayTagsZh: ['城市驾驶', '动态交通改道', '市民交流'],
       locationZh: '商业中心 · 住宅区 · 高架道路 · 城市广场',
       locationEn: 'Downtown Commercial · Residential · Overpass · Plaza',
-      art: './art/campaign-return-harbor.jpg',
+      art: './art/v2-plaza.jpg',
       skyPreset: 0, weather: 'light_rain',
       landmarkZh: '拥堵改道的沿海高架与滨海商业长廊',
       spawn: [-26, 0.25, -36],
@@ -251,7 +251,7 @@
       gameplayTagsZh: ['搜索与救援', '列车内部探索', '铁路道岔解谜'],
       locationZh: '大型铁路枢纽 · 车站 · 铁路维修设施 · 列车内部',
       locationEn: 'Rail Hub · Station · Maintenance Shed · Train Interior',
-      art: './art/campaign-rail.jpg',
+      art: './art/v2-industrial.jpg',
       skyPreset: 0, weather: 'overcast_rain',
       landmarkZh: '双孔山地铁路隧道口与脱轨迫停的城际列车',
       spawn: [-124, 0.25, 5],
@@ -286,20 +286,20 @@
       gameplayTagsZh: ['独立地下空间探索', '分区电力路由解谜', '逐区恢复照明'],
       locationZh: '地下公共设施 · 维护通道 · 主供电枢纽',
       locationEn: 'Underground Utility Tunnels · Maintenance Corridors · Power Vault',
-      art: './art/campaign-night-record.jpg',
+      art: './art/v2-interior.jpg',
       skyPreset: 3, weather: 'underground_humid',
-      landmarkZh: '独立构建的地下三向拱形管廊与中央高压配电大厅',
-      spawn: [-60, -7.8, -62],
+      landmarkZh: '西区地下管廊地面检修枢纽与中央高压配电区',
+      spawn: [-60, 0.25, -62],
       scenePreset: 'underground_vault',
       characters: ['lin', 'mara', 'harris'],
-      transitionZh: '穿过铁路枢纽旁的检修井，你进入盐线市地底纵横交错的公共设施管廊。四周漆黑渗水，必须逐区合闸配电，才能看清地底隐藏的惊人裂痕。',
-      transitionEn: 'Descend into Saltline’s independent subterranean utility tunnels. Route power across three breaker bays to restore lighting and uncover the structural fault.',
-      descriptionZh: '在完全独立的地下拱形维护管廊与中央配电厅中探索，完成三区负载均衡电力解谜，看着黑暗通道逐段亮起，并发现被人为封死的旧地质监测室。',
-      descriptionEn: 'Explore dedicated underground utility corridors, solve the 3-sector power routing puzzle to progressively light the vault, and uncover the sealed geological chamber.',
+      transitionZh: '穿过铁路枢纽旁的地下检修井口，你沿着横跨大世界城区的三座市政高压配电枢纽逐区合闸，排查盐线地底隐藏的沉降裂痕。',
+      transitionEn: 'Follow Saltline’s subterranean utility corridor across three open-world power substations to restore lighting and uncover the structural fault.',
+      descriptionZh: '在大世界城区西侧的三座地下管廊配电枢纽间穿梭，完成三区负载均衡电力解谜，看着整片街区与监测站逐段亮起，并揭开被封锁的地质监测室。',
+      descriptionEn: 'Traverse three connected utility substations across the open world, solve the 3-sector power routing puzzle, and uncover the sealed geological station.',
       objectives: [
-        { id: 'c5_bay1', titleZh: '沿西侧维护管廊抵达 A 区配电室，恢复地下通道基础照明', optionalZh: '排查渗水阀门压力表', target: [-74, -7.8, -62], action: 'power_puzzle' },
-        { id: 'c5_bay2', titleZh: '平衡 B/C 两区高压母线负载，避免变压器过载跳闸', optionalZh: '打开密封地质观测门', target: [-46, -7.8, -62], action: 'power_puzzle' },
-        { id: 'c5_reveal', titleZh: '进入被封锁的地质监测室，与哈里斯核实沉降加速的真正原因', optionalZh: '导出地下监测曲线', target: [-60, -7.8, -78], action: 'story_reveal' },
+        { id: 'c5_bay1', titleZh: '前往西侧 A 区管廊配电枢纽，恢复地下通道与街区基础照明', optionalZh: '排查渗水阀门压力表', target: [-74, 0.25, -62], action: 'power_puzzle' },
+        { id: 'c5_bay2', titleZh: '平衡东侧 B/C 两区高压母线负载，避免变压器过载跳闸', optionalZh: '打开密封地质观测门', target: [-46, 0.25, -62], action: 'power_puzzle' },
+        { id: 'c5_reveal', titleZh: '抵达北侧被封锁的地质监测室，与哈里斯核实沉降加速的真正原因', optionalZh: '导出地下监测曲线', target: [-60, 0.25, -78], action: 'story_reveal' },
       ],
       cutscene: {
         tag: 'CHAPTER 05 · 盐线之下',
@@ -321,7 +321,7 @@
       gameplayTagsZh: ['动态水位上涨', '多层立体空间移动', '船坞搜救'],
       locationZh: '南港大型船坞 · 海岸工程设施 · 多层维护建筑',
       locationEn: 'South Drydock · Coastal Engineering Works · Multi-Story Pump House',
-      art: './art/campaign-drydock.jpg',
+      art: './art/v2-coastline.jpg',
       skyPreset: 0, weather: 'heavy_rain',
       landmarkZh: '真实水位持续攀升的巨型干船坞与多层钢架泵房',
       spawn: [-26, 0.25, 68],
@@ -356,7 +356,7 @@
       gameplayTagsZh: ['山区盘山驾驶', '自然森林探索', '高地通信塔修复'],
       locationZh: '西岸山区 · 海岸松林 · 盘山公路 · 山脊通信设施',
       locationEn: 'West Highlands · Coastal Pine Forest · Switchback Road · Ridge Relay',
-      art: './art/campaign-last-pilot.jpg',
+      art: './art/v2-terrain.jpg',
       skyPreset: 2, weather: 'mountain_mist_sunset',
       landmarkZh: '黄昏云海之上的 +14m 盘山公路与海岸松林山脊',
       spawn: [-112, 0.25, -78],
@@ -391,7 +391,7 @@
       gameplayTagsZh: ['多角色协作操作', '核心剧情对峙', '影响后续章节的抉择'],
       locationZh: '大型通信中心 · 控制大厅 · 卫星上行机房',
       locationEn: 'Highland Comms Center · Control Hall · Satellite Uplink',
-      art: './art/campaign-night-record.jpg',
+      art: './art/v2-rooftop.jpg',
       skyPreset: 2, weather: 'dusk_clearing',
       landmarkZh: '全景落地窗卫星控制大厅与巨型旋转雷达盘',
       spawn: [-194, 14.1, -78],
@@ -429,7 +429,7 @@
       gameplayTagsZh: ['大型风暴天气演出', '海岸大桥推进', '海上转运救援'],
       locationZh: '海岸大桥 · 港口外海 · 海上交通设施',
       locationEn: 'Coastal Bridge · Outer Harbor · Maritime Ferry Terminal',
-      art: './art/campaign-tidegate.jpg',
+      art: './art/v2-alley.jpg',
       skyPreset: 3, weather: 'severe_storm',
       landmarkZh: '狂风暴雨中的海岸大桥与巨浪拍岸的外海渡口',
       spawn: [-26, 0.25, 108],
@@ -464,7 +464,7 @@
       gameplayTagsZh: ['独立大型多层海上平台', '多角色协作疏散', '设施状态变化'],
       locationZh: '盐线外海工程平台（主甲板 · 机械舱 · 生活区 · 直升机坪）',
       locationEn: 'Saltline Offshore Platform (Main Deck · Machinery · Quarters · Helipad)',
-      art: './art/campaign-anchorage.jpg',
+      art: './art/v2-skyline.jpg',
       skyPreset: 3, weather: 'offshore_gale',
       landmarkZh: '四层立体钢结构外海工程平台（独立完整场景）',
       spawn: [96, 4.2, 60],
@@ -499,7 +499,7 @@
       gameplayTagsZh: ['夜间城市电力分配', '角色关系发展', '抉择后果呈现'],
       locationZh: '夜间商业中心 · 公共建筑 · 停电城市街道',
       locationEn: 'Blackout Downtown · Civic Buildings · Night Streets',
-      art: './art/campaign-return-harbor.jpg',
+      art: './art/v2-night.jpg',
       skyPreset: 3, weather: 'night_drizzle',
       landmarkZh: '伸手不见五指却随你恢复供电而逐区亮起的夜间盐线城',
       spawn: [-26, 0.25, -48],
@@ -534,7 +534,7 @@
       gameplayTagsZh: ['多角色现场对质', '真相整合', '解决人物矛盾'],
       locationZh: '大型公共档案建筑 · 市政管理中心 · 听证大厅',
       locationEn: 'Civic Archive Building · Municipal Admin Center · Hearing Hall',
-      art: './art/campaign-night-record.jpg',
+      art: './art/v2-facade.jpg',
       skyPreset: 3, weather: 'calm_night',
       landmarkZh: '市政清关与档案大厅及三层调度中枢',
       spawn: [0, 0.25, -104],
@@ -569,7 +569,7 @@
       gameplayTagsZh: ['跨区域最终大关卡', '多角色联合协作', '多阶段动态环境变化与终极抉择'],
       locationZh: '横跨港口防潮枢纽 · 铁路动脉 · 海岸应急机场的联动战区',
       locationEn: 'Multi-District Finale: Tide Gate · Rail Artery · Coastal Airfield',
-      art: './art/campaign-last-pilot.jpg',
+      art: './art/v2-skyline.jpg',
       skyPreset: 2, weather: 'pre_dawn_storm_break',
       landmarkZh: '全城联动抢险：防潮大闸 + 铁路物资专列 + 海岸应急机场跑道',
       spawn: [-26, 0.25, 86],
@@ -607,7 +607,7 @@
       gameplayTagsZh: ['可操作尾声', '城市状态变化展示', '角色结局与自由探索解锁'],
       locationZh: '危机结束、阳光洒满的盐线沿海城市与滨海长廊',
       locationEn: 'Post-Crisis Saltline City & Sunlit Waterfront Promenade',
-      art: './art/campaign-reopen.jpg',
+      art: './art/v2-entrance.jpg',
       skyPreset: 1, weather: 'clear_dawn',
       landmarkZh: '晴空晨曦下焕然一新的盐线港与重开的滨海钟楼广场',
       spawn: [19.5, 0.30, -96],
@@ -832,7 +832,7 @@
   // =========================================================================
   function createChapterSetPieceManager(world) {
     const { THREE, scene, physics } = world || {};
-    if (!THREE || !scene) return { activate: () => {}, update: () => {}, dispose: () => {}, get state() { return null; } };
+    if (!THREE || !scene) return { activate: () => {}, setObjectiveBeacon: () => {}, update: () => {}, dispose: () => {}, get state() { return null; } };
     const { Group, Mesh, BoxGeometry, CylinderGeometry, PlaneGeometry, MeshStandardMaterial, MeshBasicMaterial, PointLight, Vector3 } = THREE;
 
     const root = new Group();
@@ -984,11 +984,29 @@
       root.add(g);
     }
 
+    // Open-world glowing 3D objective beacon (beam + ring) visible across the entire city
+    let beaconGroup = null;
+    function setObjectiveBeacon(targetPos) {
+      if (beaconGroup) { root.remove(beaconGroup); beaconGroup = null; }
+      if (!targetPos || !Array.isArray(targetPos)) return;
+      beaconGroup = new Group();
+      beaconGroup.name = 'campaign-v2-objective-beacon';
+      const beamMat = new MeshBasicMaterial({ color: 0xf2c45a, transparent: true, opacity: 0.28, depthWrite: false });
+      const ringMat = new MeshBasicMaterial({ color: 0x66d9f0, transparent: true, opacity: 0.72, depthWrite: false });
+      const beam = new Mesh(cylGeo, beamMat);
+      beam.scale.set(0.32, 34, 0.32);
+      beam.position.set(targetPos[0], (targetPos[1] || 0) + 17, targetPos[2]);
+      const ring = new Mesh(cylGeo, ringMat);
+      ring.scale.set(2.4, 0.12, 2.4);
+      ring.position.set(targetPos[0], (targetPos[1] || 0) + 0.14, targetPos[2]);
+      beaconGroup.add(beam, ring);
+      root.add(beaconGroup);
+    }
+
     function activate(preset) {
       clearCurrent();
       activePreset = preset;
-      if (preset === 'underground_vault') buildUndergroundVault();
-      else if (preset === 'rising_water_drydock') buildRisingWaterDrydock();
+      if (preset === 'rising_water_drydock') buildRisingWaterDrydock();
       else if (preset === 'offshore_platform') buildOffshorePlatform();
     }
 
@@ -1018,10 +1036,11 @@
 
     return {
       activate,
+      setObjectiveBeacon,
       setVaultZoneLit,
       lockWaterLevel,
       update,
-      dispose: clearCurrent,
+      dispose: () => { beaconGroup = null; clearCurrent(); },
       get state() {
         return { preset: activePreset, waterLevel: Number(waterLevel.toFixed(2)), waterLocked, currentGust: Number(currentGust.toFixed(2)) };
       },
@@ -1149,8 +1168,9 @@
       saveMgr.setActiveSlotId(slotId);
       saveMgr.saveCheckpoint(ch.id, objectiveIdx, ch.spawn, slotId);
 
-      // Apply chapter-specific sky, weather, 3D set-piece, spawn & active cast
+      // Apply chapter-specific sky, weather, 3D set-piece, open-world beacon, spawn & active cast
       setPieces.activate(ch.scenePreset);
+      setPieces.setObjectiveBeacon?.(ch.objectives?.[objectiveIdx]?.target);
       if (world?.openWorld?.setSkyPreset) world.openWorld.setSkyPreset(ch.skyPreset, true);
       if (world?.player?.pos && ch.spawn) {
         world.player.pos.set(ch.spawn[0], ch.spawn[1], ch.spawn[2]);
@@ -1172,6 +1192,7 @@
       if (objectiveIdx + 1 < activeChapter.objectives.length) {
         objectiveIdx++;
         const nextObj = activeChapter.objectives[objectiveIdx];
+        setPieces.setObjectiveBeacon?.(nextObj?.target);
         saveMgr.saveCheckpoint(activeChapter.id, objectiveIdx, nextObj.target);
         emit('objective:advance', { chapter: activeChapter, objectiveIdx, objective: nextObj });
         return { completedChapter: false, chapter: activeChapter, objectiveIdx, objective: nextObj };

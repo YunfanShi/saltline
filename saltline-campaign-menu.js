@@ -41,8 +41,8 @@
       .sl-camp2-btn.gold{background:#f2c45a;border-color:#f2c45a;color:#0b1116}
       .sl-camp2-btn.danger{background:rgba(239,68,68,.18);border-color:rgba(248,113,113,.5);color:#fecaca}
 
-      /* Focused Campaign V2 HUD */
-      .sl-chud{position:fixed;left:18px;top:16px;z-index:21;width:min(350px,42vw);background:rgba(8,14,20,.86);border:1px solid rgba(110,196,225,.34);border-left:3px solid #f2c45a;border-radius:6px;padding:10px 14px;color:#edf5f8;font-family:system-ui,-apple-system,sans-serif;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.45);display:none}
+      /* Focused Campaign V2 HUD (positioned cleanly below the top-left minimap) */
+      .sl-chud{position:fixed;left:18px;top:146px;z-index:21;width:min(350px,42vw);background:rgba(8,14,20,.86);border:1px solid rgba(110,196,225,.34);border-left:3px solid #f2c45a;border-radius:6px;padding:10px 14px;color:#edf5f8;font-family:system-ui,-apple-system,sans-serif;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.45);display:none}
       .sl-chud.on{display:block}
       .sl-chud-kicker{font:800 10.5px/1 ui-monospace,monospace;letter-spacing:.14em;color:#f2c45a;margin-bottom:4px}
       .sl-chud-obj{font:700 14px/1.35 system-ui,sans-serif;color:#fff;margin-bottom:4px}
