@@ -2540,8 +2540,8 @@
     placeExternal(city.detail, 'portable_generator', -38.5, .16, -54.0, .4, 1.0);
     placeExternal(city.detail, 'exterior_aircon_unit', 14.8, 1.8, -62.5, Math.PI / 2, 1.0);
     placeExternal(city.detail, 'exterior_aircon_unit', 14.8, 1.8, -48.5, Math.PI / 2, 1.0);
-    placeExternal(city.detail, 'modular_electricity_poles', -36.5, .16, -122.0, 0, 1.0);
-    placeExternal(city.detail, 'modular_electricity_poles', -68.0, .16, -122.0, 0, 1.0);
+    placeExternal(city.detail, 'modular_electricity_poles', -36.5, .16, -114.5, 0, 1.0);
+    placeExternal(city.detail, 'modular_electricity_poles', -68.0, .16, -114.5, 0, 1.0);
 
     // =========================================================================
     // SECTOR 2 (INLAND WEST-CENTER): MOUNTAIN RIDGE & +14m SATELLITE COMMS
@@ -3369,7 +3369,7 @@
     placeExternal(swClinic.detail, 'modular_industrial_pipes_01', -172.0, .16, 56.0, 0, 1.0);
     placeExternal(swClinic.detail, 'portable_generator', -172.0, .16, 82.0, .6, 1.0);
     placeExternal(swClinic.detail, 'utility_box_01', -152.0, .16, 86.0, Math.PI / 2, 1.0);
-    placeExternal(swClinic.detail, 'modular_electricity_poles', -216.0, .16, 78.0, 0, 1.0);
+    placeExternal(swClinic.detail, 'modular_electricity_poles', -196.0, .16, 84.0, 0, 1.0);
     placeExternal(swClinic.detail, 'concrete_road_barrier', -152.0, .16, 124.0, 0, 1.0);
     placeExternal(swClinic.detail, 'exterior_aircon_unit', -152.0, 2.2, 82.0, Math.PI / 2, 1.0);
     for (const px of [-216, -200, -184, -168, -154]) addPineTree(swClinic.detail, px, .16, 138, 1.15);
@@ -4342,7 +4342,7 @@
           brief: `${act ? local(...act.description) : ''}${obj?.zh ? `\n当前目标：${obj.zh}` : ''}（提示：靠近四号泊位老霍克、警务室苏珊、战地护士林婉等任意 NPC 按 [E] 可面对面了解完整案情）`,
         });
       }
-      else if (e.code === 'KeyH' && !e.repeat) {
+      else if (e.code === 'KeyH' && !e.repeat && !window.SALTLINE_CAMPAIGN_V2_ACTIVE) {
         e.preventDefault();
         if (squadAllies.length && world.player?.pos) {
           for (const ally of squadAllies) ally.moveTo(world.player.pos);
