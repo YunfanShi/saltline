@@ -16,6 +16,9 @@ const WS_MAGIC = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const ROOT = path.resolve(__dirname, '..');
 const ASSETS = new Set([
   'index.html', 'zh.js', 'saltline-ui.css',
+  'train-slice.html', 'train-slice.js', 'train-slice-view.js', 'vendor/saltline-three.js',
+  'flood-slice-demo.html', 'port-flood-slice.js',
+  'crash-rescue-test.html', 'crash-rescue-test.js', 'port-crash-rescue-slice.js',
   'port-campaign.js', 'port-commander.js', 'port-conquest.js', 'port-rail-yard.js', 'port-expansion.js', 'port-campaign-events.js',
   'port-campaign-ui.js', 'port-campaign-ui.css', 'port-npc-models.js', 'port-campaign-runtime.js',
   'port-campaign-continuation-layout.js', 'port-campaign-continuation.js',

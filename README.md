@@ -4,7 +4,7 @@ A small browser first-person shooter set in a rainy industrial port. Recover evi
 <img width="1685" height="906" alt="image" src="https://github.com/user-attachments/assets/8dd32149-90f4-4d69-a573-4411a49a9ba9" />
 
 
-## Saltline fork 0.17.0
+## Saltline fork 0.18.0
 
 - **Campaign** opens the ordered story and shows your next chapter.
 - Chapter titles appear briefly on entry. The task stays on the left until completion. Subtitle names show the speaker’s side while dialogue stays the same color.
@@ -55,6 +55,16 @@ Walk up to marked ammunition crates to top up reserves, including the caches on 
 ## Multiplayer
 
 Run `node server/lan.cjs` and open the address printed by the terminal. Open **Multiplayer → LAN Multiplayer Lobby** to create or join a room (up to **8 players**, Protocol v2, 20Hz authoritative WebSocket sync). Choose from **5 playable Saltline theaters** (`coastal_quarter`, `port_rail`, `mountain_forest`, `old_harbor`, `coastal_industrial`) and **5 modes** (`conquest`, `breakthrough`, `coop_rescue`, `coop_campaign`, `sandbox`), with live SVG map preview, mid-match join, 30-second disconnect seat reservation, automatic host migration, and return-to-lobby rematch. See [server/README.md](server/README.md).
+
+## Campaign vertical-slice prototypes
+
+The revised six-chapter campaign is a design baseline, not the currently playable campaign. These independent greyboxes are available through the local server and do not write to the existing campaign save:
+
+- [Two-train chase](train-slice.html): first-person roof traversal and target practice. Exit returns to the game menu.
+- [Aircraft crash and rescue](crash-rescue-test.html): crash, search, escort and retry in a test scene. Its checkpoint and wreck state last only during the current test session.
+- [Flooded service tunnel](flood-slice-demo.html): pump cooperation, rising water and upper/lower routes with separate local checkpoints.
+
+These are prototypes, not finished campaign missions. They use simplified environments and are not yet connected to the campaign or its persistent world.
 
 ## Developer menu
 

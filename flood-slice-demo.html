@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>管廊洪水 · 三维测试</title>
+<style>body{margin:0;background:#10191e;color:#e1eeee;font:16px system-ui}canvas{display:block;width:100vw;height:100vh}#panel{position:fixed;top:12px;left:12px;max-width:min(600px,90vw);background:#10191ee8;padding:12px 16px;border:1px solid #879a9c;border-radius:5px}p{margin:.4em 0}button{padding:.5rem;margin:.2rem}</style></head><body>
+<div id="panel"><strong>管廊洪水 · 三维测试</strong><p>WASD 或方向键移动，E 与附近黄色控制台交互。左侧高位检修廊，右侧低位闸门。</p><p id="status" role="status"></p><button id="interact">交互 E</button><button id="reset">重置切片进度</button> <a href="./index.html" style="color:#bcefff">退出测试</a></div>
+<script src="./vendor/saltline-three.js"></script><script src="./port-flood-slice.js"></script><script>
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x1b3037);scene.fog=new THREE.Fog(0x1b3037,15,50);
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,100),renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.setSize(innerWidth,innerHeight);document.body.prepend(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xc8eaff,0x46514a,2));const lamp=new THREE.DirectionalLight(0xffffff,1.5);lamp.position.set(-3,8,2);scene.add(lamp);
+const game=createServiceTunnelSlice({THREE,scene},{storage:localStorage});
+const body=new THREE.Mesh(new THREE.BoxGeometry(.6,1.5,.5),new THREE.MeshStandardMaterial({color:0xf2c769}));scene.add(body);
+const player={alive:true,pos:game.recover()},keys=new Set(),status=document.querySelector('#status');
+function action(){game.interact(player)}document.querySelector('#interact').onclick=action;document.querySelector('#reset').onclick=()=>{game.reset();player.pos=game.recover()};
+addEventListener('keydown',e=>{keys.add(e.code);if(e.code==='KeyE'&&!e.repeat)action();if(e.code.startsWith('Arrow'))e.preventDefault()});addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+let prev=performance.now();function frame(now){const dt=Math.min(.1,(now-prev)/1000);prev=now;const dx=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0),dz=(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-(keys.has('KeyW')||keys.has('ArrowUp')?1:0);const speed=3/Math.max(1,Math.hypot(dx,dz));player.pos.x=Math.max(-6,Math.min(6,player.pos.x+dx*speed*dt));player.pos.z=Math.max(-21,Math.min(1,player.pos.z+dz*speed*dt));player.pos.y=player.pos.x < -3 ? Math.min(1.2, Math.max(0, (-player.pos.z-6) * .4)) : 0;
+const result=game.update(dt,player);if(result.failed)player.pos=result.respawn;body.position.set(player.pos.x,player.pos.y+.75,player.pos.z);camera.position.set(player.pos.x,player.pos.y+6,player.pos.z+8);camera.lookAt(player.pos.x,player.pos.y,player.pos.z-3);
+const s=game.state;const objective={pump:'靠近水泵，按 E 与玛拉协作启动水泵',route:'选择 upper 高位检修廊或 lower 低位闸门',crossing:s.route==='upper'?'到高位阀门按 E 关闭进水':'到低位闸门按 E 打开通道',escape:'前往尽头中央出口按 E',complete:'切片完成'}[s.phase];status.textContent=`${objective} · 水位 ${s.level.toFixed(2)} m · 玛拉${s.npcReady?'正在操作水泵':'等待协作'} · 路线 ${s.route||'未选择'}`;renderer.render(scene,camera);requestAnimationFrame(frame)}requestAnimationFrame(frame);
+</script></body></html>
