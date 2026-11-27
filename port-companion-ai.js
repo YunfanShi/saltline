@@ -11,7 +11,7 @@
     modelType = null,
     flankOffset = [2.2, -1.8],
     canHeal = true,
-    fireRate = 1.05,
+    fireRate = 2.8,
     startPos,
     onSpeak = null,
   } = {}) => {
@@ -205,9 +205,14 @@
           spawnTracer(muzzle, hostile.pos);
           human?.flashMuzzle?.(true);
           muzzleFlashTimer = .08;
-          hostile.damage?.(22, hostile.pos, hostile.pos.clone().sub(muzzle).normalize(), 'companion');
-          fx?.sparks?.(hostile.pos, up, 5);
-          audio?.play?.('sidearm_shot', { pos: muzzle, ref: 12, gain: .42, jitter: .05 });
+          // Suppressive assist only: never clear enemies or steal lethal kills from the player,
+          // and never trigger player hitmarker / player-bus gunfire audio.
+          const maxHp = Number(hostile.maxHp) > 0 ? hostile.maxHp : 100;
+          if (typeof hostile.hp === 'number' && hostile.hp > maxHp * 0.40) {
+            hostile.damage?.(5, hostile.pos, hostile.pos.clone().sub(muzzle).normalize(), 'companion');
+          }
+          fx?.sparks?.(hostile.pos, up, 3);
+          audio?.play?.('impact_metal', { pos: muzzle, ref: 8, gain: .14, pitch: 1.35, jitter: .08 });
           if (calloutCooldown <= 0) {
             const callouts = role === 'medic'
               ? [

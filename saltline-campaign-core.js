@@ -984,28 +984,141 @@
       root.add(g);
     }
 
-    // Open-world glowing 3D objective beacon (beam + ring) visible across the entire city
+    // Physical 3D Interactive Story Console / Button / Valve spawned at every chapter objective
+    // (Replaces shooting pillars: players walk up to the physical console and press [E] to trigger story events!)
     let beaconGroup = null;
-    function setObjectiveBeacon(targetPos) {
-      if (beaconGroup) { root.remove(beaconGroup); beaconGroup = null; }
+    let activeConsoleButtonMat = null;
+    let activeConsoleScreenMat = null;
+    let consolePulseClock = 0;
+    function setObjectiveBeacon(targetPos, actionType = 'console') {
+      if (beaconGroup) { root.remove(beaconGroup); beaconGroup = null; activeConsoleButtonMat = null; activeConsoleScreenMat = null; }
       if (!targetPos || !Array.isArray(targetPos)) return;
       beaconGroup = new Group();
-      beaconGroup.name = 'campaign-v2-objective-beacon';
-      const beamMat = new MeshBasicMaterial({ color: 0xf2c45a, transparent: true, opacity: 0.28, depthWrite: false });
-      const ringMat = new MeshBasicMaterial({ color: 0x66d9f0, transparent: true, opacity: 0.72, depthWrite: false });
-      const beam = new Mesh(cylGeo, beamMat);
-      beam.scale.set(0.32, 34, 0.32);
-      beam.position.set(targetPos[0], (targetPos[1] || 0) + 17, targetPos[2]);
+      beaconGroup.name = 'campaign-v2-story-console';
+      const tx = targetPos[0], ty = targetPos[1] || 0, tz = targetPos[2];
+
+      // Subtle holographic locator ring on ground (no giant red shootable jammer pillars)
+      const ringMat = new MeshBasicMaterial({ color: 0x66d9f0, transparent: true, opacity: 0.62, depthWrite: false });
       const ring = new Mesh(cylGeo, ringMat);
-      ring.scale.set(2.4, 0.12, 2.4);
-      ring.position.set(targetPos[0], (targetPos[1] || 0) + 0.14, targetPos[2]);
-      beaconGroup.add(beam, ring);
+      ring.scale.set(1.85, 0.06, 1.85);
+      ring.position.set(tx, ty + 0.05, tz);
+      beaconGroup.add(ring);
+
+      // Tactile 3D Interactive Console / Valve Pedestal
+      const bodyMat = new MeshStandardMaterial({ color: 0x26313a, roughness: 0.52, metalness: 0.64 });
+      const trimMat = new MeshStandardMaterial({ color: 0xd99b26, roughness: 0.48, metalness: 0.28 });
+      activeConsoleScreenMat = new MeshBasicMaterial({ color: 0x38c7e8 });
+      activeConsoleButtonMat = new MeshBasicMaterial({ color: 0x4cff8f, transparent: true, opacity: 0.95 });
+
+      const pedestal = new Mesh(boxGeo, bodyMat);
+      pedestal.scale.set(0.92, 1.18, 0.64);
+      pedestal.position.set(tx, ty + 0.59, tz);
+      const trim = new Mesh(boxGeo, trimMat);
+      trim.scale.set(0.98, 0.09, 0.68);
+      trim.position.set(tx, ty + 0.12, tz);
+      const screen = new Mesh(boxGeo, activeConsoleScreenMat);
+      screen.scale.set(0.68, 0.36, 0.06);
+      screen.position.set(tx, ty + 1.24, tz + 0.16);
+      screen.rotation.x = -0.35;
+
+      const isValve = /valve|ballast|flood/i.test(String(actionType));
+      const button = new Mesh(isValve ? cylGeo : boxGeo, activeConsoleButtonMat);
+      if (isValve) {
+        button.scale.set(0.28, 0.08, 0.28);
+        button.rotation.x = Math.PI / 2;
+      } else {
+        button.scale.set(0.24, 0.09, 0.18);
+      }
+      button.position.set(tx, ty + 1.16, tz + 0.28);
+
+      // Soft tall guide shimmer visible from down the street
+      const beamMat = new MeshBasicMaterial({ color: 0x66d9f0, transparent: true, opacity: 0.16, depthWrite: false });
+      const beam = new Mesh(cylGeo, beamMat);
+      beam.scale.set(0.18, 22, 0.18);
+      beam.position.set(tx, ty + 11.2, tz);
+
+      beaconGroup.add(pedestal, trim, screen, button, beam);
       root.add(beaconGroup);
+    }
+
+    function markConsoleActivated() {
+      if (activeConsoleButtonMat) activeConsoleButtonMat.color.setHex(0x66d9f0);
+      if (activeConsoleScreenMat) activeConsoleScreenMat.color.setHex(0x88ffaa);
+    }
+
+    // =========================================================================
+    // 5B. REAL 3D OPEN-WORLD AIRCRAFT CRASH SET-PIECE (Flying -> Smoke -> Crash -> Wreckage)
+    // =========================================================================
+    let crashState = null;
+    let crashRoot = null;
+    function triggerAircraftCrash(impactArr = [-18, 0.25, -64]) {
+      if (crashRoot) { root.remove(crashRoot); crashRoot = null; }
+      const ix = impactArr[0], iy = impactArr[1] || 0.25, iz = impactArr[2];
+      crashRoot = new Group();
+      crashRoot.name = 'setpiece-aircraft-crash';
+
+      const planeGroup = new Group();
+      const hullMat = new MeshStandardMaterial({ color: 0x3b4954, roughness: 0.46, metalness: 0.58 });
+      const stripeMat = new MeshStandardMaterial({ color: 0xd96226, roughness: 0.45, metalness: 0.22 });
+      const glassMat = new MeshStandardMaterial({ color: 0x1b2f3d, roughness: 0.15, metalness: 0.8 });
+      const propMat = new MeshStandardMaterial({ color: 0x181b1e, roughness: 0.5, metalness: 0.7 });
+
+      const fuselage = new Mesh(boxGeo, hullMat);
+      fuselage.scale.set(2.4, 2.2, 13.5);
+      const nose = new Mesh(boxGeo, stripeMat);
+      nose.scale.set(1.8, 1.5, 2.8);
+      nose.position.set(0, -0.15, 7.6);
+      const cockpit = new Mesh(boxGeo, glassMat);
+      cockpit.scale.set(1.9, 0.85, 2.2);
+      cockpit.position.set(0, 0.82, 5.4);
+      const wings = new Mesh(boxGeo, hullMat);
+      wings.scale.set(18.5, 0.32, 3.2);
+      wings.position.set(0, 0.45, 0.6);
+      const tailFin = new Mesh(boxGeo, stripeMat);
+      tailFin.scale.set(0.28, 3.6, 2.8);
+      tailFin.position.set(0, 2.2, -5.8);
+      const tailWing = new Mesh(boxGeo, hullMat);
+      tailWing.scale.set(6.4, 0.22, 1.5);
+      tailWing.position.set(0, 0.9, -6.0);
+
+      const propL = new Mesh(boxGeo, propMat);
+      propL.scale.set(2.6, 0.16, 0.12);
+      propL.position.set(-4.6, 0.2, 2.5);
+      const propR = new Mesh(boxGeo, propMat);
+      propR.scale.set(2.6, 0.16, 0.12);
+      propR.position.set(4.6, 0.2, 2.5);
+
+      const fireMat = new MeshBasicMaterial({ color: 0xff6a1a, transparent: true, opacity: 0.0 });
+      const fireCore = new Mesh(cylGeo, fireMat);
+      fireCore.scale.set(2.4, 3.2, 2.4);
+      fireCore.position.set(0, 1.2, 0);
+
+      planeGroup.add(fuselage, nose, cockpit, wings, tailFin, tailWing, propL, propR, fireCore);
+      crashRoot.add(planeGroup);
+      root.add(crashRoot);
+
+      const startPos = new Vector3(ix + 115, iy + 68, iz - 95);
+      const impactPos = new Vector3(ix, iy + 0.95, iz);
+      planeGroup.position.copy(startPos);
+      planeGroup.lookAt(impactPos);
+
+      crashState = {
+        planeGroup, propL, propR, fireCore, fireMat,
+        startPos, impactPos,
+        elapsed: 0,
+        flightDur: 3.2,
+        impacted: false,
+        smokeTick: 0,
+      };
+      world?.audioV2?.playAircraftCrash?.(3.2);
+      return { impactPos: [ix, iy, iz], flightDur: 3.2 };
     }
 
     function activate(preset) {
       clearCurrent();
       activePreset = preset;
+      crashState = null;
+      crashRoot = null;
       if (preset === 'rising_water_drydock') buildRisingWaterDrydock();
       else if (preset === 'offshore_platform') buildOffshorePlatform();
     }
@@ -1020,7 +1133,49 @@
     }
 
     function update(dt, difficultyId = 'tactical') {
-      if (!activePreset || !(dt > 0)) return;
+      if (!(dt > 0)) return;
+      consolePulseClock += dt;
+      if (activeConsoleButtonMat && activeConsoleButtonMat.color) {
+        activeConsoleButtonMat.opacity = 0.55 + 0.45 * Math.sin(consolePulseClock * 4.5);
+      }
+      if (crashState) {
+        crashState.elapsed += dt;
+        const { planeGroup, propL, propR, fireCore, fireMat, startPos, impactPos, flightDur } = crashState;
+        if (!crashState.impacted) {
+          const t = Math.min(1, crashState.elapsed / flightDur);
+          const ease = t * (0.45 + 0.55 * t);
+          planeGroup.position.lerpVectors(startPos, impactPos, ease);
+          planeGroup.lookAt(impactPos);
+          planeGroup.rotation.z += Math.sin(t * Math.PI * 1.4) * 0.55 + t * 0.35;
+          propL.rotation.z += dt * 36;
+          propR.rotation.z -= dt * 18;
+          crashState.smokeTick += dt;
+          if (crashState.smokeTick >= 0.08) {
+            crashState.smokeTick = 0;
+            world?.fx?.smoke?.(planeGroup.position, { size: 3.4, life: 3.2, color: 0x221f1c, alpha: 0.72, rise: 1.1, count: 2 });
+          }
+          if (t >= 1) {
+            crashState.impacted = true;
+            planeGroup.position.copy(impactPos);
+            planeGroup.rotation.set(0.18, 0.72, 0.42);
+            fireMat.opacity = 0.82;
+            world?.disasters?.spawnFireballExplosion?.(impactPos, 2.4);
+            world?.fx?.smoke?.(impactPos, { size: 9.5, life: 9.0, color: 0x1a1715, alpha: 0.85, rise: 2.2, count: 14 });
+            world?.fx?.sparks?.(impactPos, new Vector3(0, 1, 0), 48);
+            world?.player?.addShake?.(0.75);
+          }
+        } else {
+          const flicker = 0.75 + 0.25 * Math.sin(crashState.elapsed * 14);
+          fireCore.scale.set(2.2 * flicker, 3.0 * flicker, 2.2 * flicker);
+          fireMat.opacity = 0.65 + 0.2 * flicker;
+          crashState.smokeTick += dt;
+          if (crashState.smokeTick >= 0.45) {
+            crashState.smokeTick = 0;
+            world?.fx?.smoke?.(impactPos, { size: 5.5, life: 4.5, color: 0x1e1b18, alpha: 0.65, rise: 1.8, count: 2 });
+          }
+        }
+      }
+      if (!activePreset) return;
       const diff = DIFFICULTY_PRESETS[difficultyId] || DIFFICULTY_PRESETS.tactical;
       if (activePreset === 'rising_water_drydock' && waterMesh && waterRising && !waterLocked) {
         waterLevel = Math.min(2.85, waterLevel + dt * 0.045 * diff.hazardMultiplier);
@@ -1037,18 +1192,152 @@
     return {
       activate,
       setObjectiveBeacon,
+      markConsoleActivated,
+      triggerAircraftCrash,
       setVaultZoneLit,
       lockWaterLevel,
       update,
-      dispose: () => { beaconGroup = null; clearCurrent(); },
+      dispose: () => { beaconGroup = null; crashState = null; crashRoot = null; clearCurrent(); },
       get state() {
-        return { preset: activePreset, waterLevel: Number(waterLevel.toFixed(2)), waterLocked, currentGust: Number(currentGust.toFixed(2)) };
+        return {
+          preset: activePreset,
+          waterLevel: Number(waterLevel.toFixed(2)),
+          waterLocked,
+          currentGust: Number(currentGust.toFixed(2)),
+          aircraftCrashActive: !!crashState,
+          aircraftImpacted: !!crashState?.impacted,
+        };
       },
     };
   }
 
   // =========================================================================
-  // 6. ACTIVE CHARACTER BEHAVIOR CONTROLLER (Follow, Lead, Operate, Emote)
+  // 5C. CAMPAIGN CINEMATIC DIRECTOR (Chapter Intro Fly-Ins & Story Event Cutscenes)
+  // =========================================================================
+  function createCampaignCinematicDirector(world) {
+    let activeShot = null;
+    let overlayEl = null;
+
+    function ensureOverlay() {
+      if (overlayEl || typeof document === 'undefined') return overlayEl;
+      overlayEl = document.createElement('div');
+      overlayEl.id = 'sl-v2-cinematic-overlay';
+      overlayEl.style.cssText = 'position:fixed;inset:0;z-index:42;pointer-events:none;display:none;';
+      overlayEl.innerHTML = `
+        <div style="position:absolute;left:0;right:0;top:0;height:54px;background:linear-gradient(180deg,rgba(4,8,12,.92),rgba(4,8,12,0));"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:96px;background:linear-gradient(0deg,rgba(4,8,12,.94),rgba(4,8,12,0));display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:18px;gap:6px;">
+          <div data-cine-tag style="font:700 11px/1 system-ui;letter-spacing:.26em;text-transform:uppercase;color:#f2c45a;"></div>
+          <div data-cine-sub style="font:600 15px/1.35 system-ui;color:#eef5f7;text-shadow:0 2px 10px rgba(0,0,0,.9);max-width:740px;text-align:center;padding:0 18px;"></div>
+          <div style="font:500 11px/1 system-ui;color:rgba(216,232,238,.58);letter-spacing:.12em;">按 SPACE 或 ESC 跳过过场动画</div>
+        </div>`;
+      document.body.appendChild(overlayEl);
+      return overlayEl;
+    }
+
+    function playShot({ tag = '', subtitle = '', from, to, lookAtFrom, lookAtTo, duration = 4.0, onComplete = null } = {}) {
+      activeShot = {
+        tag, subtitle,
+        from: from || [0, 12, 0],
+        to: to || [0, 2, 0],
+        lookAtFrom: lookAtFrom || [0, 1.5, -10],
+        lookAtTo: lookAtTo || lookAtFrom || [0, 1.5, -10],
+        duration: Math.max(1.2, duration),
+        elapsed: 0,
+        onComplete,
+      };
+      const el = ensureOverlay();
+      if (el) {
+        el.style.display = 'block';
+        const tagEl = el.querySelector('[data-cine-tag]');
+        const subEl = el.querySelector('[data-cine-sub]');
+        if (tagEl) tagEl.textContent = tag;
+        if (subEl) subEl.textContent = subtitle;
+      }
+      return true;
+    }
+
+    function playChapterIntro(chapter, onComplete = null) {
+      if (!chapter) return false;
+      const sp = chapter.spawn || [-26, 0.25, -42];
+      const tgt = chapter.objectives?.[0]?.target || [sp[0], sp[1], sp[2] - 18];
+      world?.audioV2?.playChapterIntro?.(chapter.number || 1);
+      return playShot({
+        tag: `${chapter.titleZh} · 入场镜头`,
+        subtitle: chapter.transitionZh || chapter.landmarkZh || '',
+        from: [sp[0] + 22, (sp[1] || 0) + 18, sp[2] + 24],
+        to: [sp[0], (sp[1] || 0) + 1.65, sp[2]],
+        lookAtFrom: [tgt[0], (tgt[1] || 0) + 2.5, tgt[2]],
+        lookAtTo: [tgt[0], (tgt[1] || 0) + 1.4, tgt[2]],
+        duration: 4.2,
+        onComplete,
+      });
+    }
+
+    function playStoryEventCutscene({ tag, subtitle, focusPos, duration = 3.6, onComplete = null } = {}) {
+      const fp = focusPos || [0, 1.5, 0];
+      return playShot({
+        tag: tag || '剧情事件',
+        subtitle: subtitle || '',
+        from: [fp[0] + 14, (fp[1] || 0) + 9, fp[2] + 16],
+        to: [fp[0] - 8, (fp[1] || 0) + 6, fp[2] + 14],
+        lookAtFrom: [fp[0], (fp[1] || 0) + 2.2, fp[2]],
+        lookAtTo: [fp[0], (fp[1] || 0) + 1.6, fp[2]],
+        duration,
+        onComplete,
+      });
+    }
+
+    function skip() {
+      if (!activeShot) return false;
+      const cb = activeShot.onComplete;
+      activeShot = null;
+      if (overlayEl) overlayEl.style.display = 'none';
+      if (typeof cb === 'function') { try { cb(); } catch {} }
+      return true;
+    }
+
+    function update(dt) {
+      if (!activeShot || !(dt > 0)) return false;
+      activeShot.elapsed += dt;
+      const t = Math.min(1, activeShot.elapsed / activeShot.duration);
+      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      const cam = world?.camera;
+      if (cam?.position && cam?.lookAt) {
+        const lerp = (a, b) => a + (b - a) * ease;
+        cam.position.set(
+          lerp(activeShot.from[0], activeShot.to[0]),
+          lerp(activeShot.from[1], activeShot.to[1]),
+          lerp(activeShot.from[2], activeShot.to[2])
+        );
+        cam.lookAt(
+          lerp(activeShot.lookAtFrom[0], activeShot.lookAtTo[0]),
+          lerp(activeShot.lookAtFrom[1], activeShot.lookAtTo[1]),
+          lerp(activeShot.lookAtFrom[2], activeShot.lookAtTo[2])
+        );
+      }
+      if (t >= 1) skip();
+      return !!activeShot;
+    }
+
+    function dispose() {
+      activeShot = null;
+      if (overlayEl) { overlayEl.remove(); overlayEl = null; }
+    }
+
+    return {
+      playShot,
+      playChapterIntro,
+      playStoryEventCutscene,
+      skip,
+      update,
+      dispose,
+      get active() { return !!activeShot; },
+    };
+  }
+
+  // =========================================================================
+  // 6. ACTIVE CHARACTER BEHAVIOR CONTROLLER (Autonomous Patrol, Console Work,
+  //    Pointing, Waving, Radio Calls & Natural Gaze Tracking)
   // =========================================================================
   function createCharacterBehaviorController(world) {
     const activeActors = new Map();
@@ -1058,6 +1347,7 @@
       if (!world?.THREE || !world?.scene || typeof window.createSaltlineHuman !== 'function') return;
       const castIds = (chapter.characters || []).filter(id => id !== 'lin');
       const [sx, sy, sz] = chapter.spawn || [0, 0.25, 0];
+      const obj0 = chapter.objectives?.[0]?.target || [sx, sy, sz - 12];
       castIds.forEach((cid, i) => {
         const meta = SALTLINE_CHARACTERS.find(c => c.id === cid);
         if (!meta) return;
@@ -1069,13 +1359,20 @@
           variation: i % 3,
         });
         const angle = (i - (castIds.length - 1) / 2) * 0.9;
-        human.actor.position.set(sx + Math.cos(angle) * 3.2, sy, sz + Math.sin(angle) * 3.2 + 2.4);
+        if (i === 1) {
+          human.actor.position.set(obj0[0] + 1.6, obj0[1] || sy, obj0[2] + 1.4);
+        } else {
+          human.actor.position.set(sx + Math.cos(angle) * 3.2, sy, sz + Math.sin(angle) * 3.2 + 2.4);
+        }
         world.scene.add(human.actor);
         activeActors.set(cid, {
           meta,
           human,
-          behavior: i === 0 ? 'follow' : 'wait_at_objective', // follow | lead | operate | wait_at_objective | talk
+          behavior: i === 0 ? 'follow' : (i === 1 ? 'inspect_console' : 'patrol_area'),
           emotion: 'focused',
+          homePos: { x: human.actor.position.x, z: human.actor.position.z },
+          actionTimer: 2.5 + i * 1.4,
+          currentAnim: 'stand',
           age: i * 1.3,
           stride: 0,
         });
@@ -1093,33 +1390,59 @@
       if (!playerPos || !(dt > 0)) return;
       for (const rec of activeActors.values()) {
         rec.age += dt;
+        rec.actionTimer -= dt;
         const pos = rec.human.actor.position;
+        const distPlayer = Math.hypot(playerPos.x - pos.x, playerPos.z - pos.z);
         let target = null;
+
         if (rec.behavior === 'follow') {
-          const dist = Math.hypot(playerPos.x - pos.x, playerPos.z - pos.z);
-          if (dist > 4.2) target = playerPos;
+          if (distPlayer > 4.6) target = playerPos;
         } else if (rec.behavior === 'lead' && objectivePos) {
           target = objectivePos;
+        } else if (rec.behavior === 'patrol_area') {
+          const px = rec.homePos.x + Math.cos(rec.age * 0.35) * 4.5;
+          const pz = rec.homePos.z + Math.sin(rec.age * 0.35) * 4.5;
+          if (Math.hypot(px - pos.x, pz - pos.z) > 0.6) target = { x: px, z: pz };
         }
+
         if (target) {
           const dx = target.x - pos.x, dz = target.z - pos.z;
           const d = Math.hypot(dx, dz);
-          if (d > 2.2) {
-            const spd = Math.min(d - 1.8, dt * 3.6);
+          const stopDist = rec.behavior === 'patrol_area' ? 0.35 : 2.3;
+          if (d > stopDist) {
+            const run = d > 9.5;
+            const spd = Math.min(d - stopDist * 0.5, dt * (run ? 5.6 : 3.2));
             pos.x += (dx / d) * spd;
             pos.z += (dz / d) * spd;
             rec.human.actor.rotation.y = Math.atan2(dx, dz);
             rec.stride += spd * 4.5;
-            rec.human.pose('walk', rec.stride, rec.age, true, dt);
+            rec.currentAnim = run ? 'run' : 'walk';
+            rec.human.pose(rec.currentAnim, rec.stride, rec.age, true, dt);
             continue;
           }
         }
-        // Face player naturally when idle or talking
-        const fx = playerPos.x - pos.x, fz = playerPos.z - pos.z;
-        if (Math.hypot(fx, fz) < 12) {
-          rec.human.actor.rotation.y = Math.atan2(fx, fz);
+
+        if (rec.behavior === 'talk') {
+          rec.currentAnim = 'talk';
+        } else if (rec.behavior === 'inspect_console') {
+          if (distPlayer < 5.5 && rec.actionTimer <= 0) {
+            rec.currentAnim = rec.currentAnim === 'point_ahead' ? 'inspect_console' : 'point_ahead';
+            rec.actionTimer = 4.2;
+          } else if (distPlayer >= 5.5) {
+            rec.currentAnim = 'inspect_console';
+          }
+        } else if (rec.actionTimer <= 0) {
+          const pool = distPlayer < 7 ? ['wave_follow', 'point_ahead', 'radio_call', 'talk'] : ['radio_call', 'stand'];
+          rec.currentAnim = pool[Math.floor((rec.age * 10) % pool.length)];
+          rec.actionTimer = 4.5 + (rec.age % 3.5);
         }
-        rec.human.pose(rec.behavior === 'talk' ? 'talk' : 'stand', 0, rec.age, false, dt);
+
+        if (rec.currentAnim === 'inspect_console' && objectivePos) {
+          rec.human.actor.rotation.y = Math.atan2(objectivePos.x - pos.x, objectivePos.z - pos.z);
+        } else if (distPlayer < 16) {
+          rec.human.actor.rotation.y = Math.atan2(playerPos.x - pos.x, playerPos.z - pos.z);
+        }
+        rec.human.pose(rec.currentAnim, 0, rec.age, false, dt);
       }
     }
 
@@ -1135,7 +1458,7 @@
       setBehavior,
       update,
       disposeCast,
-      get cast() { return [...activeActors.values()].map(r => ({ id: r.meta.id, behavior: r.behavior, emotion: r.emotion })); },
+      get cast() { return [...activeActors.values()].map(r => ({ id: r.meta.id, behavior: r.behavior, anim: r.currentAnim, emotion: r.emotion })); },
     };
   }
 
@@ -1145,6 +1468,7 @@
   function createSaltlineCampaignV2(world, { storage } = {}) {
     const saveMgr = createCampaignSaveManager(storage);
     const setPieces = createChapterSetPieceManager(world);
+    const cinematics = createCampaignCinematicDirector(world);
     const charCtrl = createCharacterBehaviorController(world);
 
     let activeChapter = null;
@@ -1168,9 +1492,10 @@
       saveMgr.setActiveSlotId(slotId);
       saveMgr.saveCheckpoint(ch.id, objectiveIdx, ch.spawn, slotId);
 
-      // Apply chapter-specific sky, weather, 3D set-piece, open-world beacon, spawn & active cast
       setPieces.activate(ch.scenePreset);
-      setPieces.setObjectiveBeacon?.(ch.objectives?.[objectiveIdx]?.target);
+      const firstObj = ch.objectives?.[objectiveIdx];
+      setPieces.setObjectiveBeacon?.(firstObj?.target, firstObj?.action);
+      world?.audioV2?.setAmbience?.(ch.weather || 'overcast_mist');
       if (world?.openWorld?.setSkyPreset) world.openWorld.setSkyPreset(ch.skyPreset, true);
       if (world?.player?.pos && ch.spawn) {
         world.player.pos.set(ch.spawn[0], ch.spawn[1], ch.spawn[2]);
@@ -1178,6 +1503,9 @@
         world.openWorld?.warmUpSync?.(world.player.pos);
       }
       charCtrl.spawnChapterCast(ch);
+      if (!skipCutscene) {
+        cinematics.playChapterIntro(ch);
+      }
       emit('chapter:start', { chapter: ch, objectiveIdx, skipCutscene });
       return { chapter: ch, objectiveIdx };
     }
@@ -1186,31 +1514,65 @@
       if (!active || !activeChapter) return null;
       const curObj = activeChapter.objectives[objectiveIdx];
       if (choiceId) saveMgr.recordChoice(activeChapter.id, choiceId);
+
+      setPieces.markConsoleActivated?.();
+      const act = String(curObj?.action || '');
+      if (/valve|ballast|flood/i.test(act)) world?.audioV2?.playValveTurn?.();
+      else if (/power|repair|restore|grid/i.test(act)) world?.audioV2?.playBreakerThrow?.();
+      else world?.audioV2?.playButtonPress?.();
+
       if (activeChapter.scenePreset === 'underground_vault') setPieces.setVaultZoneLit(objectiveIdx);
       if (activeChapter.scenePreset === 'rising_water_drydock' && objectiveIdx >= 2) setPieces.lockWaterLevel();
+
+      // Trigger dramatic story-driven open-world Aircraft Crash & cutscene on key story beats (no pillar shooting!)
+      let triggeredEvent = null;
+      if ((activeChapter.id === 'ch01' && objectiveIdx === 2) || (activeChapter.id === 'ch02' && objectiveIdx === 1) || (activeChapter.id === 'ch09' && objectiveIdx === 0)) {
+        const crashPoint = [
+          (curObj?.target?.[0] || -20) + 18,
+          0.25,
+          (curObj?.target?.[2] || -60) - 22,
+        ];
+        setPieces.triggerAircraftCrash(crashPoint);
+        cinematics.playStoryEventCutscene({
+          tag: '突发空难 · 应急运输机迫降坠毁',
+          subtitle: '盐线沿海空域一架应急运输机受电磁干扰失控坠毁在前方街区！',
+          focusPos: crashPoint,
+          duration: 4.8,
+        });
+        triggeredEvent = 'aircraft_crash';
+      } else if (curObj?.target) {
+        world?.audioV2?.playObjectiveComplete?.();
+        cinematics.playStoryEventCutscene({
+          tag: `${activeChapter.shortZh} · 剧情推进`,
+          subtitle: `已完成：${curObj.titleZh}`,
+          focusPos: curObj.target,
+          duration: 2.6,
+        });
+      }
 
       if (objectiveIdx + 1 < activeChapter.objectives.length) {
         objectiveIdx++;
         const nextObj = activeChapter.objectives[objectiveIdx];
-        setPieces.setObjectiveBeacon?.(nextObj?.target);
+        setPieces.setObjectiveBeacon?.(nextObj?.target, nextObj?.action);
         saveMgr.saveCheckpoint(activeChapter.id, objectiveIdx, nextObj.target);
-        emit('objective:advance', { chapter: activeChapter, objectiveIdx, objective: nextObj });
-        return { completedChapter: false, chapter: activeChapter, objectiveIdx, objective: nextObj };
+        emit('objective:advance', { chapter: activeChapter, objectiveIdx, objective: nextObj, triggeredEvent });
+        return { completedChapter: false, chapter: activeChapter, objectiveIdx, objective: nextObj, triggeredEvent };
       }
 
-      // Chapter completed!
+      world?.audioV2?.playChapterComplete?.();
       const finished = activeChapter;
       const updatedSlot = saveMgr.completeChapter(finished.id);
       const nextIdx = SALTLINE_CHAPTERS.findIndex(c => c.id === finished.id) + 1;
       const nextChapter = SALTLINE_CHAPTERS[nextIdx] || null;
-      emit('chapter:complete', { chapter: finished, nextChapter, slot: updatedSlot });
-      return { completedChapter: true, chapter: finished, nextChapter, slot: updatedSlot };
+      emit('chapter:complete', { chapter: finished, nextChapter, slot: updatedSlot, triggeredEvent });
+      return { completedChapter: true, chapter: finished, nextChapter, slot: updatedSlot, triggeredEvent };
     }
 
     function update(dt) {
       if (!active || !activeChapter || !(dt > 0)) return;
       const slot = saveMgr.getSlot();
       setPieces.update(dt, slot.difficulty);
+      cinematics.update(dt);
       const curObj = activeChapter.objectives[objectiveIdx];
       const objPos = curObj?.target ? { x: curObj.target[0], y: curObj.target[1], z: curObj.target[2] } : null;
       charCtrl.update(dt, world?.player?.pos, objPos);
@@ -1227,8 +1589,10 @@
         sessionTimeAccum = 0;
       }
       active = false;
+      cinematics.dispose();
       setPieces.dispose();
       charCtrl.disposeCast();
+      world?.audioV2?.stopAmbience?.();
     }
 
     return {
@@ -1237,6 +1601,7 @@
       difficulties: DIFFICULTY_PRESETS,
       saveMgr,
       setPieces,
+      cinematics,
       charCtrl,
       startChapter,
       advanceObjective,
@@ -1258,6 +1623,7 @@
     validateGameplayMatrix,
     createCampaignSaveManager,
     createChapterSetPieceManager,
+    createCampaignCinematicDirector,
     createCharacterBehaviorController,
     createSaltlineCampaignV2,
   };

@@ -31,7 +31,7 @@ const ASSETS = new Set([
   'WorldEngine/Performance/ChunkManager.js',
   'WorldEngine/Terrain/TerrainGenerator.js', 'WorldEngine/Rendering/LightingSystem.js',
   'port-external-assets.js', 'port-open-world-cinematics.js', 'port-open-world-district.js', 'port-drivable-vehicle.js', 'port-disaster-events.js',
-  'saltline-campaign-core.js', 'saltline-campaign-menu.js', 'saltline-mp-modes.js', 'saltline-mp-maps.js',
+  'saltline-audio-v2.js', 'saltline-campaign-core.js', 'saltline-campaign-menu.js', 'saltline-mp-modes.js', 'saltline-mp-maps.js',
   'developer-menu.js', 'developer-menu.css',
   'art/campaign-prologue.jpg', 'art/campaign-berth.jpg', 'art/campaign-rail.jpg', 'art/campaign-drydock.jpg', 'art/campaign-tidegate.jpg',
   'art/campaign-anchorage.jpg', 'art/campaign-return-harbor.jpg', 'art/campaign-night-record.jpg',

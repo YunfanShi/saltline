@@ -178,3 +178,98 @@ test('SaltlineCampaignV2: 3D CharacterBehaviorController spawns cast and drives 
   ctrl.disposeCast();
   assert.equal(ctrl.cast.length, 0, 'disposeCast() should clear active cast');
 });
+
+test('SaltlineAudioV2 + Story Consoles + Open-World Aircraft Crash + Cutscenes + Companion VFX Isolation', () => {
+  const { sandbox } = makeSandbox();
+  loadBrowserScript('saltline-audio-v2.js', sandbox);
+  loadBrowserScript('saltline-campaign-core.js', sandbox);
+
+  assert.ok(sandbox.SaltlineAudioV2?.createSaltlineAudioV2, 'SaltlineAudioV2 should load cleanly');
+  const audioV2 = sandbox.SaltlineAudioV2.createSaltlineAudioV2();
+  audioV2.setVolume(0.6);
+  audioV2.setMuted(true);
+  audioV2.setMuted(false);
+  audioV2.setAmbience('severe_storm');
+  audioV2.playButtonPress();
+  audioV2.playValveTurn();
+  audioV2.playBreakerThrow();
+  audioV2.playRadioSquelch(true);
+  audioV2.playAircraftCrash(3.2);
+  audioV2.playChapterIntro(1);
+  audioV2.playObjectiveComplete();
+  audioV2.playChapterComplete();
+  audioV2.playThunder();
+  audioV2.playFootstep('metal');
+  assert.equal(audioV2.weather, 'severe_storm');
+  audioV2.dispose();
+
+  class Vec3 {
+    constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+    set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
+    copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
+    lerpVectors(a, b, t) { this.x = a.x + (b.x - a.x) * t; this.y = a.y + (b.y - a.y) * t; this.z = a.z + (b.z - a.z) * t; return this; }
+  }
+  class Obj {
+    constructor() { this.children = []; this.position = new Vec3(); this.rotation = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }; this.scale = new Vec3(1, 1, 1); }
+    add(...items) { this.children.push(...items); }
+    remove(item) { const i = this.children.indexOf(item); if (i >= 0) this.children.splice(i, 1); }
+    lookAt() {}
+    updateMatrix() {}
+  }
+  const mockTHREE = {
+    Group: Obj,
+    Mesh: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } },
+    BoxGeometry: class {},
+    CylinderGeometry: class {},
+    PlaneGeometry: class {},
+    MeshStandardMaterial: class { constructor(o) { Object.assign(this, o); this.color = { setHex() {} }; } },
+    MeshBasicMaterial: class { constructor(o) { Object.assign(this, o); this.color = { setHex() {} }; } },
+    PointLight: class extends Obj {},
+    Vector3: Vec3,
+  };
+  const scene = new Obj();
+  const cam = { position: new Vec3(), lookAtCalls: 0, lookAt() { this.lookAtCalls++; } };
+  let crashBlastCount = 0;
+  let crashAudioCount = 0;
+  const world = {
+    THREE: mockTHREE,
+    scene,
+    camera: cam,
+    player: { pos: new Vec3(), vel: new Vec3(), addShake() {} },
+    disasters: { spawnFireballExplosion() { crashBlastCount++; } },
+    fx: { smoke() {}, sparks() {} },
+    audioV2: {
+      setAmbience() {}, stopAmbience() {}, playButtonPress() {}, playValveTurn() {},
+      playBreakerThrow() {}, playChapterIntro() {}, playObjectiveComplete() {}, playChapterComplete() {},
+      playAircraftCrash() { crashAudioCount++; },
+    },
+  };
+
+  const C = sandbox.SaltlineCampaignV2;
+  const camp = C.createSaltlineCampaignV2(world);
+  camp.startChapter('ch02');
+  assert.equal(camp.cinematics.active, true, 'Chapter start should launch cinematic intro fly-in');
+  camp.update(1.0);
+  assert.ok(cam.lookAtCalls > 0, 'Cinematic director should drive camera lookAt during intro fly-in');
+  camp.cinematics.skip();
+  assert.equal(camp.cinematics.active, false, 'skip() should cleanly end active cutscene');
+
+  camp.advanceObjective();
+  const resCrash = camp.advanceObjective();
+  assert.equal(resCrash.triggeredEvent, 'aircraft_crash', 'Story button interaction should trigger open-world aircraft crash without shooting pillars');
+  assert.equal(crashAudioCount, 1, 'Aircraft crash should trigger SaltlineAudioV2.playAircraftCrash');
+  assert.equal(camp.setPieces.state.aircraftCrashActive, true);
+  assert.equal(camp.setPieces.state.aircraftImpacted, false);
+
+  for (let i = 0; i < 40; i++) camp.update(0.1);
+  assert.equal(camp.setPieces.state.aircraftImpacted, true, 'Aircraft should descend and impact ground after flight duration');
+  assert.equal(crashBlastCount, 1, 'Impact should trigger fiery explosion set-piece');
+
+  const companionSrc = fs.readFileSync(path.join(ROOT, 'port-companion-ai.js'), 'utf8');
+  assert.ok(companionSrc.includes('hostile.hp > maxHp * 0.40'), 'Companion AI must never steal kills below 40% HP');
+  assert.ok(!companionSrc.includes("'sidearm_shot'"), 'Companion AI must not play player-bus sidearm_shot sound');
+  const htmlSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.ok(htmlSrc.includes('A!=="companion"&&s.events.emit("enemy:hit"'), 'Gull damage must isolate companion hits from player events');
+  assert.ok(htmlSrc.includes('G!=="companion"&&s.events.emit("enemy:hit"'), 'Hound damage must isolate companion hits from player events');
+  assert.ok(htmlSrc.includes('saltline-audio-v2.js'), 'index.html must load saltline-audio-v2.js');
+});

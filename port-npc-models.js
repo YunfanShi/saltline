@@ -445,6 +445,10 @@
     function updatePose(mode = 'stand', stride = 0, age = 0, moving = false, dt = 0.016) {
       const safeDt = Math.max(0, Math.min(0.08, Number.isFinite(dt) ? dt : 0.016));
       const isTalking = mode === 'talk';
+      const isInspect = mode === 'inspect_console';
+      const isPoint = mode === 'point_ahead';
+      const isWave = mode === 'wave_follow';
+      const isRadio = mode === 'radio_call';
       const isWalking = moving || mode === 'walk';
       const isRunning = mode === 'run';
 
@@ -466,35 +470,49 @@
         }
       }
 
-      // Expressive conversational animation overlay (head nods, attentive tilt, breathing, natural hand gestures)
+      // Expressive procedural character action overlays on top of skeletal clips
       if (isTalking) {
         talkClock += safeDt;
         const nod = Math.sin(talkClock * 2.8) * 0.065 + Math.sin(talkClock * 1.15) * 0.04;
         const turn = Math.sin(talkClock * 1.45) * 0.09;
         const tilt = Math.cos(talkClock * 0.95) * 0.045;
-        if (headBone) {
-          headBone.rotation.x += nod;
-          headBone.rotation.y += turn;
-          headBone.rotation.z += tilt;
-        }
-        if (neckBone) {
-          neckBone.rotation.x += nod * 0.45;
-          neckBone.rotation.y += turn * 0.35;
-        }
-        if (spineBone) {
-          spineBone.rotation.x += Math.sin(talkClock * 1.8) * 0.025;
-          spineBone.rotation.y += Math.sin(talkClock * 0.85) * 0.04;
-        }
+        if (headBone) { headBone.rotation.x += nod; headBone.rotation.y += turn; headBone.rotation.z += tilt; }
+        if (neckBone) { neckBone.rotation.x += nod * 0.45; neckBone.rotation.y += turn * 0.35; }
+        if (spineBone) { spineBone.rotation.x += Math.sin(talkClock * 1.8) * 0.025; spineBone.rotation.y += Math.sin(talkClock * 0.85) * 0.04; }
         const gesture = Math.max(0, Math.sin(talkClock * 2.2));
         if (rightArm) rightArm.rotation.x -= 0.18 + gesture * 0.16;
         if (rightForeArm) rightForeArm.rotation.z += 0.22 + Math.sin(talkClock * 3.1) * 0.14;
         if (leftArm) leftArm.rotation.x -= 0.10 + Math.cos(talkClock * 1.9) * 0.08;
         if (leftForeArm) leftForeArm.rotation.z -= 0.14 + Math.cos(talkClock * 2.6) * 0.10;
+      } else if (isInspect) {
+        talkClock += safeDt;
+        if (spineBone) spineBone.rotation.x += 0.11 + Math.sin(talkClock * 1.6) * 0.02;
+        if (headBone) { headBone.rotation.x += 0.16; headBone.rotation.y += Math.sin(talkClock * 1.4) * 0.14; }
+        if (rightArm) rightArm.rotation.x -= 0.58 + Math.sin(talkClock * 4.5) * 0.08;
+        if (rightForeArm) rightForeArm.rotation.z += 0.38 + Math.cos(talkClock * 5.2) * 0.12;
+        if (leftArm) leftArm.rotation.x -= 0.48 + Math.cos(talkClock * 3.8) * 0.06;
+        if (leftForeArm) leftForeArm.rotation.z -= 0.32;
+      } else if (isPoint) {
+        talkClock += safeDt;
+        if (headBone) headBone.rotation.y += Math.sin(talkClock * 1.3) * 0.16;
+        if (spineBone) spineBone.rotation.y -= 0.08;
+        if (rightArm) rightArm.rotation.x -= 1.05 + Math.sin(talkClock * 2.4) * 0.06;
+        if (rightForeArm) rightForeArm.rotation.z += 0.08;
+      } else if (isWave) {
+        talkClock += safeDt;
+        if (headBone) headBone.rotation.z += Math.sin(talkClock * 2.5) * 0.06;
+        if (rightArm) rightArm.rotation.x -= 1.35;
+        if (rightForeArm) rightForeArm.rotation.z += 0.35 + Math.sin(talkClock * 6.5) * 0.36;
+      } else if (isRadio) {
+        talkClock += safeDt;
+        if (headBone) { headBone.rotation.z -= 0.09; headBone.rotation.x += Math.sin(talkClock * 2.2) * 0.04; }
+        if (leftArm) leftArm.rotation.x -= 0.85;
+        if (leftForeArm) leftForeArm.rotation.z -= 0.72;
       } else {
         talkClock = 0;
-        if (!spec.mixamo && !isWalking && spineBone) {
-          // Subtle living breathing for non-Mixamo standing NPCs
-          spineBone.rotation.x += Math.sin(age * 2.0) * 0.02;
+        if (!isWalking && !isRunning) {
+          if (spineBone) spineBone.rotation.x += Math.sin(age * 1.8) * 0.022;
+          if (headBone) headBone.rotation.y += Math.sin(age * 0.55) * 0.12;
         }
       }
     }
