@@ -276,10 +276,12 @@
       stepped_mixed_use: 'stepped_mixed_use',
       bonded_warehouse: 'bonded_warehouse',
       waterfront_rowhouses: 'waterfront_rowhouses',
+      industrial_complex: 'industrial_complex',
     };
     const ARCHETYPE_LIST = [
       'commercial_arcade', 'modern_office', 'harbor_apartment', 'civic_customs',
       'coastal_residence', 'industrial_hall', 'stepped_mixed_use', 'bonded_warehouse', 'waterfront_rowhouses',
+      'industrial_complex',
     ];
 
     // =========================================================================
@@ -509,6 +511,18 @@
               for (const u of p.units) {
                 push(mats.granite, u.uw + 0.22, 0.80, u.ud + 0.22, u.ux, baseY + 0.40, u.uz);
                 push(mats.steelDark, u.uw - 0.65, u.uh - 0.3, u.ud - 0.65, u.ux, baseY + u.uh / 2, u.uz);
+              }
+            } else if (archetype === 'industrial_complex') {
+              const tankMat = matLib.get('tank_industrial');
+              push(mats.concreteWet, width + 1.0, 1.5, depth + 1.0, cx, baseY + 0.75, cz);
+              push(mats.corrugated, width * 0.62, p.wallH - 1.5, depth * 0.86, cx - width * 0.18, baseY + 1.5 + (p.wallH - 1.5) / 2, cz);
+              push(mats.steelDark, width * 0.34, p.wallH * 0.65, depth * 0.44, cx + width * 0.32, baseY + 1.5 + p.wallH * 0.32, cz - depth * 0.22);
+              for (const sz of [-depth * 0.24, depth * 0.24]) {
+                addMesh(unitCyl, tankMat, cx + width * 0.32, baseY + p.wallH * 0.68, cz + sz, 0, 0, 0, 2.8, p.wallH * 1.15, 2.8);
+              }
+              push(mats.steelGalv, width * 0.56, 0.48, 1.4, cx + width * 0.08, baseY + p.wallH * 0.72, cz + depth * 0.22);
+              for (const sx of [-width * 0.28, -width * 0.12]) {
+                addMesh(unitCyl, mats.steelDark, cx + sx, baseY + p.wallH + 3.8, cz - depth * 0.26, 0, 0, 0, 0.72, 7.6, 0.72);
               }
             } else {
               push(mats.concreteWet, width + 0.6, 1.4, depth + 0.6, cx, baseY + 0.7, cz);
@@ -935,6 +949,14 @@
               for (const u of p.units) {
                 addCol(u.ux - u.uw / 2, baseY, u.uz - u.ud / 2, u.ux + u.uw / 2, baseY + u.uh, u.uz + u.ud / 2);
               }
+            } else if (spec.withInterior && (archetype === 'civic_customs' || archetype === 'commercial_arcade' || archetype === 'bonded_warehouse')) {
+              const t = 0.45;
+              addCol(cx - width / 2, baseY, cz - depth / 2, cx + width / 2, baseY + height, cz - depth / 2 + t);
+              addCol(cx - width / 2, baseY, cz - depth / 2, cx - width / 2 + t, baseY + height, cz + depth / 2);
+              addCol(cx + width / 2 - t, baseY, cz - depth / 2, cx + width / 2, baseY + height, cz + depth / 2);
+              addCol(cx - width / 2, baseY, cz + depth / 2 - t, cx - 2.0, baseY + height, cz + depth / 2);
+              addCol(cx + 2.0, baseY, cz + depth / 2 - t, cx + width / 2, baseY + height, cz + depth / 2);
+              addCol(cx - width / 2, baseY + 3.8, cz - depth / 2, cx + width / 2, baseY + height, cz + depth / 2);
             } else {
               addCol(cx - width / 2, baseY, cz - depth / 2, cx + width / 2, baseY + height, cz + depth / 2);
             }

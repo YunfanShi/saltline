@@ -259,27 +259,32 @@
     resetForLobby() { super.resetForLobby(); this.tickets = { blue: this.config.startingTickets, red: this.config.startingTickets }; }
   }
 
-  // 2. BREAKTHROUGH CONTROLLER
+  // 2. BREAKTHROUGH CONTROLLER (Sequential Multi-Sector Attacker/Defender Assault)
   class BreakthroughController extends BaseGameModeController {
     constructor(config) {
       super('breakthrough', config);
+      this.attackerTeam = 'blue';
+      this.defenderTeam = 'red';
       this.sector = 0;
+      this.fallbackTimer = 0;
       this.tickets = { blue: this.config.startingTickets, red: 4 };
     }
     initObjectives() {
       super.initObjectives();
       this.objectives = this.objectives.slice(0, 4);
       this.objectives.forEach((o, i) => {
-        o.owner = 'red'; o.control = -100; o.locked = i > 0; o.secured = false;
+        o.owner = 'red'; o.control = -100; o.locked = i > 0; o.secured = false; o.sectorIndex = i;
       });
       this.sector = 0;
+      this.fallbackTimer = 0;
       this.tickets = { blue: this.config.startingTickets, red: this.objectives.length };
     }
     update(dt, { units = [] } = {}) {
       if (this.winner || !(dt > 0)) return null;
       this.elapsed = Math.min(this.config.duration, this.elapsed + dt);
+      if (this.fallbackTimer > 0) this.fallbackTimer = Math.max(0, this.fallbackTimer - dt);
       const active = this.objectives[this.sector];
-      if (active) {
+      if (active && !active.locked) {
         let blue = 0, red = 0, capId = null;
         for (const u of units) {
           if (!u.alive || dist2D(u.pos, active.pos) > 9.0) continue;
@@ -293,11 +298,14 @@
             active.owner = 'blue';
             active.secured = true;
             this.sector++;
-            this.tickets.blue += 15; // Attacker reinforcement bonus on sector breakthrough!
+            this.fallbackTimer = 12;
+            this.tickets.blue += 35;
             this.tickets.red = Math.max(0, this.objectives.length - this.sector);
             if (this.objectives[this.sector]) this.objectives[this.sector].locked = false;
             if (capId) this.recordStat(capId, 'captures', 1, 350);
           }
+        } else if (!active.contested && red > 0 && active.control > -100) {
+          active.control = Math.max(-100, active.control - red * 10 * dt);
         }
       }
       return this.checkVictory();
@@ -307,16 +315,26 @@
       else if (this.tickets.blue <= 0 || this.elapsed >= this.config.duration) { this.winner = 'red'; this.endedReason = '守方成功守住最后防线！'; }
       return this.winner;
     }
-    exportState() { return { ...super.exportState(), sector: this.sector, tickets: { ...this.tickets } }; }
+    exportState() {
+      return {
+        ...super.exportState(),
+        attackerTeam: this.attackerTeam,
+        defenderTeam: this.defenderTeam,
+        sector: this.sector,
+        fallbackTimer: Number(this.fallbackTimer.toFixed(1)),
+        tickets: { ...this.tickets },
+      };
+    }
     applyState(r) {
       if (!super.applyState(r)) return false;
       if (Number.isInteger(r.sector)) this.sector = r.sector;
+      if (Number.isFinite(r.fallbackTimer)) this.fallbackTimer = r.fallbackTimer;
       if (r.tickets) this.tickets = { blue: r.tickets.blue, red: r.tickets.red };
       return true;
     }
   }
 
-  // 3. CO-OP RESCUE CONTROLLER (Role-Differentiated Teamwork!)
+  // 3. CO-OP RESCUE CONTROLLER (Role-Differentiated Teamwork, Hazards & Extraction Grading)
   class CoopRescueController extends BaseGameModeController {
     constructor(config) {
       super('coop_rescue', config);
@@ -324,14 +342,19 @@
       this.rescueTarget = 6;
       this.facilitiesRepaired = 0;
       this.facilityTarget = 2;
+      this.hazardLevel = 0;
+      this.rescueGrade = 'B';
       this.tickets = { blue: this.config.startingTickets, red: this.rescueTarget };
     }
     initObjectives() {
       super.initObjectives();
       this.rescued = 0;
       this.facilitiesRepaired = 0;
+      this.hazardLevel = 0;
+      const situations = ['power_hazard', 'structural_breach', 'medical_emergency', 'trapped_civilian', 'flood_evacuation'];
       this.objectives.forEach((o, i) => {
         o.kind = i < 2 ? 'facility_repair' : 'civilian_rescue';
+        o.situation = situations[i % situations.length];
         o.progress = 0;
         o.secured = false;
       });
@@ -340,16 +363,17 @@
     update(dt, { units = [] } = {}) {
       if (this.winner || !(dt > 0)) return null;
       this.elapsed = Math.min(this.config.duration, this.elapsed + dt);
+      const unrepaired = Math.max(0, this.facilityTarget - this.facilitiesRepaired);
+      this.hazardLevel = Math.min(1, this.hazardLevel + unrepaired * 0.008 * dt);
       for (const obj of this.objectives) {
         if (obj.secured) continue;
         let speed = 0, helperId = null;
         for (const u of units) {
           if (!u.alive || u.team !== 'blue' || dist2D(u.pos, obj.pos) > 7.5) continue;
-          // Role differentiation: Engineers repair 2x faster, Medics rescue 2x faster, Recon gives +30% aura!
           const roleMul = (obj.kind === 'facility_repair' && u.role === 'engineer') ? 2.0
             : (obj.kind === 'civilian_rescue' && u.role === 'medic') ? 2.0
-            : (u.role === 'recon' ? 1.3 : 1.0);
-          speed += 0.16 * roleMul;
+            : (u.role === 'transport' ? 1.5 : (u.role === 'recon' ? 1.3 : 1.0));
+          speed += 0.16 * roleMul * (1 - this.hazardLevel * 0.25);
           if (!helperId && u.isPlayer) helperId = u.id;
         }
         if (speed > 0) {
@@ -359,6 +383,7 @@
             obj.owner = 'blue';
             if (obj.kind === 'facility_repair') {
               this.facilitiesRepaired++;
+              this.hazardLevel = Math.max(0, this.hazardLevel - 0.35);
               if (helperId) this.recordStat(helperId, 'repairs', 1, 300);
             } else {
               this.rescued = Math.min(this.rescueTarget, this.rescued + 2);
@@ -373,9 +398,11 @@
     checkVictory() {
       if (this.rescued >= this.rescueTarget && this.facilitiesRepaired >= this.facilityTarget) {
         this.winner = 'blue';
-        this.endedReason = `全部 ${this.rescueTarget} 名受困市民安全撤离，应急设施恢复运转！`;
+        this.rescueGrade = this.elapsed < this.config.duration * 0.45 ? 'S' : (this.elapsed < this.config.duration * 0.72 ? 'A' : 'B');
+        this.endedReason = `全部 ${this.rescueTarget} 名受困市民安全撤离（评级 ${this.rescueGrade}），应急设施恢复运转！`;
       } else if (this.tickets.blue <= 0 || this.elapsed >= this.config.duration) {
         this.winner = 'red';
+        this.rescueGrade = 'C';
         this.endedReason = '搜救窗口超时或救援队全员失去行动能力。';
       }
       return this.winner;
@@ -385,6 +412,8 @@
         ...super.exportState(),
         rescued: this.rescued, rescueTarget: this.rescueTarget,
         facilitiesRepaired: this.facilitiesRepaired, facilityTarget: this.facilityTarget,
+        hazardLevel: Number(this.hazardLevel.toFixed(2)),
+        rescueGrade: this.rescueGrade,
         tickets: { ...this.tickets },
       };
     }
@@ -392,12 +421,14 @@
       if (!super.applyState(r)) return false;
       if (Number.isFinite(r.rescued)) this.rescued = r.rescued;
       if (Number.isFinite(r.facilitiesRepaired)) this.facilitiesRepaired = r.facilitiesRepaired;
+      if (Number.isFinite(r.hazardLevel)) this.hazardLevel = r.hazardLevel;
+      if (r.rescueGrade) this.rescueGrade = r.rescueGrade;
       if (r.tickets) this.tickets = { blue: r.tickets.blue, red: r.tickets.red };
       return true;
     }
   }
 
-  // 4. COOPERATIVE CAMPAIGN CONTROLLER (2–4P Shared 14-Chapter Progression)
+  // 4. COOPERATIVE CAMPAIGN CONTROLLER (2–4P Shared 14-Chapter Progression + Events + Reconnect)
   class CoopCampaignController extends BaseGameModeController {
     constructor(config) {
       super('coop_campaign', config);
@@ -406,6 +437,9 @@
       this.sharedCheckpoint = null;
       this.coopHoldProgress = 0;
       this.choices = {};
+      this.sharedEvents = [];
+      this.npcStates = {};
+      this.disconnectedPlayers = new Map();
     }
     getChapters() {
       return (typeof window !== 'undefined' && window.SaltlineCampaignV2?.SALTLINE_CHAPTERS) || [];
@@ -414,6 +448,9 @@
       super.init(playersList);
       this.objectiveIndex = 0;
       this.coopHoldProgress = 0;
+      this.sharedEvents = [];
+      this.npcStates = {};
+      this.disconnectedPlayers.clear();
       this.syncChapterObjectives();
     }
     syncChapterObjectives() {
@@ -429,12 +466,42 @@
       }));
       this.sharedCheckpoint = { chapterId: ch.id, chapterIndex: this.chapterIndex, objectiveIndex: this.objectiveIndex };
     }
+    recordChoice(chapterId, choiceId) {
+      this.choices[chapterId] = choiceId;
+      this.stateSeq++;
+      return this.choices;
+    }
+    triggerSharedEvent(eventId, payload = {}) {
+      const ev = { id: eventId, payload, at: Number(this.elapsed.toFixed(1)) };
+      this.sharedEvents.push(ev);
+      this.stateSeq++;
+      return ev;
+    }
+    syncNpcState(npcId, statePatch) {
+      this.npcStates[npcId] = { ...(this.npcStates[npcId] || {}), ...statePatch };
+      this.stateSeq++;
+    }
+    handleDisconnect(playerId) {
+      const p = this.players.get(playerId);
+      if (!p) return false;
+      this.disconnectedPlayers.set(playerId, { ...p, disconnectedAt: this.elapsed });
+      this.stateSeq++;
+      return true;
+    }
+    rejoinPlayer(playerId) {
+      const saved = this.disconnectedPlayers.get(playerId);
+      if (saved) {
+        this.players.set(playerId, { ...saved });
+        this.disconnectedPlayers.delete(playerId);
+      }
+      this.stateSeq++;
+      return this.exportState();
+    }
     update(dt, { units = [] } = {}) {
       if (this.winner || !(dt > 0)) return null;
       this.elapsed += dt;
       const activeObj = this.objectives[this.objectiveIndex];
       if (!activeObj) return this.checkVictory();
-      // Require cooperative presence: scales dynamically with active player count (1+ players near objective, faster with 2-4!)
       const activePlayers = units.filter(u => u.alive && u.isPlayer);
       const nearPlayers = activePlayers.filter(u => dist2D(u.pos, activeObj.pos) <= 9.0);
       if (nearPlayers.length > 0) {
@@ -475,7 +542,9 @@
         chapterIndex: this.chapterIndex,
         objectiveIndex: this.objectiveIndex,
         sharedCheckpoint: this.sharedCheckpoint,
-        choices: this.choices,
+        choices: { ...this.choices },
+        sharedEvents: [...this.sharedEvents],
+        npcStates: { ...this.npcStates },
       };
     }
     applyState(r) {
@@ -487,21 +556,42 @@
       if (Number.isInteger(r.objectiveIndex)) this.objectiveIndex = r.objectiveIndex;
       if (r.sharedCheckpoint) this.sharedCheckpoint = r.sharedCheckpoint;
       if (r.choices) this.choices = { ...r.choices };
+      if (Array.isArray(r.sharedEvents)) this.sharedEvents = [...r.sharedEvents];
+      if (r.npcStates) this.npcStates = { ...r.npcStates };
       return true;
     }
   }
 
-  // 5. OPEN WORLD SANDBOX CONTROLLER (Host Rules + World Events + Free Exploration)
+  // 5. OPEN WORLD SANDBOX CONTROLLER (Host Rules + World Conditions + Vehicles + Facilities)
   class SandboxController extends BaseGameModeController {
     constructor(config) {
       super('sandbox', config);
       this.worldState = {
         weather: this.config.weather || 'clear',
         timeOfDay: this.config.timeOfDay || 'day',
+        hazardIntensity: 0.5,
         aiWaves: Boolean(this.config.customRules?.aiWaves),
         infiniteAmmo: this.config.customRules?.infiniteAmmo !== false,
         activeEvent: null,
+        spawnedVehicles: [],
+        facilities: { harbor_power: true, flood_gate: false, lighthouse_beacon: true },
       };
+    }
+    setWorldCondition(patch = {}) {
+      Object.assign(this.worldState, patch);
+      this.stateSeq++;
+      return { ...this.worldState };
+    }
+    spawnVehicle(type = 'sar_4x4', pos = [0, 0.3, 0]) {
+      const v = { id: `veh_${this.worldState.spawnedVehicles.length + 1}`, type, pos, spawnedAt: Math.round(this.elapsed) };
+      this.worldState.spawnedVehicles.push(v);
+      this.stateSeq++;
+      return v;
+    }
+    toggleFacility(facilityId) {
+      this.worldState.facilities[facilityId] = !this.worldState.facilities[facilityId];
+      this.stateSeq++;
+      return this.worldState.facilities[facilityId];
     }
     triggerWorldEvent(eventName) {
       this.worldState.activeEvent = { name: eventName, triggeredAt: Math.round(this.elapsed) };
@@ -520,10 +610,19 @@
       this.stateSeq++;
       return this.getSettlement();
     }
-    exportState() { return { ...super.exportState(), worldState: { ...this.worldState } }; }
+    exportState() {
+      return {
+        ...super.exportState(),
+        worldState: {
+          ...this.worldState,
+          spawnedVehicles: [...this.worldState.spawnedVehicles],
+          facilities: { ...this.worldState.facilities },
+        },
+      };
+    }
     applyState(r) {
       if (!super.applyState(r)) return false;
-      if (r.worldState) this.worldState = { ...r.worldState };
+      if (r.worldState) this.worldState = { ...this.worldState, ...r.worldState };
       return true;
     }
   }

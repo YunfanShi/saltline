@@ -163,8 +163,8 @@ async function main() {
     await cdp.send('Runtime.enable');
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
 
-    const targetUrl = `http://127.0.0.1:${httpPort}/index.html?mode=openworld&autostart=1&q=medium&seed=4207&noaudio=1`;
-    await cdp.send('Page.navigate', { url: targetUrl });
+    const bootT0 = Date.now();
+    await cdp.send('Page.navigate', { url: `http://127.0.0.1:${httpPort}/index.html?mode=openworld&autostart=1&q=medium&seed=4207&noaudio=1` });
 
     for (let i = 0; i < 60; i++) {
       await sleep(500);
@@ -172,93 +172,104 @@ async function main() {
       if (st?.fatal) throw new Error(st.fatal);
       if (st?.ready && st?.hasG) break;
     }
-
-    // Start Campaign V2 Chapter 1 and wait for Rocketbox GLB character models to load
-    const ch1Info = await evalJs(cdp, `(async () => {
-      if (__G.campaignV2) {
-        __G.campaignV2.startChapter('ch01', { skipCutscene: true });
-        await new Promise(r => setTimeout(r, 2600));
-        // Find Mara's world position and yaw
-        let maraPos = null, maraYaw = null;
-        __G.scene.traverse(n => {
-          if (n.name === 'cast-mara') {
-            maraPos = [n.position.x, n.position.y, n.position.z];
-            maraYaw = n.rotation.y;
+    const worldBootMs = Date.now() - bootT0;
+    const metrics = [];
+    const samplePerf = () => evalJs(cdp, `new Promise(resolve => {
+      let prev, frames = 0, calls = 0, tris = 0;
+      const deltas = [];
+      function tick(now) {
+        if (prev !== undefined) {
+          deltas.push(now - prev);
+          const st = typeof SALTLINE_GET_STATS === 'function' ? SALTLINE_GET_STATS() : {};
+          calls += st.drawCalls || 0; tris += st.triangles || 0;
+          if (++frames >= 20) {
+            const avgMs = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+            resolve({ fps: Number((1000 / Math.max(0.1, avgMs)).toFixed(1)), frameMs: Number(avgMs.toFixed(1)), drawCalls: Math.round(calls / frames), triangles: Math.round(tris / frames) });
+            return;
           }
-        });
-        return { maraPos, maraYaw, playerPos: __G.player.pos.toArray(), cast: __G.campaignV2.charCtrl.cast };
+        }
+        prev = now; requestAnimationFrame(tick);
       }
-      return { error: 'no campaignV2' };
-    })()`);
-    console.log('CH01_INFO:', JSON.stringify(ch1Info));
+      requestAnimationFrame(tick);
+    })`);
+    const snap = async (filename, label, loadMs = null) => {
+      await sleep(650);
+      const perf = await samplePerf();
+      const s = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });
+      fs.writeFileSync(path.join(OUT_DIR, filename), Buffer.from(s.data, 'base64'));
+      metrics.push({ file: filename, label, loadMs, ...perf });
+      console.log(`📸 ${filename} | ${label} | FPS: ${perf.fps} | DC: ${perf.drawCalls} | Tris: ${perf.triangles}${loadMs != null ? ` | Load: ${loadMs}ms` : ''}`);
+    };
 
-    // Shot 1: First-person view from player spawn looking down street at Mara & NPCs
+    const ch1Info = await evalJs(cdp, `(async () => {
+      __G.campaignV2.startChapter('ch01', { skipCutscene: true });
+      await new Promise(r => setTimeout(r, 2400));
+      let maraPos = null, maraYaw = 0;
+      __G.scene.traverse(n => { if (n.name === 'cast-mara') { maraPos = [n.position.x, n.position.y, n.position.z]; maraYaw = n.rotation.y; } });
+      __G.openWorld.setPhotoMode(true);
+      __G.player.enabled = false;
+      __G.weapon.setVisible(false);
+      return { maraPos, maraYaw };
+    })()`);
+
     if (ch1Info?.maraPos) {
       const [mx, my, mz] = ch1Info.maraPos;
-      // Stand behind/side of player looking toward Mara and the street objective
-      await evalJs(cdp, `(() => {
-        __G.openWorld.setPhotoMode(true);
-        __G.player.enabled = false;
-        __setShot({ cam: "${mx - 2.6},${my + 1.55},${mz + 3.2},${mx},${my + 1.25},${mz - 2.0}", fov: 56 });
-        return true;
-      })()`);
-      await sleep(700);
-      const s1 = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
-      fs.writeFileSync(path.join(OUT_DIR, 'qa-01-ch01-squad.jpg'), Buffer.from(s1.data, 'base64'));
-      console.log('Saved qa-01-ch01-squad.jpg');
+      await evalJs(cdp, `__setShot({ cam: "${mx - 2.6},${my + 1.55},${mz + 3.2},${mx},${my + 1.25},${mz - 2.0}", fov: 56 }); true`);
+      await snap('qa-01-ch01-squad.jpg', 'Ch01 Squad & Street', worldBootMs);
 
-      // Shot 2: Front-3/4 close-up of Mara to inspect Rocketbox arms, hands, rifle, and facing direction
-      const fwdX = Math.sin(ch1Info.maraYaw || 0);
-      const fwdZ = Math.cos(ch1Info.maraYaw || 0);
-      const cx = mx + fwdX * 2.4 + fwdZ * 0.9;
-      const cz = mz + fwdZ * 2.4 - fwdX * 0.9;
+      const fwdX = Math.sin(ch1Info.maraYaw || 0), fwdZ = Math.cos(ch1Info.maraYaw || 0);
+      const cx = mx + fwdX * 2.4 + fwdZ * 0.9, cz = mz + fwdZ * 2.4 - fwdX * 0.9;
       await evalJs(cdp, `__setShot({ cam: "${cx.toFixed(2)},${(my + 1.38).toFixed(2)},${cz.toFixed(2)},${mx.toFixed(2)},${(my + 1.15).toFixed(2)},${mz.toFixed(2)}", fov: 46 }); true`);
-      await sleep(700);
-      const s2 = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
-      fs.writeFileSync(path.join(OUT_DIR, 'qa-02-mara-closeup.jpg'), Buffer.from(s2.data, 'base64'));
-      console.log('Saved qa-02-mara-closeup.jpg');
+      await snap('qa-02-mara-closeup.jpg', 'Mara Rifle & Pose Close-up');
 
-      // Shot 3: Open [H] squad command panel + issue order '2' (operate_objective / point_ahead)
-      await evalJs(cdp, `(() => {
-        __G.campaignV2.npcCommands.setOpen(true);
-        __G.campaignV2.npcCommands.issueOrder('2');
-        return true;
-      })()`);
-      await sleep(600);
-      const s3 = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
-      fs.writeFileSync(path.join(OUT_DIR, 'qa-03-squad-command.jpg'), Buffer.from(s3.data, 'base64'));
-      console.log('Saved qa-03-squad-command.jpg');
+      await evalJs(cdp, `__G.campaignV2.npcCommands.setOpen(true); __G.campaignV2.npcCommands.issueOrder('2'); true`);
+      await snap('qa-03-squad-command.jpg', '[H] Tactical Squad Command UI');
+      await evalJs(cdp, `__G.campaignV2.npcCommands.setOpen(false); true`);
     }
 
-    // Shot 4: Chapter 3 driving gates (3 glowing arches)
-    await evalJs(cdp, `(() => {
-      __G.campaignV2.npcCommands.setOpen(false);
-      __G.campaignV2.startChapter('ch03', { skipCutscene: true });
-      const t = __G.campaignV2.getActiveWaypointTarget();
-      __setShot({ cam: "${-26},${4.5},${-46},${-26},${2.2},${-80}", fov: 60 });
-      return t;
-    })()`);
-    await sleep(900);
-    const s4 = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
-    fs.writeFileSync(path.join(OUT_DIR, 'qa-04-ch03-driving-gates.jpg'), Buffer.from(s4.data, 'base64'));
-    console.log('Saved qa-04-ch03-driving-gates.jpg');
+    await evalJs(cdp, `__G.campaignV2.startChapter('ch03', { skipCutscene: true }); __setShot({ cam: "-26,4.5,-44,-26,2.0,-82", fov: 60 }); true`);
+    await snap('qa-04-ch03-city.jpg', 'Showcase Ch03 Across the City');
 
-    // Shot 5: Upgraded 360x320m WorldEngine Multiplayer Map (coastal_metropolis)
-    await evalJs(cdp, `(() => {
-      __G.campaignV2.stop();
-      const loader = window.SaltlineMPMaps.createMultiplayerMapLoader(__G);
-      const res = loader.loadMap('coastal_metropolis');
-      __setShot({ cam: "-48,26,74,10,8,-20", fov: 62 });
-      window.__qaMpLoader = loader;
-      return { id: res.id, usesWorldEngine: res.usesWorldEngine, buildingCount: res.buildingCount };
-    })()`);
-    await sleep(900);
-    const s5 = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 90 });
-    fs.writeFileSync(path.join(OUT_DIR, 'qa-05-mp-metropolis.jpg'), Buffer.from(s5.data, 'base64'));
-    console.log('Saved qa-05-mp-metropolis.jpg');
+    await evalJs(cdp, `__G.campaignV2.startChapter('ch06', { skipCutscene: true }); for (let i=0;i<30;i++) __G.campaignV2.update(0.2); __setShot({ cam: "-26,7.5,64,-16,3.2,86", fov: 62 }); true`);
+    await snap('qa-05-ch06-rising-water.jpg', 'Showcase Ch06 Rising Water Drydock');
 
-    const errs = await evalJs(cdp, 'window.__errors || []');
-    console.log('CONSOLE_ERRORS:', JSON.stringify([...cdp.consoleErrors, ...errs]));
+    await evalJs(cdp, `__G.campaignV2.startChapter('ch10', { skipCutscene: true }); __setShot({ cam: "76,14.5,86,108,8.5,60", fov: 58 }); true`);
+    await snap('qa-06-ch10-offshore-platform.jpg', 'Showcase Ch10 Offshore Platform');
+
+    const mpShots = [
+      ['coastal_metropolis', 'qa-07-mp-coastal_metropolis.jpg', '-48,26,74,10,8,-20'],
+      ['iron_harbor', 'qa-08-mp-iron_harbor.jpg', '-64,22,68,14,6,-18'],
+      ['highland_passage', 'qa-09-mp-highland_passage.jpg', '-110,24,78,30,10,-28'],
+      ['old_saltline', 'qa-10-mp-old_saltline.jpg', '-58,18,62,6,6,-12'],
+      ['industrial_coast', 'qa-11-mp-industrial_coast.jpg', '-74,22,76,22,8,-26'],
+    ];
+    await evalJs(cdp, `__G.campaignV2.stop(); window.__qaMpLoader = window.SaltlineMPMaps.createMultiplayerMapLoader(__G); true`);
+    for (const [mapId, file, cam] of mpShots) {
+      const loadMs = await evalJs(cdp, `(() => { const t0 = performance.now(); window.__qaMpLoader.loadMap('${mapId}'); __setShot({ cam: "${cam}", fov: 62 }); return Math.round(performance.now() - t0); })()`);
+      await snap(file, `MP Map: ${mapId}`, loadMs);
+    }
+
+    await evalJs(cdp, `window.__qaMpLoader.loadMap('coastal_metropolis'); __setShot({ cam: "-62,8.5,38,-86,9.0,58", fov: 52 }); true`);
+    await snap('qa-12-building-closeup.jpg', 'Building Facade & PBR Detail Close-up');
+
+    await evalJs(cdp, `window.__qaMpLoader.unloadMap(); __setShot({ cam: "-11.3,1.8,-55,-0.8,1.55,-57", fov: 60 }); true`);
+    await snap('qa-13-building-interior.jpg', 'Accessible Building Interior');
+
+    await evalJs(cdp, `window.__qaMpLoader.loadMap('coastal_metropolis'); __setShot({ cam: "152,12,48,205,0,-10", fov: 60 }); true`);
+    await snap('qa-14-water-coastline.jpg', 'Layered Coastal Water & Seawall');
+
+    await evalJs(cdp, `window.__qaMpLoader.unloadMap(); true`);
+    const errs = [...new Set([...cdp.consoleErrors, ...(await evalJs(cdp, 'window.__errors || []'))])];
+    const summary = {
+      capturedAt: new Date().toISOString(),
+      worldBootMs,
+      shotCount: metrics.length,
+      avgFps: Number((metrics.reduce((s, m) => s + m.fps, 0) / Math.max(1, metrics.length)).toFixed(1)),
+      consoleErrors: errs,
+      shots: metrics,
+    };
+    fs.writeFileSync(path.join(OUT_DIR, 'qa-metrics.json'), JSON.stringify(summary, null, 2));
+    console.log('QA_METRICS_SAVED:', path.join(OUT_DIR, 'qa-metrics.json'), 'ERRORS:', errs.length);
   } finally {
     if (cdp) cdp.close();
     try { chrome.kill('SIGTERM'); } catch (_) {}

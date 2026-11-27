@@ -917,6 +917,45 @@
       root.add(g);
     }
 
+    let platformGroup = null;
+    let platformTiltDeg = 0;
+    let platformBallastBalanced = false;
+
+    function buildCityGridlockSetPiece() {
+      const g = new Group();
+      g.name = 'setpiece-city-gridlock';
+      const concrete = new MeshStandardMaterial({ color: 0x6f757a, roughness: 0.88, metalness: 0.06 });
+      const orange = new MeshStandardMaterial({ color: 0xe66a1f, roughness: 0.48, metalness: 0.18 });
+      const white = new MeshStandardMaterial({ color: 0xeaf0f4, roughness: 0.74, metalness: 0.08 });
+      const redCross = new MeshStandardMaterial({ color: 0xd93838, roughness: 0.42, metalness: 0.15 });
+      const steel = new MeshStandardMaterial({ color: 0x333f48, roughness: 0.52, metalness: 0.64 });
+      const beaconMat = new MeshBasicMaterial({ color: 0xff9b26 });
+      for (const [bx, bz] of [[-29, -62], [-23, -62], [-26, -65]]) {
+        addSolid(g, concrete, bx, 0.55, bz, 3.4, 0.95, 0.72, 'concrete', true);
+        addSolid(g, orange, bx, 1.12, bz, 2.6, 0.22, 0.22, 'metal', false);
+        addSolid(g, beaconMat, bx, 1.38, bz, 0.24, 0.24, 0.24, 'metal', false);
+      }
+      addSolid(g, steel, -32, 2.5, -58, 0.35, 5.0, 0.35, 'metal', true);
+      addSolid(g, steel, -20, 2.5, -58, 0.35, 5.0, 0.35, 'metal', true);
+      addSolid(g, orange, -26, 4.8, -58, 12.6, 0.85, 0.28, 'metal', false);
+      const mx = -6, mz = -149;
+      addSolid(g, concrete, mx, 0.24, mz, 11.5, 0.28, 8.5, 'concrete', true);
+      addSolid(g, white, mx, 3.35, mz, 10.6, 0.24, 7.6, 'metal', false);
+      for (const sx of [-4.9, 4.9]) for (const sz of [-3.4, 3.4]) {
+        addSolid(g, steel, mx + sx, 1.8, mz + sz, 0.22, 3.1, 0.22, 'metal', true);
+      }
+      addSolid(g, redCross, mx, 3.55, mz + 3.85, 1.8, 0.42, 0.14, 'metal', false);
+      addSolid(g, redCross, mx, 3.55, mz + 3.85, 0.42, 1.4, 0.14, 'metal', false);
+      for (const [cx, cz] of [[-3.2, -1.8], [-1.8, -1.8], [3.1, 1.6]]) {
+        addSolid(g, white, mx + cx, 0.78, mz + cz, 1.15, 0.78, 0.85, 'metal', true);
+        addSolid(g, redCross, mx + cx, 1.19, mz + cz, 0.38, 0.06, 0.14, 'metal', false);
+      }
+      const medLight = new PointLight(0xfff1d6, 18, 28, 1.4);
+      medLight.position.set(mx, 3.0, mz);
+      g.add(medLight);
+      root.add(g);
+    }
+
     function buildRisingWaterDrydock() {
       const g = new Group();
       g.name = 'setpiece-rising-water';
@@ -931,27 +970,45 @@
       waterRising = true;
       waterLocked = false;
 
-      // Multi-level emergency steel catwalks above flood level (y = 3.6m)
       const steel = new MeshStandardMaterial({ color: 0x3b4852, roughness: 0.52, metalness: 0.66 });
       const rail = new MeshStandardMaterial({ color: 0xe2a82e, roughness: 0.48, metalness: 0.22 });
-      addSolid(g, steel, -16, 3.6, 82, 2.6, 0.22, 28, 'metal', true);
-      addSolid(g, rail, -17.2, 4.2, 82, 0.1, 1.0, 28, 'metal', false);
-      addSolid(g, rail, -14.8, 4.2, 82, 0.1, 1.0, 28, 'metal', false);
+      const concrete = new MeshStandardMaterial({ color: 0x5c6469, roughness: 0.88, metalness: 0.08 });
+      const valveRed = new MeshStandardMaterial({ color: 0xc93b2b, roughness: 0.45, metalness: 0.32 });
+      const glass = new MeshStandardMaterial({ color: 0x62b4cf, roughness: 0.16, metalness: 0.45, transparent: true, opacity: 0.45 });
+      addSolid(g, steel, -16, 3.6, 82, 3.0, 0.24, 30, 'metal', true);
+      addSolid(g, steel, -22, 3.6, 96, 14.0, 0.24, 4.2, 'metal', true);
+      addSolid(g, rail, -17.4, 4.2, 82, 0.1, 1.0, 30, 'metal', false);
+      addSolid(g, rail, -14.6, 4.2, 82, 0.1, 1.0, 30, 'metal', false);
+      for (let i = 0; i < 12; i++) {
+        addSolid(g, steel, -16, 0.45 + i * 0.28, 65.5 + i * 0.72, 2.8, 0.20, 0.88, 'metal', true);
+      }
+      addSolid(g, concrete, -12, 5.2, 74, 5.2, 3.2, 5.6, 'concrete', true);
+      addSolid(g, glass, -14.65, 5.3, 74, 0.14, 1.6, 4.2, 'glass', false);
+      for (const vx of [-28.5, -23.5]) {
+        addSolid(g, steel, vx, 5.1, 96, 1.6, 3.0, 1.6, 'metal', true);
+        addSolid(g, valveRed, vx, 5.0, 95.1, 0.9, 0.9, 0.22, 'metal', false);
+      }
+      const dockLight = new PointLight(0xffd28a, 18, 36, 1.4);
+      dockLight.position.set(-16, 7.2, 82);
+      g.add(dockLight);
       root.add(g);
     }
 
     function buildOffshorePlatform() {
       const g = new Group();
       g.name = 'setpiece-offshore-platform';
+      platformGroup = g;
+      platformTiltDeg = 3.2;
+      platformBallastBalanced = false;
       const steel = new MeshStandardMaterial({ color: 0x334049, roughness: 0.56, metalness: 0.64 });
       const deckMat = new MeshStandardMaterial({ color: 0x4b5358, roughness: 0.82, metalness: 0.18 });
       const orange = new MeshStandardMaterial({ color: 0xd96226, roughness: 0.48, metalness: 0.22 });
       const white = new MeshStandardMaterial({ color: 0xdbe2e6, roughness: 0.72, metalness: 0.08 });
       const yellow = new MeshStandardMaterial({ color: 0xe6b422, roughness: 0.5, metalness: 0.2 });
       const glass = new MeshStandardMaterial({ color: 0x5ba2bd, roughness: 0.14, metalness: 0.45, transparent: true, opacity: 0.42 });
+      const screenGlow = new MeshBasicMaterial({ color: 0x38d9f5 });
 
       const ox = 108, oz = 60;
-      // 4 Massive concrete-steel caisson legs anchored into East Sea
       for (const lx of [-14, 14]) for (const lz of [-12, 12]) {
         const leg = new Mesh(cylGeo, orange);
         leg.position.set(ox + lx, 1.5, oz + lz);
@@ -959,24 +1016,39 @@
         leg.matrixAutoUpdate = false; leg.updateMatrix();
         g.add(leg);
       }
-      // Deck 1 (y=4.0m): Main Operations & Machinery Deck (36m x 30m)
       addSolid(g, deckMat, ox, 3.8, oz, 36, 0.45, 30, 'metal', true);
-      addSolid(g, steel, ox - 8, 5.8, oz - 6, 12, 3.6, 10, 'metal', true); // Machinery housing
-      addSolid(g, orange, ox + 10, 5.6, oz - 7, 8, 3.2, 6, 'metal', true); // Ballast pump unit
-      // Deck 2 (y=8.0m): Crew Living Quarters & Triage Bay
+      addSolid(g, steel, ox - 8, 5.8, oz - 6, 12, 3.6, 10, 'metal', true);
+      addSolid(g, orange, ox + 10, 5.6, oz - 7, 8, 3.2, 6, 'metal', true);
+      for (const tz of [-3, 1, 5]) {
+        const tank = new Mesh(cylGeo, yellow);
+        tank.position.set(ox + 9, 5.4, oz + tz); tank.scale.set(1.1, 2.8, 1.1);
+        tank.matrixAutoUpdate = false; tank.updateMatrix(); g.add(tank);
+      }
+      addSolid(g, orange, ox + 4, 4.6, oz + 1, 9.5, 0.36, 0.36, 'metal', false);
       addSolid(g, deckMat, ox, 7.8, oz + 2, 26, 0.4, 20, 'metal', true);
-      addSolid(g, white, ox - 4, 9.8, oz + 5, 16, 3.6, 10, 'metal', true);
-      addSolid(g, glass, ox - 4, 10.0, oz + 10.1, 12, 1.4, 0.15, 'glass', false);
-      // Deck 3 (y=12.0m): Helipad & Control Bridge
+      addSolid(g, white, ox - 4, 9.8, oz + 0.2, 16, 3.6, 0.32, 'concrete', true);
+      addSolid(g, white, ox - 12, 9.8, oz + 5.1, 0.32, 3.6, 10, 'concrete', true);
+      addSolid(g, white, ox + 4, 9.8, oz + 5.1, 0.32, 3.6, 10, 'concrete', true);
+      addSolid(g, white, ox - 8.5, 9.8, oz + 10.0, 7.0, 3.6, 0.32, 'concrete', true);
+      addSolid(g, white, ox + 1.2, 9.8, oz + 10.0, 5.5, 3.6, 0.32, 'concrete', true);
+      addSolid(g, white, ox - 4, 11.55, oz + 5.1, 16.4, 0.26, 10.2, 'concrete', true);
+      addSolid(g, glass, ox - 8.5, 10.0, oz + 10.18, 5.4, 1.4, 0.12, 'glass', false);
+      addSolid(g, steel, ox - 7, 8.5, oz + 4, 2.4, 0.9, 1.2, 'metal', true);
+      addSolid(g, white, ox - 7, 9.0, oz + 4, 2.2, 0.12, 1.1, 'metal', false);
+      addSolid(g, steel, ox - 1, 8.6, oz + 2.5, 2.6, 1.1, 0.9, 'metal', true);
+      addSolid(g, screenGlow, ox - 1, 9.3, oz + 2.5, 1.4, 0.65, 0.10, 'metal', false);
+      const interiorLight = new PointLight(0xffe8c2, 14, 22, 1.4);
+      interiorLight.position.set(ox - 4, 10.9, oz + 5);
+      g.add(interiorLight);
       addSolid(g, steel, ox, 11.8, oz, 20, 0.4, 18, 'metal', true);
-      addSolid(g, yellow, ox, 12.04, oz, 8, 0.05, 8, 'metal', false); // Helipad H ring
-      addSolid(g, orange, ox - 8, 14.0, oz - 6, 6, 3.8, 6, 'metal', true); // Control bridge
-      // Walkable Steel Ramps connecting Deck 1 -> Deck 2 -> Deck 3
+      addSolid(g, yellow, ox, 12.04, oz, 8, 0.05, 8, 'metal', false);
+      addSolid(g, orange, ox - 8, 14.0, oz - 6, 6, 3.8, 6, 'metal', true);
+      addSolid(g, glass, ox - 8, 14.4, oz - 2.95, 5.2, 1.4, 0.14, 'glass', false);
+      addSolid(g, steel, ox - 8, 17.5, oz - 6, 0.36, 3.8, 0.36, 'metal', false);
       for (let i = 0; i < 12; i++) {
         addSolid(g, steel, ox + 14.5, 4.1 + i * 0.33, oz - 4 + i * 0.9, 2.4, 0.18, 1.0, 'metal', true);
         addSolid(g, steel, ox + 10.5, 8.1 + i * 0.33, oz + 8 - i * 0.85, 2.2, 0.18, 0.95, 'metal', true);
       }
-      // Evacuation Lifeboat Davit on West Edge
       addSolid(g, orange, ox - 16.5, 5.2, oz + 8, 2.6, 1.8, 7.2, 'metal', true);
       const beacon = new PointLight(0xffb85c, 24, 48, 1.4);
       beacon.position.set(ox, 16.5, oz);
@@ -1191,7 +1263,11 @@
       activePreset = preset;
       crashState = null;
       crashRoot = null;
-      if (preset === 'rising_water_drydock') buildRisingWaterDrydock();
+      platformGroup = null;
+      platformTiltDeg = 0;
+      platformBallastBalanced = false;
+      if (preset === 'city_gridlock') buildCityGridlockSetPiece();
+      else if (preset === 'rising_water_drydock') buildRisingWaterDrydock();
       else if (preset === 'offshore_platform') buildOffshorePlatform();
     }
 
@@ -1202,6 +1278,12 @@
     function lockWaterLevel() {
       waterLocked = true;
       waterRising = false;
+    }
+
+    function stabilizePlatformBallast() {
+      platformBallastBalanced = true;
+      platformTiltDeg = 0;
+      if (platformGroup) platformGroup.rotation.z = 0;
     }
 
     function update(dt, difficultyId = 'tactical') {
@@ -1270,6 +1352,7 @@
       getAircraftPosition,
       setVaultZoneLit,
       lockWaterLevel,
+      stabilizePlatformBallast,
       update,
       dispose: () => {
         for (const sn of activeSubNodes) sn.human?.actor?.removeFromParent?.();
@@ -1277,6 +1360,7 @@
         beaconGroup = null;
         crashState = null;
         crashRoot = null;
+        platformGroup = null;
         clearCurrent();
       },
       get subNodes() { return activeSubNodes; },
@@ -1285,6 +1369,8 @@
           preset: activePreset,
           waterLevel: Number(waterLevel.toFixed(2)),
           waterLocked,
+          platformTiltDeg: Number(platformTiltDeg.toFixed(2)),
+          platformBallastBalanced,
           currentGust: Number(currentGust.toFixed(2)),
           aircraftCrashActive: !!crashState,
           aircraftImpacted: !!crashState?.impacted,
@@ -1553,18 +1639,34 @@
   // 5E. [H] NPC TACTICAL COMMAND PANEL (Order Squad NPCs to Follow, Operate,
   //     Hold, Patrol, or Radio Report + Point Way)
   // =========================================================================
+  // Tactical Squad Commands (NPCs NEVER complete mission objectives for the player; only tactical/free-mission roles!)
   const NPC_COMMAND_PRESETS = Object.freeze([
     { id: 'follow', key: '1', labelZh: '跟随掩护', descZh: '紧跟主角推进并随时警戒', behavior: 'follow', voiceId: 'cmd_follow' },
-    { id: 'operate_objective', key: '2', labelZh: '前往操作目标', descZh: '跑向当前剧情控制台并作业', behavior: 'operate_objective', voiceId: 'cmd_operate' },
-    { id: 'hold', key: '3', labelZh: '原地待命警戒', descZh: '在当前位置警戒留守', behavior: 'hold', voiceId: 'cmd_hold' },
-    { id: 'patrol_area', key: '4', labelZh: '周边巡逻侦察', descZh: '在附近区域自主巡逻侦察', behavior: 'patrol_area', voiceId: 'cmd_patrol' },
-    { id: 'radio_report', key: '5', labelZh: '电台汇报指路', descZh: '电台回报局势并指向任务点', behavior: 'radio_report', voiceId: 'cmd_report' },
+    { id: 'hold', key: '2', labelZh: '原地待命警戒', descZh: '在当前位置警戒防守', behavior: 'hold', voiceId: 'cmd_hold' },
+    { id: 'patrol_area', key: '3', labelZh: '周边巡逻侦察', descZh: '在附近区域自主巡逻侦察', behavior: 'patrol_area', voiceId: 'cmd_patrol' },
+    { id: 'radio_report', key: '4', labelZh: '电台汇报指路', descZh: '电台回报局势并指向任务点', behavior: 'radio_report', voiceId: 'cmd_report' },
   ]);
 
-  function createNpcCommandController(world, charCtrl) {
+  const TACTICAL_FREE_ACTIONS = new Set([
+    'reach_and_talk', 'escape_event', 'nature_explore', 'storm_traverse',
+    'finale_stage1', 'finale_stage2', 'epilogue_walk', 'epilogue_complete',
+  ]);
+  function isTacticalCommandAllowed(chapter, objective) {
+    if (!chapter || !objective) return true;
+    return TACTICAL_FREE_ACTIONS.has(String(objective.action || ''))
+      || chapter.primaryGameplay === 'city_exploration'
+      || chapter.primaryGameplay === 'natural_exploration';
+  }
+
+  function createNpcCommandController(world, charCtrl, getMissionContext = null) {
     let open = false;
     let lastOrderId = 'follow';
     let panelEl = null;
+    function isCommandAllowed() {
+      const ctx = typeof getMissionContext === 'function' ? getMissionContext() : null;
+      if (!ctx) return true;
+      return isTacticalCommandAllowed(ctx.chapter, ctx.objective);
+    }
 
     function ensurePanel() {
       if (panelEl || typeof document === 'undefined') return panelEl;
@@ -1574,7 +1676,7 @@
       panelEl.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;margin-bottom:8px;background:linear-gradient(90deg,rgba(10,15,24,.84) 0%,rgba(10,15,24,.48) 78%,rgba(10,15,24,0) 100%);border-left:2px solid #f3d284;border-bottom:1px solid rgba(243,210,132,.28);backdrop-filter:blur(10px);">
           <div style="font-size:12.5px;font-weight:700;letter-spacing:.14em;color:#f3d284;">◆ 战术小队指令</div>
-          <div style="font-size:11px;color:rgba(224,234,244,.66);">[1-5] / [H] 关闭</div>
+          <div style="font-size:11px;color:rgba(224,234,244,.66);">[1-4] / [H] 关闭</div>
         </div>
         <div data-cmd-list style="display:flex;flex-direction:column;gap:8px;"></div>
         <div data-cmd-status style="margin-top:9px;padding:5px 12px;font-size:11px;color:#f3d284;letter-spacing:.05em;background:linear-gradient(90deg,rgba(10,15,24,.68) 0%,rgba(10,15,24,0) 100%);"></div>`;
@@ -1609,14 +1711,16 @@
       if (!panelEl) return;
       const st = panelEl.querySelector('[data-cmd-status]');
       const cast = charCtrl?.cast || [];
+      const allowed = isCommandAllowed();
       const orderMeta = NPC_COMMAND_PRESETS.find(c => c.id === lastOrderId);
       if (st) {
-        st.textContent = cast.length
-          ? `◆ 当前小队 (${cast.length}人) · 执行中：${orderMeta?.labelZh || lastOrderId}`
-          : '当前章节暂无可指挥队友';
+        st.textContent = !allowed
+          ? '◆ 当前为剧情/专属任务阶段，队友由任务路线自动协同（自由/防守阶段可指挥）'
+          : (cast.length ? `◆ 当前小队 (${cast.length}人) · 执行中：${orderMeta?.labelZh || lastOrderId}` : '当前章节暂无可指挥队友');
       }
       for (const btn of panelEl.querySelectorAll('[data-npc-order]')) {
         const active = btn.dataset.npcOrder === lastOrderId;
+        btn.style.opacity = allowed ? '1' : '0.45';
         btn.style.borderLeftColor = active ? '#f3d284' : 'rgba(243,210,132,.42)';
         btn.style.borderTopColor = active ? 'rgba(243,210,132,.75)' : 'rgba(255,255,255,.18)';
         btn.style.borderBottomColor = active ? 'rgba(243,210,132,.65)' : 'rgba(255,255,255,.14)';
@@ -1644,6 +1748,10 @@
     }
 
     function issueOrder(orderId) {
+      if (!isCommandAllowed()) {
+        world?.tactical?.notify?.('当前为剧情任务阶段，队友按任务路线协同行动', 'Mission-driven AI', true, 2.6);
+        return null;
+      }
       const cmd = NPC_COMMAND_PRESETS.find(c => c.id === orderId || c.key === String(orderId));
       if (!cmd) return null;
       lastOrderId = cmd.id;
@@ -1665,6 +1773,7 @@
 
     return {
       presets: NPC_COMMAND_PRESETS,
+      isCommandAllowed,
       toggle,
       setOpen,
       issueOrder,
@@ -1942,16 +2051,32 @@
   // =========================================================================
   // 7. UNIFIED CAMPAIGN CONTROLLER (Bridges 14 Chapters into Saltline Runtime)
   // =========================================================================
+  function getChapterStoryBrief(chapterId) {
+    const ch = SALTLINE_CHAPTERS.find(c => c.id === chapterId) || SALTLINE_CHAPTERS[0];
+    const people = (ch.characters || []).map(id => SALTLINE_CHARACTERS.find(c => c.id === id)?.nameZh).filter(Boolean).join('、');
+    return {
+      chapterId: ch.id,
+      titleZh: ch.titleZh,
+      whatHappened: ch.transitionZh,
+      whyItMatters: ch.descriptionZh,
+      keyPeople: people || '林恩、玛拉',
+      yourRole: ch.objectives?.[0]?.titleZh || ch.shortZh,
+    };
+  }
+
   function createSaltlineCampaignV2(world, { storage } = {}) {
     const saveMgr = createCampaignSaveManager(storage);
     const setPieces = createChapterSetPieceManager(world);
     const waypoint = createWaypointOverlay(world);
     const cinematics = createCampaignCinematicDirector(world);
     const charCtrl = createCharacterBehaviorController(world);
-    const npcCommands = createNpcCommandController(world, charCtrl);
 
     let activeChapter = null;
     let objectiveIdx = 0;
+    const npcCommands = createNpcCommandController(world, charCtrl, () => ({
+      chapter: activeChapter,
+      objective: activeChapter?.objectives?.[objectiveIdx] || null,
+    }));
     let active = false;
     let sessionTimeAccum = 0;
     let objState = null;
@@ -2075,6 +2200,7 @@
 
       if (activeChapter.scenePreset === 'underground_vault') setPieces.setVaultZoneLit(objectiveIdx);
       if (activeChapter.scenePreset === 'rising_water_drydock' && objectiveIdx >= 2) setPieces.lockWaterLevel();
+      if (activeChapter.scenePreset === 'offshore_platform' && objectiveIdx === 0) setPieces.stabilizePlatformBallast?.();
 
       // Trigger dramatic story-driven open-world Aircraft Crash & dynamic tracking cutscene
       let triggeredEvent = null;
@@ -2341,6 +2467,8 @@
     SALTLINE_CHARACTERS,
     DIFFICULTY_PRESETS,
     NPC_COMMAND_PRESETS,
+    isTacticalCommandAllowed,
+    getChapterStoryBrief,
     OBJECTIVE_MECHANIC_MAP,
     resolveObjectiveMechanic,
     validateGameplayMatrix,

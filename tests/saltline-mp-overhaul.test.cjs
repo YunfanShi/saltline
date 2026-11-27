@@ -175,19 +175,32 @@ test('SaltlineMPModes: 5 independent controllers with distinct rules & monotonic
   const rSnap = rescue.exportState();
   assert.ok(rSnap.facilitiesRepaired >= 1 || rSnap.objectives[0].progress > 0, 'Co-op rescue should progress facility repair');
 
-  // 4. Co-op Campaign: shared 14-chapter progression
+  // 4. Co-op Campaign: shared 14-chapter progression + shared events + disconnect/reconnect recovery
   const coop = M.createGameModeController('coop_campaign', { startChapterIndex: 1 });
-  coop.init([{ id: 'p1', name: 'P1', team: 'blue' }]);
+  coop.init([{ id: 'p1', name: 'P1', team: 'blue' }, { id: 'p2', name: 'P2', team: 'blue' }]);
   assert.equal(coop.exportState().chapterIndex, 1);
+  coop.recordChoice('ch08', 'public_truth');
+  coop.triggerSharedEvent('aircraft_crash', { sector: 2 });
+  assert.equal(coop.handleDisconnect('p2'), true);
+  const rejoinSnap = coop.rejoinPlayer('p2');
+  assert.equal(rejoinSnap.choices.ch08, 'public_truth');
+  assert.equal(rejoinSnap.sharedEvents.length, 1);
   assert.equal(coop.advanceToNextChapter(), true);
   assert.equal(coop.exportState().chapterIndex, 2);
 
-  // 5. Sandbox: free roam & world events without match termination
+  // 5. Sandbox: configurable world conditions, vehicles, facilities & world events without match termination
   const sb = M.createGameModeController('sandbox', {});
   sb.init([{ id: 's1', name: 'S1', team: 'blue' }]);
+  sb.setWorldCondition({ weather: 'severe_storm', timeOfDay: 'night' });
+  sb.spawnVehicle('sar_4x4', [12, 0.3, -18]);
+  sb.toggleFacility('flood_gate');
   sb.triggerWorldEvent('storm_surge');
   sb.update(1.0);
-  assert.equal(sb.exportState().winner, null, 'Sandbox should not prematurely terminate');
+  const sbSnap = sb.exportState();
+  assert.equal(sbSnap.winner, null, 'Sandbox should not prematurely terminate');
+  assert.equal(sbSnap.worldState.weather, 'severe_storm');
+  assert.equal(sbSnap.worldState.spawnedVehicles.length, 1);
+  assert.equal(sbSnap.worldState.facilities.flood_gate, true);
 
   // Anti-rollback: older stateSeq must be ignored by applyState
   const newerSeq = conq.exportState().stateSeq + 10;

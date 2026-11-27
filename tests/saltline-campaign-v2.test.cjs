@@ -355,15 +355,30 @@ test('SaltlineVoiceManager + [H] NPC Commands + 3D-to-2D Golden Waypoint (No Lig
   const tallBeam = propGroup.children.find(m => m.scale && m.scale.y > 5);
   assert.equal(tallBeam, undefined, 'Must NOT render tall vertical light pillar beams for navigation');
 
-  // Verify [H] NPC commands toggle and dispatch real orders to squad NPCs
+  // Verify [H] NPC commands toggle and mission-driven AI gating (NO operate_objective stealing player tasks!)
   assert.equal(camp.npcCommands.toggle(), true);
-  const ord = camp.npcCommands.issueOrder('2'); // operate_objective
-  assert.equal(ord.id, 'operate_objective');
-  assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'operate_objective'), 'All squad NPCs should execute operate_objective');
-  camp.npcCommands.issueOrder('hold');
-  assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'hold'), 'All squad NPCs should execute hold');
+  assert.equal(camp.npcCommands.presets.some(p => p.id === 'operate_objective'), false, 'NPCs must NOT complete player objectives');
+  const ord = camp.npcCommands.issueOrder('2'); // hold
+  assert.equal(ord.id, 'hold');
+  assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'hold'), 'All squad NPCs should execute hold in free exploration phase');
   camp.npcCommands.issueOrder('radio_report');
   assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'radio_report'), 'All squad NPCs should execute radio_report');
+
+  // Verify scripted driving/puzzle missions gate manual player [H] commands (mission-driven AI!)
+  camp.startChapter('ch03', { skipCutscene: true });
+  assert.equal(camp.npcCommands.isCommandAllowed(), false, 'Scripted driving mission must keep NPC movement mission-driven');
+  assert.equal(camp.npcCommands.issueOrder('hold'), null, 'Manual [H] order must be refused during scripted driving phase');
+
+  // Verify 3 showcase chapters (Ch03 city_gridlock, Ch06 rising_water_drydock, Ch10 offshore_platform) + story brief
+  assert.equal(camp.setPieces.state.preset, 'city_gridlock');
+  const brief03 = sandbox.SaltlineCampaignV2.getChapterStoryBrief('ch03');
+  assert.ok(brief03.whatHappened && brief03.whyItMatters && brief03.keyPeople && brief03.yourRole);
+
+  camp.startChapter('ch10', { skipCutscene: true });
+  assert.equal(camp.setPieces.state.platformTiltDeg > 0, true, 'Offshore platform starts tilted before ballast stabilization');
+  camp.advanceObjective();
+  assert.equal(camp.setPieces.state.platformBallastBalanced, true, 'Completing Deck 1 ballast valves must stabilize platform');
+  assert.equal(camp.setPieces.state.platformTiltDeg, 0);
   camp.stop();
 });
 

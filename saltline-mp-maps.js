@@ -313,42 +313,47 @@
       const tankMat = matLib ? matLib.get('tank_industrial') : makeMat(0xc8d4db, 0.45, 0.35);
       const hazard = makeMat(0xd99b26, 0.5, 0.22);
       const grass = matLib ? matLib.get('grass_coastal') : makeMat(0x2f4d35, 0.94, 0.02);
-      const water = makeMat(0x133e57, 0.16, 0.48);
+      const water = makeMat(0x0f3b54, 0.12, 0.56);
+      const shallowWater = makeMat(0x1e6b7e, 0.16, 0.42);
+      const foamEdge = makeMat(0xc4dce3, 0.72, 0.08);
       const redCont = makeMat(0xa33228, 0.68, 0.24);
       const tealCont = makeMat(0x1f5f66, 0.68, 0.24);
 
       let buildingCount = 0;
       const addArch = (cfg) => { buildingCount++; return placeArchitecturalBuilding(root, bldgGen, addBox, concrete, cfg); };
 
-      // 360m × 320m Large-Scale Arena Ground + East Sea Horizon
+      // 360m × 320m Large-Scale Arena Ground + Layered Coastal Water & Shoreline Seawall
       if (spec.id === 'highland_passage') {
         if (!buildHighlandDisplacedTerrain(root, grass)) {
           addBox(grass, 0, -0.1, 0, MAP_BOUNDS.width, 0.4, MAP_BOUNDS.depth, { collide: true });
         }
       } else {
         addBox(asphalt, 0, -0.1, 0, MAP_BOUNDS.width, 0.4, MAP_BOUNDS.depth, { collide: true });
-        // Crossroad boulevards & raised granite sidewalks
         addBox(paver, 0, 0.14, 0, 340, 0.14, 18, { collide: false });
         addBox(paver, 0, 0.14, 0, 18, 0.14, 300, { collide: false });
-        addBox(water, 230, -0.35, 0, 140, 0.2, 380, { collide: false });
+        addBox(granite, 179.5, 0.55, 0, 2.2, 1.1, 322, { collide: true });
+        addBox(foamEdge, 182.2, -0.22, 0, 3.2, 0.12, 360, { collide: false });
+        addBox(shallowWater, 198, -0.28, 0, 30, 0.16, 380, { collide: false });
+        addBox(water, 260, -0.36, 0, 110, 0.2, 380, { collide: false });
       }
 
       if (spec.id === 'coastal_metropolis') {
-        // Grand Central Fountain Plaza + 12 Full WorldEngine Architectural Buildings + Elevated Glass Skybridges
         addBox(granite, 0, 0.20, 0, 44, 0.24, 44, { collide: true });
-        addBox(water, 0, 0.54, 0, 14, 0.42, 14, { collide: true });
+        addBox(shallowWater, 0, 0.54, 0, 14, 0.42, 14, { collide: true });
         const layouts = [
           { cx: -86, cz: -64, width: 32, depth: 24, height: 24, styleName: 'modern_office', seed: 11, labelZh: '盐线海事金融中心', labelEn: 'MARITIME TOWER' },
-          { cx: -86, cz: 58, width: 30, depth: 24, height: 18, styleName: 'commercial_arcade', seed: 12, labelZh: '西区商业拱廊', labelEn: 'WEST ARCADE' },
+          { cx: -86, cz: 58, width: 30, depth: 24, height: 18, styleName: 'commercial_arcade', seed: 12, withInterior: true, labelZh: '西区商业拱廊', labelEn: 'WEST ARCADE' },
           { cx: 82, cz: -60, width: 30, depth: 26, height: 28, styleName: 'modern_office', seed: 13, labelZh: '东海国际大厦', labelEn: 'EAST SEA PLAZA' },
           { cx: 86, cz: 56, width: 28, depth: 22, height: 20, styleName: 'stepped_mixed_use', seed: 14, labelZh: '滨海艺术中心', labelEn: 'WATERFRONT HALL' },
-          { cx: -26, cz: -96, width: 28, depth: 20, height: 16, styleName: 'civic_customs', seed: 15, labelZh: '市政应急大楼', labelEn: 'CIVIC HQ' },
+          { cx: -26, cz: -96, width: 28, depth: 20, height: 16, styleName: 'civic_customs', seed: 15, withInterior: true, labelZh: '市政应急大楼', labelEn: 'CIVIC HQ' },
           { cx: 34, cz: 96, width: 32, depth: 22, height: 21, styleName: 'harbor_apartment', seed: 16 },
           { cx: -124, cz: 4, width: 24, depth: 22, height: 15, styleName: 'waterfront_rowhouses', seed: 17 },
           { cx: 122, cz: 0, width: 26, depth: 20, height: 19, styleName: 'modern_office', seed: 18 },
         ];
         for (const cfg of layouts) addArch(cfg);
         addBox(steel, 0, 6.8, -56, 130, 0.55, 5.2, { collide: true, surface: 'metal' });
+        addBox(concrete, -38, 3.8, 72, 26, 0.4, 18, { collide: true });
+        for (let r = 0; r < 8; r++) addBox(concrete, -54 + r * 1.1, 0.4 + r * 0.42, 72, 1.4, 0.24, 5.0, { collide: true });
       } else if (spec.id === 'iron_harbor') {
         // Dual Freight Tracks + 6 Freight Cars + 2 Overhead Gantry Cranes + WorldEngine Warehouses & Industrial Halls
         for (const tx of [-8, 8]) addBox(steel, tx, 0.18, 0, 2.0, 0.16, 290, { collide: false });
@@ -427,9 +432,9 @@
         addBox(hazard, 0, 4.8, -3.1, 148, 0.16, 0.16, { collide: false });
         addBox(hazard, 0, 4.8, 3.1, 148, 0.16, 0.16, { collide: false });
         const layouts = [
-          { cx: -22, cz: -78, width: 42, depth: 26, height: 14, styleName: 'industrial_hall', seed: 51, labelZh: '二号沿海精炼厂', labelEn: 'REFINERY HALL 02' },
-          { cx: 64, cz: 74, width: 36, depth: 24, height: 13, styleName: 'industrial_hall', seed: 52, labelZh: '南岸主抽水泵站', labelEn: 'SOUTH PUMP STATION' },
-          { cx: 88, cz: -66, width: 34, depth: 22, height: 14, styleName: 'bonded_warehouse', seed: 53 },
+          { cx: -22, cz: -78, width: 42, depth: 26, height: 14, styleName: 'industrial_complex', seed: 51, labelZh: '二号沿海精炼厂', labelEn: 'REFINERY COMPLEX 02' },
+          { cx: 64, cz: 74, width: 36, depth: 24, height: 13, styleName: 'industrial_complex', seed: 52, labelZh: '南岸主抽水泵站', labelEn: 'SOUTH PUMP STATION' },
+          { cx: 88, cz: -66, width: 34, depth: 22, height: 14, styleName: 'bonded_warehouse', seed: 53, withInterior: true },
           { cx: -24, cz: 82, width: 32, depth: 22, height: 13, styleName: 'industrial_hall', seed: 54 },
         ];
         for (const cfg of layouts) addArch(cfg);

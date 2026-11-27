@@ -177,7 +177,8 @@ test('BuildingGenerator executes true 8-stage phased generation with per-phase t
   const shared = { steelDark: new Mat(), steelGalv: new Mat(), blindPane: new Mat(), redCore: new Mat(), cargoTeal: new Mat(), cargoNavy: new Mat() };
   const gen = scopeB.window.WorldEngine.createBuildingGenerator(FakeTHREE, matLib, shared);
 
-  assert.equal(gen.archetypes.length, 9);
+  assert.equal(gen.archetypes.length, 10);
+  assert.ok(gen.archetypes.includes('industrial_complex'));
   for (const style of gen.archetypes) {
     const parent = new Obj3D();
     const colliders = [];
@@ -196,7 +197,7 @@ test('BuildingGenerator executes true 8-stage phased generation with per-phase t
     assert.ok(colliders.length >= 1, `${style}: colliders phase must emit collider specs`);
     for (const pt of task.phaseTimings) assert.ok(pt.ms >= 0);
   }
-  assert.equal(scopeB.window.SALTLINE_BUILD_TIMINGS.length, 9);
+  assert.equal(scopeB.window.SALTLINE_BUILD_TIMINGS.length, 10);
   gen.dispose();
   matLib.dispose();
 });
