@@ -1,48 +1,46 @@
 /* Saltline Real Rigged 3D Human Character Loader (GLB 2.0 + SkinnedMesh + AnimationMixer).
- * Loads local MIT/CC0 rigged human characters (Soldier.glb, Michelle.glb, CesiumMan.glb),
- * shares Mixamo Idle/Walk/Run clips across Mixamo-rigged models (Soldier -> Michelle),
- * clones independent Skeletons per NPC instance, and drives talking/nodding/gesture overlays. */
+ * Uses realistic Mixamo-rigged tactical human character (Soldier.glb) with native Idle/Walk/Run clips,
+ * per-role body proportions & uniform palettes, independent Skeleton cloning per NPC, and
+ * smoothstep talking/nodding/gesture overlays. Custom GLBs can be dropped into assets/models/characters/. */
 (() => {
+  const MIXAMO_BONES = {
+    mixamo: true,
+    headBone: 'mixamorig_Head',
+    neckBone: 'mixamorig_Neck',
+    spineBone: 'mixamorig_Spine2',
+    rightArm: 'mixamorig_RightArm',
+    rightForeArm: 'mixamorig_RightForeArm',
+    leftArm: 'mixamorig_LeftArm',
+    leftForeArm: 'mixamorig_LeftForeArm',
+  };
+
   const MODEL_CATALOG = {
     soldier: {
       url: './assets/models/characters/Soldier.glb',
       targetHeight: 1.78,
+      buildScale: [1.0, 1.0, 1.0],
       yawOffset: Math.PI, // Three.js Soldier.glb faces -Z locally; rotate to +Z
-      mixamo: true,
-      headBone: 'mixamorig_Head',
-      neckBone: 'mixamorig_Neck',
-      spineBone: 'mixamorig_Spine2',
-      rightArm: 'mixamorig_RightArm',
-      rightForeArm: 'mixamorig_RightForeArm',
-      leftArm: 'mixamorig_LeftArm',
-      leftForeArm: 'mixamorig_LeftForeArm',
+      tintStrength: 0.36,
+      defaultTint: 0x3b5873,
+      ...MIXAMO_BONES,
     },
     female: {
-      url: './assets/models/characters/Michelle.glb',
+      url: './assets/models/characters/Soldier.glb',
       targetHeight: 1.68,
-      yawOffset: 0, // Michelle.glb faces +Z locally
-      mixamo: true,
-      useSharedMixamoClips: true,
-      headBone: 'mixamorig_Head',
-      neckBone: 'mixamorig_Neck',
-      spineBone: 'mixamorig_Spine2',
-      rightArm: 'mixamorig_RightArm',
-      rightForeArm: 'mixamorig_RightForeArm',
-      leftArm: 'mixamorig_LeftArm',
-      leftForeArm: 'mixamorig_LeftForeArm',
+      buildScale: [0.91, 1.0, 0.92],
+      yawOffset: Math.PI,
+      tintStrength: 0.46,
+      defaultTint: 0x4aa39e,
+      ...MIXAMO_BONES,
     },
     civilian: {
-      url: './assets/models/characters/CesiumMan.glb',
+      url: './assets/models/characters/Soldier.glb',
       targetHeight: 1.74,
-      yawOffset: 0,
-      mixamo: false,
-      headBone: 'Skeleton_torso_joint_3',
-      neckBone: 'Skeleton_torso_joint_2',
-      spineBone: 'Skeleton_torso_joint_1',
-      rightArm: 'arm_joint_R_1',
-      rightForeArm: 'arm_joint_R_2',
-      leftArm: 'arm_joint_L_1',
-      leftForeArm: 'arm_joint_L_2',
+      buildScale: [0.97, 1.0, 0.98],
+      yawOffset: Math.PI,
+      tintStrength: 0.48,
+      defaultTint: 0x8f7458,
+      ...MIXAMO_BONES,
     },
   };
 
@@ -268,7 +266,8 @@
         let track = null;
         if (path === 'rotation' && THREE.QuaternionKeyframeTrack) {
           track = new THREE.QuaternionKeyframeTrack(`${targetName}.quaternion`, inAcc.array, outAcc.array);
-          rotTracks.push(track);
+          // Never retarget root Hips quaternion across different armatures (prevents upside-down flipping)
+          if (!/hips$/i.test(targetName)) rotTracks.push(track);
         } else if (path === 'translation' && THREE.VectorKeyframeTrack) {
           track = new THREE.VectorKeyframeTrack(`${targetName}.position`, inAcc.array, outAcc.array);
         } else if (path === 'scale' && THREE.VectorKeyframeTrack) {
@@ -315,9 +314,11 @@
       }
     }
 
-    // Attach meshes / skinned meshes with subtle role tinting
-    const tintColor = tintHex != null && THREE.Color ? new THREE.Color(tintHex) : null;
+    // Attach meshes / skinned meshes with per-role uniform tinting
+    const effectiveTint = tintHex != null ? tintHex : (spec.defaultTint ?? null);
+    const tintColor = effectiveTint != null && THREE.Color ? new THREE.Color(effectiveTint) : null;
     const white = THREE.Color ? new THREE.Color(0xffffff) : null;
+    const tintStrength = spec.tintStrength ?? (spec.mixamo ? 0.34 : 0.40);
     for (let i = 0; i < (gltf.nodes || []).length; i++) {
       const nd = gltf.nodes[i];
       if (nd.mesh === undefined || !meshPrims[nd.mesh]) continue;
@@ -326,7 +327,7 @@
         if (tintColor && mat?.clone && !/visor/i.test(mat.name || '')) {
           mat = mat.clone();
           if (mat.color) {
-            const blend = white.clone().lerp(tintColor, spec.mixamo ? 0.24 : 0.34);
+            const blend = white.clone().lerp(tintColor, tintStrength);
             mat.color.multiply(blend);
           }
         }
@@ -377,7 +378,8 @@
       const h = box.max.y - box.min.y;
       if (Number.isFinite(h) && h > 0.25 && h < 5.0) {
         const s = (spec.targetHeight || 1.75) / h;
-        inner.scale.multiplyScalar(s);
+        const [bx, by, bz] = Array.isArray(spec.buildScale) ? spec.buildScale : [1, 1, 1];
+        inner.scale.set(inner.scale.x * s * bx, inner.scale.y * s * by, inner.scale.z * s * bz);
         root.updateMatrixWorld(true);
         const box2 = new THREE.Box3().setFromObject(inner);
         if (Number.isFinite(box2.min.y)) inner.position.y -= box2.min.y;
@@ -545,24 +547,32 @@
     return { root, mixer, updatePose, getHeadWorldPos, headBone };
   }
 
+  const urlBufferPromises = new Map();
   const templatePromises = new Map();
   let sharedMixamoPromise = null;
+
+  function fetchGlbOnce(url) {
+    if (!urlBufferPromises.has(url)) {
+      const p = (typeof fetch === 'function' && typeof window !== 'undefined')
+        ? fetch(url).then(r => (r.ok ? r.arrayBuffer() : null)).catch(() => null)
+        : Promise.resolve(null);
+      urlBufferPromises.set(url, p);
+    }
+    return urlBufferPromises.get(url);
+  }
 
   function loadTemplate(THREE, modelType) {
     const key = MODEL_CATALOG[modelType] ? modelType : 'soldier';
     if (!templatePromises.has(key)) {
       const spec = MODEL_CATALOG[key];
-      const p = (typeof fetch === 'function' && typeof window !== 'undefined')
-        ? fetch(spec.url)
-            .then(r => (r.ok ? r.arrayBuffer() : null))
-            .then(buf => {
-              if (!buf) return null;
-              const parsed = parseGlbBinary(buf);
-              if (!parsed) return null;
-              return buildTemplateFromGlb(THREE, parsed.gltf, parsed.binBuf, spec);
-            })
-            .catch(() => null)
-        : Promise.resolve(null);
+      const p = fetchGlbOnce(spec.url)
+        .then(buf => {
+          if (!buf) return null;
+          const parsed = parseGlbBinary(buf);
+          if (!parsed) return null;
+          return buildTemplateFromGlb(THREE, parsed.gltf, parsed.binBuf, spec);
+        })
+        .catch(() => null);
       templatePromises.set(key, p);
     }
     return templatePromises.get(key);
