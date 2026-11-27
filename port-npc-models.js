@@ -561,14 +561,15 @@
         if (typeof rightHand.getWorldScale === 'function') rightHand.getWorldScale(ws);
         const avgScale = (Math.abs(ws.x) + Math.abs(ws.y) + Math.abs(ws.z)) / 3;
         const handScale = avgScale > 0.0005 && avgScale < 0.5 ? (1 / avgScale) : (spec.mixamo ? 100 : 1);
-        rifle.scale.setScalar(handScale);
+        rifle.scale.setScalar(spec.mixamo ? handScale : handScale * 0.72);
         if (spec.mixamo) {
           rifle.position.set(0, 8, 6);
           rifle.rotation.set(Math.PI / 2, 0, -Math.PI / 2);
         } else {
-          // Bip01 R Hand: X along fingers, Z roughly forward; offset in cm-scale hand space
-          rifle.position.set(0.08 * handScale, 0.02 * handScale, 0.04 * handScale);
-          rifle.rotation.set(0.15, -0.35, -0.25);
+          // Exact inverse-quaternion orientation for Bip01 R Hand:
+          // Barrel (+Z) points horizontally forward-left [+0.46, -0.07, +0.88] across chest; optic (+Y) points UP [0, 1, 0]!
+          rifle.position.set(0.06 * handScale, 0.01 * handScale, 0.02 * handScale);
+          rifle.rotation.set(-2.144, 1.18, -2.195);
         }
         rightHand.add(rifle);
       }

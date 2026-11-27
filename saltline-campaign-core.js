@@ -1702,8 +1702,9 @@
         if (i === 1) {
           human.actor.position.set(obj0[0] + 1.6, obj0[1] || sy, obj0[2] + 1.4);
         } else {
-          human.actor.position.set(sx + Math.cos(angle) * 3.2, sy, sz + Math.sin(angle) * 3.2 + 2.4);
+          human.actor.position.set(sx + 3.0 + Math.cos(angle) * 1.4, sy, sz - 3.2 + Math.sin(angle) * 1.4);
         }
+        human.actor.rotation.y = Math.atan2(obj0[0] - human.actor.position.x, obj0[2] - human.actor.position.z);
         world.scene.add(human.actor);
         activeActors.set(cid, {
           meta,
