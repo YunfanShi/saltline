@@ -1031,13 +1031,9 @@
       }
       button.position.set(tx, ty + 1.16, tz + 0.28);
 
-      // Soft tall guide shimmer visible from down the street
-      const beamMat = new MeshBasicMaterial({ color: 0x66d9f0, transparent: true, opacity: 0.16, depthWrite: false });
-      const beam = new Mesh(cylGeo, beamMat);
-      beam.scale.set(0.18, 22, 0.18);
-      beam.position.set(tx, ty + 11.2, tz);
-
-      beaconGroup.add(pedestal, trim, screen, button, beam);
+      // Grounded tactile 3D interactive console/valve only — NO vertical navigation light pillars!
+      // Navigation uses the 3D-to-2D screen-projected golden tactical waypoint reticle + distance HUD.
+      beaconGroup.add(pedestal, trim, screen, button);
       root.add(beaconGroup);
     }
 
@@ -1112,6 +1108,12 @@
       };
       world?.audioV2?.playAircraftCrash?.(3.2);
       return { impactPos: [ix, iy, iz], flightDur: 3.2 };
+    }
+
+    function getAircraftPosition() {
+      if (!crashState?.planeGroup?.position) return null;
+      const p = crashState.planeGroup.position;
+      return [p.x, p.y, p.z];
     }
 
     function activate(preset) {
@@ -1194,6 +1196,7 @@
       setObjectiveBeacon,
       markConsoleActivated,
       triggerAircraftCrash,
+      getAircraftPosition,
       setVaultZoneLit,
       lockWaterLevel,
       update,
@@ -1212,20 +1215,120 @@
   }
 
   // =========================================================================
-  // 5C. CAMPAIGN CINEMATIC DIRECTOR (Chapter Intro Fly-Ins & Story Event Cutscenes)
+  // 5C. 3D-TO-2D GOLDEN TACTICAL WAYPOINT MARKER (Ring + Star + Arrow + Distance)
+  // =========================================================================
+  function createWaypointOverlay(world) {
+    let el = null;
+    let distEl = null;
+    let arrowEl = null;
+    let labelEl = null;
+    let lastState = { visible: false, x: 0, y: 0, distM: 0, offscreen: false };
+
+    function ensureDom() {
+      if (el || typeof document === 'undefined') return el;
+      el = document.createElement('div');
+      el.id = 'sl-v2-waypoint';
+      el.style.cssText = 'position:fixed;left:0;top:0;z-index:26;pointer-events:none;display:none;transform:translate(-50%,-50%);will-change:transform;';
+      el.innerHTML = `
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <div style="position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;">
+            <svg width="34" height="34" viewBox="0 0 34 34" style="filter:drop-shadow(0 0 6px rgba(247,214,116,.85));">
+              <circle cx="17" cy="17" r="11.5" fill="rgba(24,18,6,.36)" stroke="#f6d876" stroke-width="2.2"/>
+              <path d="M17 8.5 L19.2 14.8 L25.5 17 L19.2 19.2 L17 25.5 L14.8 19.2 L8.5 17 L14.8 14.8 Z" fill="#fff2b8"/>
+            </svg>
+            <div data-wp-arrow style="position:absolute;inset:-8px;display:none;align-items:center;justify-content:flex-end;">
+              <svg width="12" height="14" viewBox="0 0 12 14" style="filter:drop-shadow(0 0 4px rgba(0,0,0,.9));">
+                <path d="M2 2 L10 7 L2 12 L4.5 7 Z" fill="#f6d876"/>
+              </svg>
+            </div>
+          </div>
+          <div data-wp-dist style="font:700 12px/1 'IBM Plex Mono',ui-monospace,monospace;color:#fff6d1;text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.85);background:rgba(10,14,18,.58);padding:2px 6px;border-radius:999px;border:1px solid rgba(246,216,118,.42);">0m</div>
+          <div data-wp-label style="font:600 10px/1.15 system-ui,-apple-system,sans-serif;color:rgba(246,238,214,.86);text-shadow:0 1px 4px rgba(0,0,0,.95);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        </div>`;
+      document.body.appendChild(el);
+      distEl = el.querySelector('[data-wp-dist]');
+      arrowEl = el.querySelector('[data-wp-arrow]');
+      labelEl = el.querySelector('[data-wp-label]');
+      return el;
+    }
+
+    function update(targetArr, playerPos, labelText = '') {
+      const dom = ensureDom();
+      const cam = world?.camera;
+      if (!targetArr || !playerPos || !cam) {
+        if (dom) dom.style.display = 'none';
+        lastState.visible = false;
+        return lastState;
+      }
+      const tx = targetArr[0], ty = (targetArr[1] || 0) + 1.85, tz = targetArr[2];
+      const distM = Math.max(0, Math.round(Math.hypot(tx - playerPos.x, tz - playerPos.z)));
+      const vw = (typeof window !== 'undefined' && window.innerWidth) || 1280;
+      const vh = (typeof window !== 'undefined' && window.innerHeight) || 720;
+
+      let sx = vw * 0.5, sy = vh * 0.45, offscreen = false, angleRad = 0;
+      if (world?.THREE?.Vector3 && typeof cam.updateMatrixWorld === 'function') {
+        const v = new world.THREE.Vector3(tx, ty, tz);
+        v.project(cam);
+        const behind = v.z > 1;
+        let nx = behind ? -v.x : v.x;
+        let ny = behind ? -v.y : v.y;
+        offscreen = behind || Math.abs(nx) > 0.92 || Math.abs(ny) > 0.88;
+        if (offscreen) {
+          const maxC = Math.max(Math.abs(nx), Math.abs(ny), 0.001);
+          nx = (nx / maxC) * 0.88;
+          ny = (ny / maxC) * 0.82;
+          angleRad = Math.atan2(-ny, nx);
+        }
+        sx = (nx * 0.5 + 0.5) * vw;
+        sy = (-ny * 0.5 + 0.5) * vh;
+      }
+
+      lastState = { visible: true, x: Math.round(sx), y: Math.round(sy), distM, offscreen };
+      if (dom) {
+        dom.style.display = 'block';
+        dom.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%)`;
+        if (distEl) distEl.textContent = `${distM}m`;
+        if (labelEl) {
+          labelEl.textContent = offscreen ? '' : (labelText || '').slice(0, 16);
+          labelEl.style.display = offscreen ? 'none' : 'block';
+        }
+        if (arrowEl) {
+          arrowEl.style.display = offscreen ? 'flex' : 'none';
+          if (offscreen) arrowEl.style.transform = `rotate(${angleRad.toFixed(3)}rad)`;
+        }
+      }
+      return lastState;
+    }
+
+    function hide() {
+      if (el) el.style.display = 'none';
+      lastState.visible = false;
+    }
+
+    function dispose() {
+      if (el) { el.remove(); el = null; distEl = null; arrowEl = null; labelEl = null; }
+      lastState.visible = false;
+    }
+
+    return { update, hide, dispose, get state() { return lastState; } };
+  }
+
+  // =========================================================================
+  // 5D. CAMPAIGN CINEMATIC DIRECTOR (Smooth Easing, Dynamic FOV & 3D Tracking)
   // =========================================================================
   function createCampaignCinematicDirector(world) {
     let activeShot = null;
     let overlayEl = null;
+    let savedFov = null;
 
     function ensureOverlay() {
       if (overlayEl || typeof document === 'undefined') return overlayEl;
       overlayEl = document.createElement('div');
       overlayEl.id = 'sl-v2-cinematic-overlay';
-      overlayEl.style.cssText = 'position:fixed;inset:0;z-index:42;pointer-events:none;display:none;';
+      overlayEl.style.cssText = 'position:fixed;inset:0;z-index:42;pointer-events:none;display:none;transition:opacity .35s ease;';
       overlayEl.innerHTML = `
-        <div style="position:absolute;left:0;right:0;top:0;height:54px;background:linear-gradient(180deg,rgba(4,8,12,.92),rgba(4,8,12,0));"></div>
-        <div style="position:absolute;left:0;right:0;bottom:0;height:96px;background:linear-gradient(0deg,rgba(4,8,12,.94),rgba(4,8,12,0));display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:18px;gap:6px;">
+        <div style="position:absolute;left:0;right:0;top:0;height:56px;background:linear-gradient(180deg,rgba(4,8,12,.94),rgba(4,8,12,0));"></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:102px;background:linear-gradient(0deg,rgba(4,8,12,.95),rgba(4,8,12,0));display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:18px;gap:6px;">
           <div data-cine-tag style="font:700 11px/1 system-ui;letter-spacing:.26em;text-transform:uppercase;color:#f2c45a;"></div>
           <div data-cine-sub style="font:600 15px/1.35 system-ui;color:#eef5f7;text-shadow:0 2px 10px rgba(0,0,0,.9);max-width:740px;text-align:center;padding:0 18px;"></div>
           <div style="font:500 11px/1 system-ui;color:rgba(216,232,238,.58);letter-spacing:.12em;">按 SPACE 或 ESC 跳过过场动画</div>
@@ -1234,13 +1337,21 @@
       return overlayEl;
     }
 
-    function playShot({ tag = '', subtitle = '', from, to, lookAtFrom, lookAtTo, duration = 4.0, onComplete = null } = {}) {
+    function playShot({
+      tag = '', subtitle = '', from, to, lookAtFrom, lookAtTo,
+      getFocusPos = null, fovFrom = null, fovTo = null, duration = 4.0, onComplete = null,
+    } = {}) {
+      const cam = world?.camera;
+      if (cam && typeof cam.fov === 'number' && savedFov === null) savedFov = cam.fov;
       activeShot = {
         tag, subtitle,
         from: from || [0, 12, 0],
         to: to || [0, 2, 0],
         lookAtFrom: lookAtFrom || [0, 1.5, -10],
         lookAtTo: lookAtTo || lookAtFrom || [0, 1.5, -10],
+        getFocusPos,
+        fovFrom: fovFrom ?? (savedFov ? savedFov - 6 : null),
+        fovTo: fovTo ?? savedFov,
         duration: Math.max(1.2, duration),
         elapsed: 0,
         onComplete,
@@ -1264,33 +1375,44 @@
       return playShot({
         tag: `${chapter.titleZh} · 入场镜头`,
         subtitle: chapter.transitionZh || chapter.landmarkZh || '',
-        from: [sp[0] + 22, (sp[1] || 0) + 18, sp[2] + 24],
+        from: [sp[0] + 24, (sp[1] || 0) + 19, sp[2] + 26],
         to: [sp[0], (sp[1] || 0) + 1.65, sp[2]],
-        lookAtFrom: [tgt[0], (tgt[1] || 0) + 2.5, tgt[2]],
+        lookAtFrom: [tgt[0], (tgt[1] || 0) + 3.0, tgt[2]],
         lookAtTo: [tgt[0], (tgt[1] || 0) + 1.4, tgt[2]],
-        duration: 4.2,
+        duration: 4.5,
         onComplete,
       });
     }
 
-    function playStoryEventCutscene({ tag, subtitle, focusPos, duration = 3.6, onComplete = null } = {}) {
+    function playStoryEventCutscene({ tag, subtitle, focusPos, getFocusPos = null, duration = 3.8, onComplete = null } = {}) {
       const fp = focusPos || [0, 1.5, 0];
       return playShot({
         tag: tag || '剧情事件',
         subtitle: subtitle || '',
-        from: [fp[0] + 14, (fp[1] || 0) + 9, fp[2] + 16],
-        to: [fp[0] - 8, (fp[1] || 0) + 6, fp[2] + 14],
-        lookAtFrom: [fp[0], (fp[1] || 0) + 2.2, fp[2]],
-        lookAtTo: [fp[0], (fp[1] || 0) + 1.6, fp[2]],
+        from: [fp[0] + 16, (fp[1] || 0) + 10, fp[2] + 18],
+        to: [fp[0] - 9, (fp[1] || 0) + 6.5, fp[2] + 15],
+        lookAtFrom: [fp[0], (fp[1] || 0) + 2.4, fp[2]],
+        lookAtTo: [fp[0], (fp[1] || 0) + 1.5, fp[2]],
+        getFocusPos,
         duration,
         onComplete,
       });
+    }
+
+    function restoreFov() {
+      const cam = world?.camera;
+      if (cam && savedFov !== null && typeof cam.fov === 'number') {
+        cam.fov = savedFov;
+        cam.updateProjectionMatrix?.();
+        savedFov = null;
+      }
     }
 
     function skip() {
       if (!activeShot) return false;
       const cb = activeShot.onComplete;
       activeShot = null;
+      restoreFov();
       if (overlayEl) overlayEl.style.display = 'none';
       if (typeof cb === 'function') { try { cb(); } catch {} }
       return true;
@@ -1300,20 +1422,32 @@
       if (!activeShot || !(dt > 0)) return false;
       activeShot.elapsed += dt;
       const t = Math.min(1, activeShot.elapsed / activeShot.duration);
-      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      // Quintic smootherstep for cinema-grade acceleration/deceleration
+      const ease = t * t * t * (t * (t * 6 - 15) + 10);
       const cam = world?.camera;
       if (cam?.position && cam?.lookAt) {
         const lerp = (a, b) => a + (b - a) * ease;
+        const swayX = Math.sin(activeShot.elapsed * 1.4) * 0.14 * (1 - t);
+        const swayY = Math.cos(activeShot.elapsed * 1.1) * 0.10 * (1 - t);
         cam.position.set(
-          lerp(activeShot.from[0], activeShot.to[0]),
-          lerp(activeShot.from[1], activeShot.to[1]),
+          lerp(activeShot.from[0], activeShot.to[0]) + swayX,
+          lerp(activeShot.from[1], activeShot.to[1]) + swayY,
           lerp(activeShot.from[2], activeShot.to[2])
         );
-        cam.lookAt(
-          lerp(activeShot.lookAtFrom[0], activeShot.lookAtTo[0]),
-          lerp(activeShot.lookAtFrom[1], activeShot.lookAtTo[1]),
-          lerp(activeShot.lookAtFrom[2], activeShot.lookAtTo[2])
-        );
+        const dynFocus = typeof activeShot.getFocusPos === 'function' ? activeShot.getFocusPos() : null;
+        if (dynFocus) {
+          cam.lookAt(dynFocus[0], dynFocus[1], dynFocus[2]);
+        } else {
+          cam.lookAt(
+            lerp(activeShot.lookAtFrom[0], activeShot.lookAtTo[0]),
+            lerp(activeShot.lookAtFrom[1], activeShot.lookAtTo[1]),
+            lerp(activeShot.lookAtFrom[2], activeShot.lookAtTo[2])
+          );
+        }
+        if (activeShot.fovFrom !== null && activeShot.fovTo !== null && typeof cam.fov === 'number') {
+          cam.fov = lerp(activeShot.fovFrom, activeShot.fovTo);
+          cam.updateProjectionMatrix?.();
+        }
       }
       if (t >= 1) skip();
       return !!activeShot;
@@ -1321,6 +1455,7 @@
 
     function dispose() {
       activeShot = null;
+      restoreFov();
       if (overlayEl) { overlayEl.remove(); overlayEl = null; }
     }
 
@@ -1336,8 +1471,118 @@
   }
 
   // =========================================================================
+  // 5E. [H] NPC TACTICAL COMMAND PANEL (Order Squad NPCs to Follow, Operate,
+  //     Hold, Patrol, or Radio Report + Point Way)
+  // =========================================================================
+  const NPC_COMMAND_PRESETS = Object.freeze([
+    { id: 'follow', key: '1', labelZh: '跟随掩护', descZh: '紧跟主角推进并随时警戒', behavior: 'follow', voiceId: 'cmd_follow' },
+    { id: 'operate_objective', key: '2', labelZh: '前往操作目标', descZh: '跑向当前剧情控制台并作业', behavior: 'operate_objective', voiceId: 'cmd_operate' },
+    { id: 'hold', key: '3', labelZh: '原地待命警戒', descZh: '在当前位置警戒留守', behavior: 'hold', voiceId: 'cmd_hold' },
+    { id: 'patrol_area', key: '4', labelZh: '周边巡逻侦察', descZh: '在附近区域自主巡逻侦察', behavior: 'patrol_area', voiceId: 'cmd_patrol' },
+    { id: 'radio_report', key: '5', labelZh: '电台汇报指路', descZh: '电台回报局势并指向任务点', behavior: 'radio_report', voiceId: 'cmd_report' },
+  ]);
+
+  function createNpcCommandController(world, charCtrl) {
+    let open = false;
+    let lastOrderId = 'follow';
+    let panelEl = null;
+
+    function ensurePanel() {
+      if (panelEl || typeof document === 'undefined') return panelEl;
+      panelEl = document.createElement('div');
+      panelEl.id = 'sl-v2-npc-cmd';
+      panelEl.style.cssText = 'position:fixed;right:24px;top:50%;transform:translateY(-50%);z-index:38;width:276px;background:rgba(10,16,22,.92);border:1px solid rgba(246,216,118,.48);border-radius:10px;padding:12px 14px;color:#edf5f8;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.62);display:none;pointer-events:auto;';
+      panelEl.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.12);">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#f6d876;">[H] 队友行动指令</div>
+          <div style="font-size:11px;color:rgba(218,234,240,.6);">按 1-5 或点击</div>
+        </div>
+        <div data-cmd-list style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div data-cmd-status style="margin-top:8px;font-size:11px;color:#7de0f5;"></div>`;
+      const list = panelEl.querySelector('[data-cmd-list]');
+      for (const cmd of NPC_COMMAND_PRESETS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.npcOrder = cmd.id;
+        btn.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#eef6f8;cursor:pointer;font-size:12px;';
+        btn.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:rgba(246,216,118,.2);color:#f6d876;font-weight:700;flex:none;">${cmd.key}</span><span><strong style="display:block;font-size:12px;">${cmd.labelZh}</strong><span style="font-size:10px;color:rgba(218,234,240,.68);">${cmd.descZh}</span></span>`;
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          issueOrder(cmd.id);
+          setOpen(false);
+        });
+        list.appendChild(btn);
+      }
+      document.body.appendChild(panelEl);
+      return panelEl;
+    }
+
+    function refreshStatus() {
+      if (!panelEl) return;
+      const st = panelEl.querySelector('[data-cmd-status]');
+      const cast = charCtrl?.cast || [];
+      const orderMeta = NPC_COMMAND_PRESETS.find(c => c.id === lastOrderId);
+      if (st) {
+        st.textContent = cast.length
+          ? `当前小队 (${cast.length}人) · 执行：${orderMeta?.labelZh || lastOrderId}`
+          : '当前章节暂无可指挥队友';
+      }
+      for (const btn of panelEl.querySelectorAll('[data-npc-order]')) {
+        const active = btn.dataset.npcOrder === lastOrderId;
+        btn.style.borderColor = active ? '#f6d876' : 'rgba(255,255,255,.14)';
+        btn.style.background = active ? 'rgba(246,216,118,.16)' : 'rgba(255,255,255,.06)';
+      }
+    }
+
+    function setOpen(nextOpen) {
+      open = !!nextOpen;
+      const dom = ensurePanel();
+      if (dom) {
+        dom.style.display = open ? 'block' : 'none';
+        if (open) refreshStatus();
+      }
+      if (open) world?.audioV2?.playButtonPress?.();
+      return open;
+    }
+
+    function toggle() {
+      return setOpen(!open);
+    }
+
+    function issueOrder(orderId) {
+      const cmd = NPC_COMMAND_PRESETS.find(c => c.id === orderId || c.key === String(orderId));
+      if (!cmd) return null;
+      lastOrderId = cmd.id;
+      charCtrl?.issueSquadOrder?.(cmd.behavior);
+      world?.audioV2?.playButtonPress?.();
+      if (world?.voiceMgr) {
+        world.voiceMgr.playLine(cmd.voiceId);
+      } else {
+        world?.tactical?.notify?.(`队友指令：${cmd.labelZh}`, cmd.labelZh, true, 3.0);
+      }
+      refreshStatus();
+      return cmd;
+    }
+
+    function dispose() {
+      open = false;
+      if (panelEl) { panelEl.remove(); panelEl = null; }
+    }
+
+    return {
+      presets: NPC_COMMAND_PRESETS,
+      toggle,
+      setOpen,
+      issueOrder,
+      dispose,
+      get open() { return open; },
+      get lastOrderId() { return lastOrderId; },
+    };
+  }
+
+  // =========================================================================
   // 6. ACTIVE CHARACTER BEHAVIOR CONTROLLER (Autonomous Patrol, Console Work,
-  //    Pointing, Waving, Radio Calls & Natural Gaze Tracking)
+  //    Pointing, Waving, Radio Calls & Player [H] Tactical Orders)
   // =========================================================================
   function createCharacterBehaviorController(world) {
     const activeActors = new Map();
@@ -1384,6 +1629,22 @@
       if (!rec) return;
       rec.behavior = behavior;
       rec.emotion = emotion;
+      if (behavior === 'patrol_area' || behavior === 'hold') {
+        rec.homePos = { x: rec.human.actor.position.x, z: rec.human.actor.position.z };
+      }
+    }
+
+    function issueSquadOrder(behavior) {
+      let count = 0;
+      for (const rec of activeActors.values()) {
+        rec.behavior = behavior;
+        rec.actionTimer = 0;
+        if (behavior === 'patrol_area' || behavior === 'hold') {
+          rec.homePos = { x: rec.human.actor.position.x, z: rec.human.actor.position.z };
+        }
+        count++;
+      }
+      return count;
     }
 
     function update(dt, playerPos, objectivePos) {
@@ -1397,7 +1658,7 @@
 
         if (rec.behavior === 'follow') {
           if (distPlayer > 4.6) target = playerPos;
-        } else if (rec.behavior === 'lead' && objectivePos) {
+        } else if ((rec.behavior === 'lead' || rec.behavior === 'operate_objective') && objectivePos) {
           target = objectivePos;
         } else if (rec.behavior === 'patrol_area') {
           const px = rec.homePos.x + Math.cos(rec.age * 0.35) * 4.5;
@@ -1408,9 +1669,9 @@
         if (target) {
           const dx = target.x - pos.x, dz = target.z - pos.z;
           const d = Math.hypot(dx, dz);
-          const stopDist = rec.behavior === 'patrol_area' ? 0.35 : 2.3;
+          const stopDist = rec.behavior === 'patrol_area' ? 0.35 : 2.2;
           if (d > stopDist) {
-            const run = d > 9.5;
+            const run = d > 9.0;
             const spd = Math.min(d - stopDist * 0.5, dt * (run ? 5.6 : 3.2));
             pos.x += (dx / d) * spd;
             pos.z += (dz / d) * spd;
@@ -1424,11 +1685,15 @@
 
         if (rec.behavior === 'talk') {
           rec.currentAnim = 'talk';
-        } else if (rec.behavior === 'inspect_console') {
+        } else if (rec.behavior === 'hold') {
+          rec.currentAnim = 'stand';
+        } else if (rec.behavior === 'radio_report') {
+          rec.currentAnim = Math.floor(rec.age / 2.5) % 2 === 0 ? 'radio_call' : 'point_ahead';
+        } else if (rec.behavior === 'inspect_console' || rec.behavior === 'operate_objective') {
           if (distPlayer < 5.5 && rec.actionTimer <= 0) {
             rec.currentAnim = rec.currentAnim === 'point_ahead' ? 'inspect_console' : 'point_ahead';
             rec.actionTimer = 4.2;
-          } else if (distPlayer >= 5.5) {
+          } else if (distPlayer >= 5.5 || rec.behavior === 'operate_objective') {
             rec.currentAnim = 'inspect_console';
           }
         } else if (rec.actionTimer <= 0) {
@@ -1437,7 +1702,7 @@
           rec.actionTimer = 4.5 + (rec.age % 3.5);
         }
 
-        if (rec.currentAnim === 'inspect_console' && objectivePos) {
+        if ((rec.currentAnim === 'inspect_console' || rec.currentAnim === 'point_ahead') && objectivePos) {
           rec.human.actor.rotation.y = Math.atan2(objectivePos.x - pos.x, objectivePos.z - pos.z);
         } else if (distPlayer < 16) {
           rec.human.actor.rotation.y = Math.atan2(playerPos.x - pos.x, playerPos.z - pos.z);
@@ -1456,6 +1721,7 @@
     return {
       spawnChapterCast,
       setBehavior,
+      issueSquadOrder,
       update,
       disposeCast,
       get cast() { return [...activeActors.values()].map(r => ({ id: r.meta.id, behavior: r.behavior, anim: r.currentAnim, emotion: r.emotion })); },
@@ -1468,8 +1734,10 @@
   function createSaltlineCampaignV2(world, { storage } = {}) {
     const saveMgr = createCampaignSaveManager(storage);
     const setPieces = createChapterSetPieceManager(world);
+    const waypoint = createWaypointOverlay(world);
     const cinematics = createCampaignCinematicDirector(world);
     const charCtrl = createCharacterBehaviorController(world);
+    const npcCommands = createNpcCommandController(world, charCtrl);
 
     let activeChapter = null;
     let objectiveIdx = 0;
@@ -1524,7 +1792,7 @@
       if (activeChapter.scenePreset === 'underground_vault') setPieces.setVaultZoneLit(objectiveIdx);
       if (activeChapter.scenePreset === 'rising_water_drydock' && objectiveIdx >= 2) setPieces.lockWaterLevel();
 
-      // Trigger dramatic story-driven open-world Aircraft Crash & cutscene on key story beats (no pillar shooting!)
+      // Trigger dramatic story-driven open-world Aircraft Crash & dynamic tracking cutscene
       let triggeredEvent = null;
       if ((activeChapter.id === 'ch01' && objectiveIdx === 2) || (activeChapter.id === 'ch02' && objectiveIdx === 1) || (activeChapter.id === 'ch09' && objectiveIdx === 0)) {
         const crashPoint = [
@@ -1537,6 +1805,7 @@
           tag: '突发空难 · 应急运输机迫降坠毁',
           subtitle: '盐线沿海空域一架应急运输机受电磁干扰失控坠毁在前方街区！',
           focusPos: crashPoint,
+          getFocusPos: () => setPieces.getAircraftPosition() || crashPoint,
           duration: 4.8,
         });
         triggeredEvent = 'aircraft_crash';
@@ -1572,9 +1841,11 @@
       if (!active || !activeChapter || !(dt > 0)) return;
       const slot = saveMgr.getSlot();
       setPieces.update(dt, slot.difficulty);
-      cinematics.update(dt);
+      const isCine = cinematics.update(dt);
       const curObj = activeChapter.objectives[objectiveIdx];
       const objPos = curObj?.target ? { x: curObj.target[0], y: curObj.target[1], z: curObj.target[2] } : null;
+      if (isCine) waypoint.hide();
+      else waypoint.update(curObj?.target, world?.player?.pos, curObj?.titleZh || '');
       charCtrl.update(dt, world?.player?.pos, objPos);
       sessionTimeAccum += dt;
       if (sessionTimeAccum >= 10) {
@@ -1589,10 +1860,13 @@
         sessionTimeAccum = 0;
       }
       active = false;
+      waypoint.dispose();
+      npcCommands.dispose();
       cinematics.dispose();
       setPieces.dispose();
       charCtrl.disposeCast();
       world?.audioV2?.stopAmbience?.();
+      world?.voiceMgr?.stopCurrent?.();
     }
 
     return {
@@ -1601,7 +1875,9 @@
       difficulties: DIFFICULTY_PRESETS,
       saveMgr,
       setPieces,
+      waypoint,
       cinematics,
+      npcCommands,
       charCtrl,
       startChapter,
       advanceObjective,
@@ -1620,10 +1896,13 @@
     SALTLINE_CHAPTERS,
     SALTLINE_CHARACTERS,
     DIFFICULTY_PRESETS,
+    NPC_COMMAND_PRESETS,
     validateGameplayMatrix,
     createCampaignSaveManager,
     createChapterSetPieceManager,
+    createWaypointOverlay,
     createCampaignCinematicDirector,
+    createNpcCommandController,
     createCharacterBehaviorController,
     createSaltlineCampaignV2,
   };

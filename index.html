@@ -408,6 +408,7 @@ kbd { display: inline-block; font: 500 10px/1 var(--f-mono); color: var(--bone);
 <script src="./port-mp-vehicles.js"></script>
 <script src="./port-mp-sync.js"></script>
 <script src="./saltline-audio-v2.js"></script>
+<script src="./saltline-voice-manager.js"></script>
 <script src="./saltline-campaign-core.js"></script>
 <script src="./saltline-campaign-menu.js"></script>
 <script src="./saltline-mp-modes.js"></script>
@@ -7375,11 +7376,30 @@ if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
  if(campHost&&!campHost.dataset.v2Mounted){
   campHost.dataset.v2Mounted='1';
   i.audioV2=window.SaltlineAudioV2?.createSaltlineAudioV2?.()||null;
+  i.voiceMgr=window.SaltlineVoiceManager?.createSaltlineVoiceManager?.({
+   audioV2:i.audioV2,
+   onSubtitle:ln=>i.tactical?.notify?.(`${ln.speaker}：${ln.textZh}`,`${ln.speaker}: ${ln.textEn}`,true,ln.durationSec||4.2),
+  })||null;
+  i.voiceMgr?.loadManifest?.();
   const campaignV2=window.SaltlineCampaignV2.createSaltlineCampaignV2(i);
   i.campaignV2=campaignV2;
   addEventListener('keydown',ev=>{
    if((ev.code==='Space'||ev.code==='Escape')&&campaignV2.cinematics?.active){
     campaignV2.cinematics.skip();
+    return;
+   }
+   if(!window.SALTLINE_CAMPAIGN_V2_ACTIVE||!campaignV2.active)return;
+   if(ev.code==='KeyH'){
+    campaignV2.npcCommands?.toggle?.();
+    return;
+   }
+   if(campaignV2.npcCommands?.open){
+    if(ev.code==='Escape'){campaignV2.npcCommands.setOpen(false);return;}
+    const digit=ev.key;
+    if(digit>='1'&&digit<='5'){
+     campaignV2.npcCommands.issueOrder(digit);
+     campaignV2.npcCommands.setOpen(false);
+    }
    }
   });
   let v2InteractCooldown=0;
@@ -7399,7 +7419,9 @@ if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
     U({skipIntro:true});
     menuV2?.showTransition?.(ch,()=>{
      r.requestLock();
-     if(ch?.cutscene?.lines?.length){
+     if(i.voiceMgr?.loaded&&i.voiceMgr.listLines({chapter:ch.id,trigger:'intro'}).length){
+      i.voiceMgr.playChapterQueue(ch.id);
+     }else if(ch?.cutscene?.lines?.length){
       ch.cutscene.lines.forEach(ln=>setTimeout(()=>{
        if(window.SALTLINE_CAMPAIGN_V2_ACTIVE){
         i.audioV2?.playRadioSquelch?.(true);

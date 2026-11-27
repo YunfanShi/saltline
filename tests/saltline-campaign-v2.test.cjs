@@ -272,4 +272,97 @@ test('SaltlineAudioV2 + Story Consoles + Open-World Aircraft Crash + Cutscenes +
   assert.ok(htmlSrc.includes('A!=="companion"&&s.events.emit("enemy:hit"'), 'Gull damage must isolate companion hits from player events');
   assert.ok(htmlSrc.includes('G!=="companion"&&s.events.emit("enemy:hit"'), 'Hound damage must isolate companion hits from player events');
   assert.ok(htmlSrc.includes('saltline-audio-v2.js'), 'index.html must load saltline-audio-v2.js');
+  assert.ok(htmlSrc.includes('saltline-voice-manager.js'), 'index.html must load saltline-voice-manager.js');
+  assert.ok(htmlSrc.includes("ev.code==='KeyH'"), 'index.html must bind H key to NPC command panel');
+});
+
+test('SaltlineVoiceManager + [H] NPC Commands + 3D-to-2D Golden Waypoint (No Light Pillars)', () => {
+  const { sandbox } = makeSandbox();
+  loadBrowserScript('saltline-voice-manager.js', sandbox);
+  loadBrowserScript('saltline-campaign-core.js', sandbox);
+
+  const manifestJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'campaign-voice-manifest.json'), 'utf8'));
+  assert.ok(Array.isArray(manifestJson.lines) && manifestJson.lines.length >= 33, 'Voice manifest should cover all 14 chapters + 5 NPC commands');
+
+  const subtitles = [];
+  const voiceMgr = sandbox.SaltlineVoiceManager.createSaltlineVoiceManager({
+    onSubtitle: (ln) => subtitles.push(ln),
+  });
+  voiceMgr.indexManifest(manifestJson);
+  assert.equal(voiceMgr.loaded, true);
+  assert.equal(voiceMgr.listLines({ chapter: 'ch01', trigger: 'intro' }).length, 2);
+  assert.equal(voiceMgr.playLine('ch01_intro_01'), true);
+  assert.equal(subtitles.length, 1);
+  assert.equal(subtitles[0].speaker, '玛拉');
+  voiceMgr.stopCurrent();
+
+  // Verify [H] NPC Command controller + Golden Waypoint projection + zero navigation light pillars
+  const actors = new Map();
+  sandbox.createSaltlineHuman = (THREE, opts) => {
+    const actor = {
+      position: { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } },
+      rotation: { y: 0 },
+      removeFromParent() { this.removed = true; },
+    };
+    const human = { actor, pose() {} };
+    actors.set(opts.name, human);
+    return human;
+  };
+  class Vec3 {
+    constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+    set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
+    copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
+    project() { this.x = 0.2; this.y = 0.1; this.z = 0.5; return this; }
+  }
+  class Obj {
+    constructor() { this.children = []; this.position = new Vec3(); this.rotation = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }; this.scale = new Vec3(1, 1, 1); }
+    add(...items) { this.children.push(...items); }
+    remove(item) { const i = this.children.indexOf(item); if (i >= 0) this.children.splice(i, 1); }
+    lookAt() {}
+    updateMatrix() {}
+  }
+  const mockTHREE = {
+    Group: Obj,
+    Mesh: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } },
+    BoxGeometry: class {},
+    CylinderGeometry: class {},
+    PlaneGeometry: class {},
+    MeshStandardMaterial: class { constructor(o) { Object.assign(this, o); this.color = { setHex() {} }; } },
+    MeshBasicMaterial: class { constructor(o) { Object.assign(this, o); this.color = { setHex() {} }; } },
+    PointLight: class extends Obj {},
+    Vector3: Vec3,
+  };
+  const scene = new Obj();
+  const cam = { position: new Vec3(), fov: 65, updateMatrixWorld() {}, updateProjectionMatrix() {}, lookAt() {} };
+  const camp = sandbox.SaltlineCampaignV2.createSaltlineCampaignV2({
+    THREE: mockTHREE,
+    scene,
+    camera: cam,
+    player: { pos: new Vec3(-26, 0.25, -42), vel: new Vec3() },
+    voiceMgr,
+  });
+  camp.startChapter('ch01', { skipCutscene: true });
+  camp.update(0.1);
+
+  // Verify waypoint reticle computes exact distance
+  assert.equal(camp.waypoint.state.visible, true);
+  assert.ok(camp.waypoint.state.distM > 0, `Expected positive waypoint distance, got ${camp.waypoint.state.distM}`);
+
+  // Verify NO vertical light pillar in the 3D objective console
+  const setpieceRoot = scene.children.find(c => c.name === 'saltline-campaign-v2-setpieces');
+  const consoleGroup = setpieceRoot?.children?.find(c => c.name === 'campaign-v2-story-console');
+  assert.ok(consoleGroup, 'Physical story console group should exist');
+  const tallBeam = consoleGroup.children.find(m => m.scale && m.scale.y > 5);
+  assert.equal(tallBeam, undefined, 'Must NOT render tall vertical light pillar beams for navigation');
+
+  // Verify [H] NPC commands toggle and dispatch real orders to squad NPCs
+  assert.equal(camp.npcCommands.toggle(), true);
+  const ord = camp.npcCommands.issueOrder('2'); // operate_objective
+  assert.equal(ord.id, 'operate_objective');
+  assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'operate_objective'), 'All squad NPCs should execute operate_objective');
+  camp.npcCommands.issueOrder('hold');
+  assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'hold'), 'All squad NPCs should execute hold');
+  camp.npcCommands.issueOrder('radio_report');
+  assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'radio_report'), 'All squad NPCs should execute radio_report');
+  camp.stop();
 });
