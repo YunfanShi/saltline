@@ -606,12 +606,15 @@
     let lastPoseState = { mode: 'stand', stride: 0, age: 0, moving: false };
     if (!disableGlb && typeof window !== 'undefined' && window.SaltlineNpcModels?.attachToActor) {
       const resolvedModelType = modelType || (
-        role === 'medic' ? 'female' :
-        (armed || role === 'pilot' || role === 'operator') ? 'soldier' : 'civilian'
+        role === 'medic' ? 'medic_female' :
+        role === 'worker' ? 'worker_male' :
+        role === 'engineer' ? 'civilian_male' :
+        (armed || role === 'pilot' || role === 'operator') ? 'specops_male' : 'civilian_male'
       );
       window.SaltlineNpcModels.attachToActor(THREE, actor, {
         modelType: resolvedModelType,
         tintHex: coat,
+        armed: Boolean(armed),
         onReady(inst) {
           glbInstance = inst;
           fallbackRig.visible = false;

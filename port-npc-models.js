@@ -1,48 +1,132 @@
 /* Saltline Real Rigged 3D Human Character Loader (GLB 2.0 + SkinnedMesh + AnimationMixer).
- * Uses realistic Mixamo-rigged tactical human character (Soldier.glb) with native Idle/Walk/Run clips,
- * per-role body proportions & uniform palettes, independent Skeleton cloning per NPC, and
- * smoothstep talking/nodding/gesture overlays. Custom GLBs can be dropped into assets/models/characters/. */
+ * Supports 8 distinct character archetypes:
+ *   - Teammates (Special Forces, armed with 3D tactical rifles): specops_male, specops_female, commander
+ *   - Friendly NPCs (distinct uniforms/civilians): medic_female, worker_male, civilian_male, civilian_female
+ *   - Hostile Mercenaries: mercenary (armored dark-visor Soldier.glb)
+ * Supports both Mixamo (Soldier.glb) and Microsoft Rocketbox Bip01 (MIT) skeletons,
+ * full walking/running/seated/combat-aim/talking/gesture poses, and right-hand 3D rifle attachment. */
 (() => {
   const MIXAMO_BONES = {
+    rigType: 'mixamo',
     mixamo: true,
+    hipsBone: 'mixamorig_Hips',
     headBone: 'mixamorig_Head',
     neckBone: 'mixamorig_Neck',
     spineBone: 'mixamorig_Spine2',
     rightArm: 'mixamorig_RightArm',
     rightForeArm: 'mixamorig_RightForeArm',
+    rightHand: 'mixamorig_RightHand',
     leftArm: 'mixamorig_LeftArm',
     leftForeArm: 'mixamorig_LeftForeArm',
+    leftUpLeg: 'mixamorig_LeftUpLeg',
+    leftLeg: 'mixamorig_LeftLeg',
+    rightUpLeg: 'mixamorig_RightUpLeg',
+    rightLeg: 'mixamorig_RightLeg',
+  };
+
+  const BIP01_BONES = {
+    rigType: 'bip01',
+    mixamo: false,
+    hipsBone: 'Bip01_Pelvis',
+    headBone: 'Bip01_Head',
+    neckBone: 'Bip01_Neck',
+    spineBone: 'Bip01_Spine2',
+    rightArm: 'Bip01_R_UpperArm',
+    rightForeArm: 'Bip01_R_Forearm',
+    rightHand: 'Bip01_R_Hand',
+    leftArm: 'Bip01_L_UpperArm',
+    leftForeArm: 'Bip01_L_Forearm',
+    leftUpLeg: 'Bip01_L_Thigh',
+    leftLeg: 'Bip01_L_Calf',
+    rightUpLeg: 'Bip01_R_Thigh',
+    rightLeg: 'Bip01_R_Calf',
   };
 
   const MODEL_CATALOG = {
-    soldier: {
+    // Enemy Mercenary (armored dark-visor Soldier.glb)
+    mercenary: {
       url: './assets/models/characters/Soldier.glb',
-      targetHeight: 1.78,
+      targetHeight: 1.80,
+      buildScale: [1.02, 1.0, 1.02],
+      yawOffset: Math.PI,
+      tintStrength: 0.32,
+      defaultTint: 0x3a2626,
+      armed: true,
+      ...MIXAMO_BONES,
+    },
+    // Special Forces Teammates (Microsoft Rocketbox MIT Military Male/Female + 3D Rifle)
+    specops_male: {
+      url: './assets/models/characters/specops_male.glb',
+      targetHeight: 1.80,
       buildScale: [1.0, 1.0, 1.0],
-      yawOffset: Math.PI, // Three.js Soldier.glb faces -Z locally; rotate to +Z
-      tintStrength: 0.36,
-      defaultTint: 0x3b5873,
-      ...MIXAMO_BONES,
+      yawOffset: 0,
+      armed: true,
+      ...BIP01_BONES,
     },
-    female: {
-      url: './assets/models/characters/Soldier.glb',
+    specops_female: {
+      url: './assets/models/characters/specops_female.glb',
+      targetHeight: 1.70,
+      buildScale: [1.0, 1.0, 1.0],
+      yawOffset: 0,
+      armed: true,
+      ...BIP01_BONES,
+    },
+    commander: {
+      url: './assets/models/characters/commander.glb',
+      targetHeight: 1.80,
+      buildScale: [1.0, 1.0, 1.0],
+      yawOffset: 0,
+      armed: false,
+      ...BIP01_BONES,
+    },
+    // Friendly Specialist & Civilian NPCs (each with a completely distinct Rocketbox MIT model)
+    medic_female: {
+      url: './assets/models/characters/medic_female.glb',
       targetHeight: 1.68,
-      buildScale: [0.91, 1.0, 0.92],
-      yawOffset: Math.PI,
-      tintStrength: 0.46,
-      defaultTint: 0x4aa39e,
-      ...MIXAMO_BONES,
+      buildScale: [1.0, 1.0, 1.0],
+      yawOffset: 0,
+      armed: false,
+      ...BIP01_BONES,
     },
-    civilian: {
-      url: './assets/models/characters/Soldier.glb',
-      targetHeight: 1.74,
-      buildScale: [0.97, 1.0, 0.98],
-      yawOffset: Math.PI,
-      tintStrength: 0.48,
-      defaultTint: 0x8f7458,
-      ...MIXAMO_BONES,
+    worker_male: {
+      url: './assets/models/characters/worker_male.glb',
+      targetHeight: 1.76,
+      buildScale: [1.0, 1.0, 1.0],
+      yawOffset: 0,
+      armed: false,
+      ...BIP01_BONES,
+    },
+    civilian_male: {
+      url: './assets/models/characters/civilian_male.glb',
+      targetHeight: 1.76,
+      buildScale: [1.0, 1.0, 1.0],
+      yawOffset: 0,
+      armed: false,
+      ...BIP01_BONES,
+    },
+    civilian_female: {
+      url: './assets/models/characters/civilian_female.glb',
+      targetHeight: 1.67,
+      buildScale: [1.0, 1.0, 1.0],
+      yawOffset: 0,
+      armed: false,
+      ...BIP01_BONES,
     },
   };
+
+  // Backwards-compatible aliases (never map friendly roles to enemy mercenary!)
+  const ALIASES = {
+    soldier: 'specops_male',
+    female: 'specops_female',
+    civilian: 'civilian_male',
+    enemy: 'mercenary',
+  };
+
+  function resolveKey(modelType) {
+    if (MODEL_CATALOG[modelType]) return modelType;
+    if (ALIASES[modelType] && MODEL_CATALOG[ALIASES[modelType]]) return ALIASES[modelType];
+    return 'specops_male';
+  }
 
   const TYPE_SIZES = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
   const COMP_ARRAYS = {
@@ -56,7 +140,36 @@
 
   function sanitizeName(name, fallbackIdx) {
     const raw = (name && String(name).trim()) || `node_${fallbackIdx}`;
-    return raw.replace(/[:.\[\]\/\\]/g, '_');
+    return raw.replace(/[:.\[\]\/\\ ]/g, '_');
+  }
+
+  function createTacticalRifle(THREE) {
+    const { Group, Mesh, BoxGeometry, CylinderGeometry, MeshStandardMaterial } = THREE;
+    if (!BoxGeometry || !CylinderGeometry) return null;
+    const g = new Group();
+    g.name = 'npc-tactical-rifle';
+    const gunMat = new MeshStandardMaterial({ color: 0x1e242a, roughness: 0.36, metalness: 0.72 });
+    const gripMat = new MeshStandardMaterial({ color: 0x2d3230, roughness: 0.78, metalness: 0.14 });
+    const metalMat = new MeshStandardMaterial({ color: 0x6f7980, roughness: 0.28, metalness: 0.85 });
+    const add = (geo, mat, sx, sy, sz, x, y, z, rx = 0) => {
+      const m = new Mesh(geo, mat);
+      m.scale.set(sx, sy, sz);
+      m.position.set(x, y, z);
+      if (rx) m.rotation.x = rx;
+      m.castShadow = true;
+      g.add(m);
+      return m;
+    };
+    const box = new BoxGeometry(1, 1, 1);
+    const cyl = new CylinderGeometry(1, 1, 1, 10);
+    add(box, gunMat, 0.052, 0.078, 0.36, 0, 0, 0.10);          // Receiver
+    add(box, gripMat, 0.044, 0.054, 0.24, 0, -0.004, 0.36);    // Handguard
+    add(cyl, metalMat, 0.012, 0.22, 0.012, 0, 0.008, 0.54, Math.PI / 2); // Barrel + suppressor
+    add(box, gripMat, 0.042, 0.086, 0.20, 0, -0.012, -0.15);   // Tactical stock
+    add(box, gunMat, 0.030, 0.145, 0.054, 0, -0.092, 0.15, 0.18); // Curved magazine
+    add(box, gunMat, 0.036, 0.044, 0.088, 0, 0.058, 0.09);     // Holographic optic
+    add(box, gripMat, 0.032, 0.090, 0.038, 0, -0.068, -0.01, -0.25); // Pistol grip
+    return g;
   }
 
   function readAccessor(gltf, binBuf, accIdx) {
@@ -184,7 +297,9 @@
         opts.metalnessMap = mr;
       }
       if (m.normalTexture) opts.normalMap = getTex(m.normalTexture.index, false);
-      if (m.alphaMode === 'BLEND') {
+      if (m.alphaMode === 'MASK') {
+        opts.alphaTest = m.alphaCutoff ?? 0.45;
+      } else if (m.alphaMode === 'BLEND') {
         opts.transparent = true;
         opts.opacity = pbr.baseColorFactor?.[3] ?? 0.65;
       }
@@ -192,7 +307,6 @@
     });
     const defaultMat = new THREE.MeshStandardMaterial({ color: 0x8b9398, roughness: 0.78, metalness: 0.08 });
 
-    // Build reusable BufferGeometries per mesh
     const meshPrims = (gltf.meshes || []).map(meshDef => {
       const out = [];
       for (const prim of meshDef.primitives || []) {
@@ -231,7 +345,6 @@
       return out;
     });
 
-    // Decode skin inverse bind matrices
     const skinDefs = (gltf.skins || []).map(sk => {
       const ibmAcc = sk.inverseBindMatrices !== undefined ? readAccessor(gltf, binBuf, sk.inverseBindMatrices) : null;
       const inverses = [];
@@ -245,7 +358,6 @@
       return { joints: sk.joints || [], inverses };
     });
 
-    // Build AnimationClips (using sanitized node names!)
     const nodeNames = (gltf.nodes || []).map((nd, i) => sanitizeName(nd.name, i));
     const clips = {};
     const rotationOnlyClips = {};
@@ -266,8 +378,7 @@
         let track = null;
         if (path === 'rotation' && THREE.QuaternionKeyframeTrack) {
           track = new THREE.QuaternionKeyframeTrack(`${targetName}.quaternion`, inAcc.array, outAcc.array);
-          // Never retarget root Hips quaternion across different armatures (prevents upside-down flipping)
-          if (!/hips$/i.test(targetName)) rotTracks.push(track);
+          if (!/hips|pelvis/i.test(targetName)) rotTracks.push(track);
         } else if (path === 'translation' && THREE.VectorKeyframeTrack) {
           track = new THREE.VectorKeyframeTrack(`${targetName}.position`, inAcc.array, outAcc.array);
         } else if (path === 'scale' && THREE.VectorKeyframeTrack) {
@@ -286,7 +397,7 @@
     return { gltf, spec, jointSet, meshPrims, skinDefs, nodeNames, clips, rotationOnlyClips };
   }
 
-  function instantiateFromTemplate(THREE, tpl, { tintHex = null, sharedMixamoClips = null } = {}) {
+  function instantiateFromTemplate(THREE, tpl, { tintHex = null, armed = false } = {}) {
     const { gltf, spec, jointSet, meshPrims, skinDefs, nodeNames } = tpl;
     const nodeObjs = new Array((gltf.nodes || []).length);
     const skinnedEntries = [];
@@ -306,7 +417,6 @@
       nodeObjs[i] = obj;
     }
 
-    // Wire hierarchy
     for (let i = 0; i < (gltf.nodes || []).length; i++) {
       const nd = gltf.nodes[i];
       for (const cIdx of nd.children || []) {
@@ -314,17 +424,16 @@
       }
     }
 
-    // Attach meshes / skinned meshes with per-role uniform tinting
-    const effectiveTint = tintHex != null ? tintHex : (spec.defaultTint ?? null);
+    const effectiveTint = spec.rigType === 'bip01' ? null : (tintHex != null ? tintHex : (spec.defaultTint ?? null));
     const tintColor = effectiveTint != null && THREE.Color ? new THREE.Color(effectiveTint) : null;
     const white = THREE.Color ? new THREE.Color(0xffffff) : null;
-    const tintStrength = spec.tintStrength ?? (spec.mixamo ? 0.34 : 0.40);
+    const tintStrength = spec.tintStrength ?? 0.34;
     for (let i = 0; i < (gltf.nodes || []).length; i++) {
       const nd = gltf.nodes[i];
       if (nd.mesh === undefined || !meshPrims[nd.mesh]) continue;
       for (const p of meshPrims[nd.mesh]) {
         let mat = p.mat;
-        if (tintColor && mat?.clone && !/visor/i.test(mat.name || '')) {
+        if (tintColor && mat?.clone && !/visor|head|face|skin|hair|eye/i.test(mat.name || '')) {
           mat = mat.clone();
           if (mat.color) {
             const blend = white.clone().lerp(tintColor, tintStrength);
@@ -336,7 +445,7 @@
           : new THREE.Mesh(p.geo, mat);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        mesh.frustumCulled = false; // Never disappear in close-up dialogue shots!
+        mesh.frustumCulled = false;
         nodeObjs[i].add(mesh);
         if (mesh.isSkinnedMesh && nd.skin !== undefined) {
           skinnedEntries.push({ mesh, skinIdx: nd.skin });
@@ -351,7 +460,6 @@
       if (nodeObjs[rIdx]) inner.add(nodeObjs[rIdx]);
     }
 
-    // Bind skeletons after hierarchy is assembled
     inner.updateMatrixWorld(true);
     for (const { mesh, skinIdx } of skinnedEntries) {
       const skDef = skinDefs[skinIdx];
@@ -362,17 +470,15 @@
         : undefined;
       const skeleton = new THREE.Skeleton(bones, inverses);
       mesh.normalizeSkinWeights?.();
-      // glTF 2.0 skins define inverseBindMatrices in mesh-local space; bindMatrix MUST be identity
-      // so modelMatrix * bindMatrixInverse cancels cleanly even after inner scale/yaw normalization.
       mesh.bind(skeleton, new THREE.Matrix4());
     }
 
-    // Normalize orientation (+Z forward), height (~1.74m), and ground flush to y=0
     const root = new THREE.Group();
     root.name = 'glb-character-root';
     inner.rotation.y = spec.yawOffset || 0;
     root.add(inner);
     root.updateMatrixWorld(true);
+    let baseInnerY = 0;
     if (THREE.Box3) {
       const box = new THREE.Box3().setFromObject(inner);
       const h = box.max.y - box.min.y;
@@ -382,34 +488,28 @@
         inner.scale.set(inner.scale.x * s * bx, inner.scale.y * s * by, inner.scale.z * s * bz);
         root.updateMatrixWorld(true);
         const box2 = new THREE.Box3().setFromObject(inner);
-        if (Number.isFinite(box2.min.y)) inner.position.y -= box2.min.y;
+        if (Number.isFinite(box2.min.y)) {
+          inner.position.y -= box2.min.y;
+          baseInnerY = inner.position.y;
+        }
       }
     }
 
-    // AnimationMixer + action bank
-    const mixer = THREE.AnimationMixer ? new THREE.AnimationMixer(inner) : null;
+    const mixer = THREE.AnimationMixer && Object.keys(tpl.clips).length ? new THREE.AnimationMixer(inner) : null;
     const actions = {};
-    const clipPool = spec.useSharedMixamoClips && sharedMixamoClips
-      ? { ...tpl.clips, ...sharedMixamoClips }
-      : tpl.clips;
-
     if (mixer) {
-      for (const [k, clip] of Object.entries(clipPool)) {
-        actions[k] = mixer.clipAction(clip);
-      }
+      for (const [k, clip] of Object.entries(tpl.clips)) actions[k] = mixer.clipAction(clip);
     }
 
     const pickAction = (...names) => {
-      for (const n of names) {
-        if (actions[n]) return actions[n];
-      }
+      for (const n of names) if (actions[n]) return actions[n];
       const vals = Object.values(actions);
       return vals.length ? vals[0] : null;
     };
 
-    const idleAct = spec.mixamo ? pickAction('idle', 'tpose') : pickAction('anim_0');
-    const walkAct = spec.mixamo ? pickAction('walk', 'run', 'idle') : pickAction('anim_0');
-    const runAct = spec.mixamo ? pickAction('run', 'walk', 'idle') : pickAction('anim_0');
+    const idleAct = spec.mixamo ? pickAction('idle', 'tpose') : pickAction('idle', 'anim_0');
+    const walkAct = spec.mixamo ? pickAction('walk', 'run', 'idle') : pickAction('walk', 'anim_0');
+    const runAct = spec.mixamo ? pickAction('run', 'walk', 'idle') : pickAction('run', 'walk', 'anim_0');
 
     let currentAct = null;
     function fadeTo(nextAct, fadeSec = 0.22, timeScale = 1.0) {
@@ -425,37 +525,72 @@
       currentAct = nextAct;
     }
 
-    // Start in idle
     if (idleAct) {
-      fadeTo(idleAct, 0.01, spec.mixamo ? 1.0 : 0.0);
+      fadeTo(idleAct, 0.01, 1.0);
       mixer?.update?.(0.016);
     }
 
-    // Resolve expressive bones for dialogue head-nods, look-at & conversational hand gestures
     const findBone = name => (name ? inner.getObjectByName(name) : null);
     const headBone = findBone(spec.headBone);
     const neckBone = findBone(spec.neckBone);
     const spineBone = findBone(spec.spineBone);
     const rightArm = findBone(spec.rightArm);
     const rightForeArm = findBone(spec.rightForeArm);
+    const rightHand = findBone(spec.rightHand);
     const leftArm = findBone(spec.leftArm);
     const leftForeArm = findBone(spec.leftForeArm);
+    const leftUpLeg = findBone(spec.leftUpLeg);
+    const leftLeg = findBone(spec.leftLeg);
+    const rightUpLeg = findBone(spec.rightUpLeg);
+    const rightLeg = findBone(spec.rightLeg);
+
+    // Save rest Euler rotations for procedural Bip01 animation & clean seated/aim overrides
+    const restRot = new Map();
+    for (const b of [headBone, neckBone, spineBone, rightArm, rightForeArm, leftArm, leftForeArm, leftUpLeg, leftLeg, rightUpLeg, rightLeg]) {
+      if (b) restRot.set(b, b.rotation.clone());
+    }
+
+    // Attach a real 3D tactical assault rifle directly to the right hand bone for Special Forces teammates & mercenaries!
+    const isArmed = Boolean(armed || spec.armed);
+    if (isArmed && rightHand) {
+      const rifle = createTacticalRifle(THREE);
+      if (rifle) {
+        // Compensate for bone world scale (Mixamo uses 0.01 cm scale; Bip01 uses meters)
+        const handScale = spec.mixamo ? 100 : 1;
+        rifle.scale.setScalar(handScale);
+        if (spec.mixamo) {
+          rifle.position.set(0, 8, 6);
+          rifle.rotation.set(Math.PI / 2, 0, -Math.PI / 2);
+        } else {
+          rifle.position.set(0.06, -0.02, 0.04);
+          rifle.rotation.set(0, Math.PI / 2, 0);
+        }
+        rightHand.add(rifle);
+      }
+    }
 
     let talkClock = 0;
+    let walkClock = 0;
     let poseBlend = 0;
     let lastOverlayMode = 'stand';
     const tmpHeadPos = new THREE.Vector3();
 
+    function resetToRest(bone) {
+      const r = bone ? restRot.get(bone) : null;
+      if (r) bone.rotation.copy(r);
+    }
+
     function updatePose(mode = 'stand', stride = 0, age = 0, moving = false, dt = 0.016) {
       const safeDt = Math.max(0, Math.min(0.08, Number.isFinite(dt) ? dt : 0.016));
+      const isSeated = mode === 'seated';
       const isTalking = mode === 'talk';
       const isInspect = mode === 'inspect_console';
       const isPoint = mode === 'point_ahead';
       const isWave = mode === 'wave_follow';
       const isRadio = mode === 'radio_call';
       const hasOverlay = isTalking || isInspect || isPoint || isWave || isRadio;
-      const isWalking = moving || mode === 'walk';
-      const isRunning = mode === 'run';
+      const isWalking = !isSeated && (moving || mode === 'walk');
+      const isRunning = !isSeated && mode === 'run';
 
       if (hasOverlay) {
         if (lastOverlayMode !== mode) { poseBlend = Math.min(poseBlend, 0.25); lastOverlayMode = mode; }
@@ -464,26 +599,70 @@
         poseBlend = Math.max(0, poseBlend - safeDt * 6.0);
         if (poseBlend <= 0.01) lastOverlayMode = 'stand';
       }
-      const w = poseBlend * poseBlend * (3 - 2 * poseBlend); // smoothstep blend
+      const w = poseBlend * poseBlend * (3 - 2 * poseBlend);
 
-      if (spec.mixamo) {
+      // Seated pelvis lowering
+      inner.position.y = isSeated ? baseInnerY - 0.34 : baseInnerY;
+
+      if (mixer && spec.mixamo) {
         if (isRunning) fadeTo(runAct, 0.22, 1.05);
         else if (isWalking) fadeTo(walkAct, 0.22, 1.0);
         else fadeTo(idleAct, 0.28, isTalking ? 0.85 : 0.9);
-        mixer?.update?.(safeDt);
-      } else if (mixer && walkAct) {
+        mixer.update(safeDt);
+      } else {
+        // Procedural Bip01 skeletal animation (for Microsoft Rocketbox photorealistic characters)
+        for (const b of restRot.keys()) resetToRest(b);
         if (isWalking || isRunning) {
-          fadeTo(walkAct, 0.16, isRunning ? 1.35 : 1.0);
-          mixer.update(safeDt);
+          walkClock += safeDt * (isRunning ? 10.5 : 6.4);
+          const sw = Math.sin(walkClock) * (isRunning ? 0.62 : 0.38);
+          const knL = Math.max(0, -Math.sin(walkClock)) * (isRunning ? 0.85 : 0.52);
+          const knR = Math.max(0, Math.sin(walkClock)) * (isRunning ? 0.85 : 0.52);
+          if (leftUpLeg) leftUpLeg.rotation.z += sw;
+          if (rightUpLeg) rightUpLeg.rotation.z -= sw;
+          if (leftLeg) leftLeg.rotation.z -= knL;
+          if (rightLeg) rightLeg.rotation.z -= knR;
+          if (spineBone) spineBone.rotation.y += Math.sin(walkClock) * 0.04;
+          if (!isArmed) {
+            if (leftArm) leftArm.rotation.z -= sw * 0.65;
+            if (rightArm) rightArm.rotation.z += sw * 0.65;
+          }
         } else {
-          if (currentAct !== walkAct) fadeTo(walkAct, 0.12, 0);
-          walkAct.timeScale = 0;
-          walkAct.time = 0.0;
-          mixer.update(0.001);
+          // Relaxed natural arms-down posture from T-pose + subtle breathing
+          if (leftArm) leftArm.rotation.x += 1.12;
+          if (rightArm) rightArm.rotation.x -= 1.12;
+          if (spineBone) spineBone.rotation.z += Math.sin(age * 1.8) * 0.018;
+          if (headBone) headBone.rotation.y += Math.sin(age * 0.55) * 0.10;
+        }
+        // Rifle-ready hold for armed Special Forces teammates
+        if (isArmed && !isSeated && !hasOverlay) {
+          if (rightArm) { rightArm.rotation.x -= 0.45; rightArm.rotation.z += 0.55; }
+          if (rightForeArm) rightForeArm.rotation.y -= 0.72;
+          if (leftArm) { leftArm.rotation.x += 0.55; leftArm.rotation.z += 0.65; }
+          if (leftForeArm) leftForeArm.rotation.y += 0.82;
         }
       }
 
-      // Smoothly blended procedural character action overlays on top of skeletal clips
+      // Proper seated pose inside SAR 4x4 vehicle (works for both Mixamo & Bip01!)
+      if (isSeated) {
+        if (spec.mixamo) {
+          if (leftUpLeg) leftUpLeg.rotation.x -= 1.35;
+          if (rightUpLeg) rightUpLeg.rotation.x -= 1.35;
+          if (leftLeg) leftLeg.rotation.x += 1.38;
+          if (rightLeg) rightLeg.rotation.x += 1.38;
+          if (rightArm) rightArm.rotation.x -= 0.48;
+          if (leftArm) leftArm.rotation.x -= 0.48;
+        } else {
+          if (leftUpLeg) leftUpLeg.rotation.z += 1.38;
+          if (rightUpLeg) rightUpLeg.rotation.z += 1.38;
+          if (leftLeg) leftLeg.rotation.z -= 1.42;
+          if (rightLeg) rightLeg.rotation.z -= 1.42;
+          if (rightArm) rightArm.rotation.z += 0.45;
+          if (leftArm) leftArm.rotation.z += 0.45;
+        }
+        return;
+      }
+
+      // Expressive procedural character action overlays
       if (isTalking && w > 0.001) {
         talkClock += safeDt;
         const nod = (Math.sin(talkClock * 2.8) * 0.065 + Math.sin(talkClock * 1.15) * 0.04) * w;
@@ -495,38 +674,27 @@
         const gesture = Math.max(0, Math.sin(talkClock * 2.2));
         if (rightArm) rightArm.rotation.x -= (0.18 + gesture * 0.16) * w;
         if (rightForeArm) rightForeArm.rotation.z += (0.22 + Math.sin(talkClock * 3.1) * 0.14) * w;
-        if (leftArm) leftArm.rotation.x -= (0.10 + Math.cos(talkClock * 1.9) * 0.08) * w;
-        if (leftForeArm) leftForeArm.rotation.z -= (0.14 + Math.cos(talkClock * 2.6) * 0.10) * w;
       } else if (isInspect && w > 0.001) {
         talkClock += safeDt;
         if (spineBone) spineBone.rotation.x += (0.11 + Math.sin(talkClock * 1.6) * 0.02) * w;
         if (headBone) { headBone.rotation.x += 0.16 * w; headBone.rotation.y += Math.sin(talkClock * 1.4) * 0.14 * w; }
         if (rightArm) rightArm.rotation.x -= (0.58 + Math.sin(talkClock * 4.5) * 0.08) * w;
         if (rightForeArm) rightForeArm.rotation.z += (0.38 + Math.cos(talkClock * 5.2) * 0.12) * w;
-        if (leftArm) leftArm.rotation.x -= (0.48 + Math.cos(talkClock * 3.8) * 0.06) * w;
-        if (leftForeArm) leftForeArm.rotation.z -= 0.32 * w;
       } else if (isPoint && w > 0.001) {
         talkClock += safeDt;
         if (headBone) headBone.rotation.y += Math.sin(talkClock * 1.3) * 0.16 * w;
-        if (spineBone) spineBone.rotation.y -= 0.08 * w;
         if (rightArm) rightArm.rotation.x -= (1.05 + Math.sin(talkClock * 2.4) * 0.06) * w;
-        if (rightForeArm) rightForeArm.rotation.z += 0.08 * w;
       } else if (isWave && w > 0.001) {
         talkClock += safeDt;
-        if (headBone) headBone.rotation.z += Math.sin(talkClock * 2.5) * 0.06 * w;
         if (rightArm) rightArm.rotation.x -= 1.35 * w;
         if (rightForeArm) rightForeArm.rotation.z += (0.35 + Math.sin(talkClock * 6.5) * 0.36) * w;
       } else if (isRadio && w > 0.001) {
         talkClock += safeDt;
-        if (headBone) { headBone.rotation.z -= 0.09 * w; headBone.rotation.x += Math.sin(talkClock * 2.2) * 0.04 * w; }
+        if (headBone) headBone.rotation.z -= 0.09 * w;
         if (leftArm) leftArm.rotation.x -= 0.85 * w;
         if (leftForeArm) leftForeArm.rotation.z -= 0.72 * w;
       } else {
         talkClock = 0;
-        if (!isWalking && !isRunning) {
-          if (spineBone) spineBone.rotation.x += Math.sin(age * 1.8) * 0.022;
-          if (headBone) headBone.rotation.y += Math.sin(age * 0.55) * 0.12;
-        }
       }
     }
 
@@ -535,8 +703,7 @@
       if (headBone) {
         root.updateMatrixWorld(true);
         headBone.getWorldPosition(target);
-        // Slightly lift from neck/head pivot to eye center
-        target.y += spec.mixamo ? 0.06 : 0.08;
+        target.y += 0.06;
         return target;
       }
       root.getWorldPosition(target);
@@ -549,7 +716,6 @@
 
   const urlBufferPromises = new Map();
   const templatePromises = new Map();
-  let sharedMixamoPromise = null;
 
   function fetchGlbOnce(url) {
     if (!urlBufferPromises.has(url)) {
@@ -562,7 +728,7 @@
   }
 
   function loadTemplate(THREE, modelType) {
-    const key = MODEL_CATALOG[modelType] ? modelType : 'soldier';
+    const key = resolveKey(modelType);
     if (!templatePromises.has(key)) {
       const spec = MODEL_CATALOG[key];
       const p = fetchGlbOnce(spec.url)
@@ -578,24 +744,12 @@
     return templatePromises.get(key);
   }
 
-  function loadSharedMixamoClips(THREE) {
-    if (!sharedMixamoPromise) {
-      sharedMixamoPromise = loadTemplate(THREE, 'soldier').then(tpl => tpl?.rotationOnlyClips || null);
-    }
-    return sharedMixamoPromise;
-  }
-
-  function attachToActor(THREE, actor, { modelType = 'soldier', tintHex = null, onReady = null } = {}) {
+  function attachToActor(THREE, actor, { modelType = 'specops_male', tintHex = null, armed = false, onReady = null } = {}) {
     if (!THREE || !actor || typeof fetch !== 'function') return;
-    const key = MODEL_CATALOG[modelType] ? modelType : 'soldier';
-    const spec = MODEL_CATALOG[key];
-    const reqs = spec.useSharedMixamoClips
-      ? Promise.all([loadTemplate(THREE, key), loadSharedMixamoClips(THREE)])
-      : Promise.all([loadTemplate(THREE, key), Promise.resolve(null)]);
-
-    reqs.then(([tpl, sharedClips]) => {
-      if (!tpl) return;
-      const inst = instantiateFromTemplate(THREE, tpl, { tintHex, sharedMixamoClips: sharedClips });
+    const key = resolveKey(modelType);
+    loadTemplate(THREE, key).then(tpl => {
+      if (!tpl) return; // Cleanly keep role-specific procedural character when optional Rocketbox GLB isn't downloaded yet
+      const inst = instantiateFromTemplate(THREE, tpl, { tintHex, armed });
       actor.add(inst.root);
       if (typeof onReady === 'function') onReady(inst);
     }).catch(() => {});
@@ -603,16 +757,13 @@
 
   function preloadAll(THREE) {
     if (!THREE || typeof fetch !== 'function') return Promise.resolve();
-    return Promise.all([
-      loadTemplate(THREE, 'soldier'),
-      loadTemplate(THREE, 'female'),
-      loadTemplate(THREE, 'civilian'),
-    ]).catch(() => {});
+    return Promise.all(Object.keys(MODEL_CATALOG).map(k => loadTemplate(THREE, k))).catch(() => {});
   }
 
   if (typeof window !== 'undefined') {
     window.SaltlineNpcModels = {
       catalog: MODEL_CATALOG,
+      aliases: ALIASES,
       attachToActor,
       preloadAll,
     };

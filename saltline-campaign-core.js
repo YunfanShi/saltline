@@ -16,7 +16,7 @@
       id: 'lin',
       nameEn: 'Lin', nameZh: '林恩',
       roleEn: 'Emergency Response Specialist', roleZh: '城市应急行动队年轻成员',
-      modelType: 'soldier', coat: 0x2c5c75,
+      modelType: 'specops_male', armed: true, coat: 0x2c5c75,
       personalityZh: '专注、观察力敏锐、有责任感；从机械执行调度命令，逐步成长为敢于质疑并独立作出艰难判断的现场核心。',
       personalityEn: 'Observant and principled; evolves from following dispatch orders into making independent crisis decisions.',
       goalZh: '在通讯断绝与基础设施连锁崩溃中，找到失联人员、查清事故根源并守住城市底线。',
@@ -29,7 +29,7 @@
       id: 'mara',
       nameEn: 'Mara', nameZh: '玛拉',
       roleEn: 'Senior Port & Grid Infrastructure Engineer', roleZh: '港口与市政基础设施资深工程师',
-      modelType: 'female', coat: 0x3b7a78,
+      modelType: 'specops_female', armed: true, coat: 0x3b7a78,
       personalityZh: '冷静务实、技术过硬、对隐患零容忍；在高压现场总能把复杂工程故障拆解成可执行的步骤。',
       personalityEn: 'Pragmatic, technically sharp, zero tolerance for negligence; turns complex grid failures into actionable steps.',
       goalZh: '阻止海底沉降引发的港口、电网与地下管廊连锁坍塌，并公开被压下三年的工程预警报告。',
@@ -42,7 +42,7 @@
       id: 'harris',
       nameEn: 'Harris', nameZh: '哈里斯',
       roleEn: 'Former Chief Municipal Engineer', roleZh: '前市政总工程师（核心知情者）',
-      modelType: 'civilian', coat: 0x6b5a48,
+      modelType: 'civilian_male', armed: false, coat: 0x6b5a48,
       personalityZh: '内敛、背负愧疚、极度谨慎；当年因妥协签下延期维修方案而引咎辞职，如今决心用行动赎罪。',
       personalityEn: 'Guilt-ridden yet resolute former chief engineer who knows the buried truth behind the infrastructure failure.',
       goalZh: '交出原始地质沉降监测数据，在地下管廊与外海平台彻底失控前补救当年的错误。',
@@ -55,7 +55,7 @@
       id: 'ward',
       nameEn: 'Ward', nameZh: '沃德',
       roleEn: 'Director of Emergency Operations', roleZh: '盐线市应急行动总负责人',
-      modelType: 'soldier', coat: 0x2d3a45,
+      modelType: 'commander', armed: true, coat: 0x2d3a45,
       personalityZh: '强硬、习惯从全局与次生灾害风险做冷酷权衡；并非纯粹反派，而是被困在安全、资源与政治压力间的指挥官。',
       personalityEn: 'Stern operations commander balancing public safety, scarce resources, and institutional pressure.',
       goalZh: '在有限救援力量下尽量压低伤亡、维持城市秩序，防止恐慌引发更大规模的踩踏与断电。',
@@ -68,7 +68,7 @@
       id: 'chen',
       nameEn: 'Chen', nameZh: '陈明',
       roleEn: 'Rail & Transit Operations Chief', roleZh: '西区铁路与城市交通调度主管',
-      modelType: 'civilian', coat: 0x8a5b32,
+      modelType: 'worker_male', armed: false, coat: 0x8a5b32,
       personalityZh: '经验老到、嘴硬心软、在混乱中自带冷幽默；把每一列火车和每一位乘客都当成自己的责任。',
       personalityEn: 'Veteran rail dispatcher with dry humor who treats every train and commuter as his personal charge.',
       goalZh: '疏通断裂的铁路与高架撤离走廊，把滞留乘客与救援物资送出危险区。',
@@ -81,7 +81,7 @@
       id: 'linwan',
       nameEn: 'Lin Wan', nameZh: '林婉',
       roleEn: 'Lead Field Medic & Evacuation Coordinator', roleZh: '前线医疗与市民疏散协调官',
-      modelType: 'female', coat: 0x457c79,
+      modelType: 'medic_female', armed: false, coat: 0x457c79,
       personalityZh: '温柔却极其果断、面对危重伤员和恐慌人群从不退缩；代表普通盐线市民最直接的生命诉求。',
       personalityEn: 'Compassionate yet decisive field medic who represents the human stakes of every crisis choice.',
       goalZh: '维持停电与洪峰中的临时诊所运作，确保船坞、外海平台与夜城居民全部安全转移。',
@@ -1598,7 +1598,8 @@
         if (!meta) return;
         const human = window.createSaltlineHuman(world.THREE, {
           name: `cast-${cid}`,
-          role: meta.id === 'linwan' ? 'medic' : (meta.id === 'ward' ? 'operator' : 'engineer'),
+          role: meta.id === 'linwan' ? 'medic' : meta.id === 'chen' ? 'worker' : (meta.id === 'mara' || meta.id === 'ward') ? 'operator' : 'engineer',
+          armed: Boolean(meta.armed),
           modelType: meta.modelType,
           coat: meta.coat,
           variation: i % 3,
@@ -1618,6 +1619,7 @@
           homePos: { x: human.actor.position.x, z: human.actor.position.z },
           actionTimer: 2.5 + i * 1.4,
           currentAnim: 'stand',
+          inVehicle: false,
           age: i * 1.3,
           stride: 0,
         });
@@ -1649,10 +1651,37 @@
 
     function update(dt, playerPos, objectivePos) {
       if (!playerPos || !(dt > 0)) return;
+      const veh = world?.vehicle;
+      const playerDriving = Boolean(veh?.driving);
+      let seatIdx = 0;
+      let exitIdx = 0;
       for (const rec of activeActors.values()) {
         rec.age += dt;
         rec.actionTimer -= dt;
         const pos = rec.human.actor.position;
+
+        // Automatically board SAR 4x4 passenger seats when player drives
+        if (playerDriving && rec.behavior !== 'hold') {
+          const seat = typeof veh?.getPassengerSeat === 'function'
+            ? veh.getPassengerSeat(seatIdx++)
+            : { pos: { x: playerPos.x + 0.5, y: playerPos.y + 0.33, z: playerPos.z }, yaw: (world?.player?.yaw || 0) + Math.PI };
+          rec.inVehicle = true;
+          pos.set(seat.pos.x, seat.pos.y, seat.pos.z);
+          rec.human.actor.rotation.y = seat.yaw;
+          rec.currentAnim = 'seated';
+          rec.human.pose('seated', 0, rec.age, false, dt);
+          continue;
+        } else if (rec.inVehicle) {
+          rec.inVehicle = false;
+          const exitPos = typeof veh?.getExitPos === 'function'
+            ? veh.getExitPos(exitIdx++)
+            : { x: playerPos.x + 2.2, y: playerPos.y, z: playerPos.z };
+          pos.set(exitPos.x, exitPos.y, exitPos.z);
+          rec.human.actor.rotation.y = veh?.yaw ?? 0;
+          rec.currentAnim = 'stand';
+          rec.human.pose('stand', 0, rec.age, false, dt);
+          continue;
+        }
         const distPlayer = Math.hypot(playerPos.x - pos.x, playerPos.z - pos.z);
         let target = null;
 

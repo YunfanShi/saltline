@@ -3383,7 +3383,7 @@
     if (typeof window.createSaltlineHuman === 'function') {
       const npcSpecs = [
         {
-          parent: horizonRoot, name: 'city-npc-dock', role: 'worker', modelType: 'civilian', pos: [-31, 0, -21], yaw: .6, variation: 0, patrol: [0, 8],
+          parent: horizonRoot, name: 'city-npc-dock', role: 'worker', modelType: 'worker_male', pos: [-31, 0, -21], yaw: .6, variation: 0, patrol: [0, 8],
           displayName: '老霍克', title: '四号泊位夜班值班员',
           pages: [
             '林恩，你终于来了！别听港务局长里德在广播里胡说——凌晨 05:31 全港断电根本不是什么线路老化！',
@@ -3396,7 +3396,7 @@
           ]
         },
         {
-          parent: city.shell, name: 'city-npc-precinct', role: 'operator', modelType: 'female', pos: [-16.8, .16, -50], yaw: -1.4, variation: 1, patrol: [0, -14],
+          parent: city.shell, name: 'city-npc-precinct', role: 'engineer', modelType: 'civilian_female', pos: [-16.8, .16, -50], yaw: -1.4, variation: 1, patrol: [0, -14],
           displayName: '苏珊', title: '沿海警务 04 号站调度员',
           pages: [
             '嘘——小声点，SAR-04！铁砧刚刚封锁了沿海大道十字路口，正在远程清空我们警务楼里的船员转运和体检档案。',
@@ -3408,7 +3408,7 @@
           ]
         },
         {
-          parent: city.shell, name: 'city-npc-plaza', role: 'worker', modelType: 'civilian', pos: [-6, .28, -149], yaw: 1.57, variation: 2, patrol: [12, 0],
+          parent: city.shell, name: 'city-npc-plaza', role: 'engineer', modelType: 'civilian_male', pos: [-6, .28, -149], yaw: 1.57, variation: 2, patrol: [12, 0],
           displayName: '周先生', title: '滨海广场目击市民',
           pages: [
             '天亮前全城突然黑了一片，我从阳台上看见三辆没挂牌照的装甲卡车拉着封条货箱，一路从沿海大道冲向了西南冷雾库。',
@@ -3419,7 +3419,7 @@
           ]
         },
         {
-          parent: city.shell, name: 'city-npc-promenade', role: 'operator', modelType: 'civilian', pos: [19.8, .30, -112], yaw: 0, variation: 0, patrol: [0, -24],
+          parent: city.shell, name: 'city-npc-promenade', role: 'worker', modelType: 'worker_male', pos: [19.8, .30, -112], yaw: 0, variation: 0, patrol: [0, -24],
           displayName: '老赵', title: '盐线港资深引航员',
           pages: [
             '你看东海那道黑压压的风暴雾墙——东海救援舰队其实已经在雾墙外待命了，但南角 22 米灯塔被铁砧切断了电源。',
@@ -3430,7 +3430,7 @@
           ]
         },
         {
-          parent: swClinic.shell, name: 'city-npc-nurse', role: 'medic', modelType: 'female', pos: [-152, 0, 118], yaw: 1.5, variation: 2, patrol: [0, -8],
+          parent: swClinic.shell, name: 'city-npc-nurse', role: 'medic', modelType: 'medic_female', pos: [-152, 0, 118], yaw: 1.5, variation: 2, patrol: [0, -8],
           displayName: '林婉', title: '西南战地分诊中心护士',
           pages: [
             '托马斯·万斯被铁砧押送路过这里时受了冻伤，趁看守换班，他偷偷把一块受损的水文录音芯片塞进了我的急救箱。',
@@ -3441,7 +3441,7 @@
           ]
         },
         {
-          parent: railWest.shell, name: 'city-npc-rail', role: 'engineer', modelType: 'civilian', pos: [-196, 0, 7.5], yaw: 1.2, variation: 0, patrol: [8, 0],
+          parent: railWest.shell, name: 'city-npc-rail', role: 'worker', modelType: 'worker_male', pos: [-196, 0, 7.5], yaw: 1.2, variation: 0, patrol: [8, 0],
           displayName: '陈师傅', title: '西区铁路编组站老扳道工',
           pages: [
             '铁砧半小时前强行征用了 3 号编组线的货运专列，把全港扣押的原始货单和证物箱全塞进了车厢。',
@@ -3452,7 +3452,7 @@
           ]
         },
         {
-          parent: mountain.shell, name: 'city-npc-comms', role: 'engineer', modelType: 'soldier', pos: [-185, summitY, -75], yaw: 1.6, variation: 1,
+          parent: mountain.shell, name: 'city-npc-comms', role: 'engineer', modelType: 'commander', pos: [-185, summitY, -75], yaw: 1.6, variation: 1,
           displayName: '陆工', title: '西岸山顶卫星站工程师',
           pages: [
             '这座 +14 米山顶雷达站是全盐线市唯一能穿透风暴层直连海事局公频的发射塔。',
@@ -3463,7 +3463,7 @@
           ]
         },
         {
-          parent: southHarbor.shell, name: 'city-npc-keeper', role: 'worker', modelType: 'civilian', pos: [7.5, 0, 131], yaw: -2.2, variation: 2,
+          parent: southHarbor.shell, name: 'city-npc-keeper', role: 'worker', modelType: 'worker_male', pos: [7.5, 0, 131], yaw: -2.2, variation: 2,
           displayName: '老沈', title: '南角灯塔守塔人',
           pages: [
             '我守了三十年南角灯塔，头一回见人往灯塔电源上装军用干扰器。',
@@ -3581,13 +3581,13 @@
     if (typeof window.createPortCompanionAI === 'function') {
       squadAllies.push(
         window.createPortCompanionAI(world, {
-          name: 'Mara Chen', displayName: '玛拉·陈', role: 'medic', modelType: 'female', coat: 0x3b7a78, variation: 1,
+          name: 'Mara Chen', displayName: '玛拉·陈', role: 'operator', modelType: 'specops_female', coat: 0x3b7a78, variation: 1,
           flankOffset: [2.4, -2.0], canHeal: true, fireRate: 1.05,
           startPos: new Vector3(-14, .16, -18),
           onSpeak: (_en, zh) => { storyDirector?.recordStoryEntry?.('玛拉·陈', zh); world.hud?.radio?.(zh, 6.5, null, { speaker: '玛拉·陈', side: 'ally' }); },
         }),
         window.createPortCompanionAI(world, {
-          name: 'Kai', displayName: '凯尔', role: 'operator', modelType: 'soldier', coat: 0x364f6b, variation: 0,
+          name: 'Kai', displayName: '凯尔', role: 'operator', modelType: 'specops_male', coat: 0x364f6b, variation: 0,
           flankOffset: [-2.6, -2.2], canHeal: false, fireRate: 0.85,
           startPos: new Vector3(-18.5, .16, -18.5),
           onSpeak: (_en, zh) => { storyDirector?.recordStoryEntry?.('凯尔', zh); world.hud?.radio?.(zh, 6.5, null, { speaker: '凯尔', side: 'ally' }); },
@@ -3652,9 +3652,26 @@
         ['玛拉·陈', '「记住随时按 [J] 可以翻看案情日志，路边碰到老霍克或苏珊也可以按 [E] 聊聊。」'],
       ];
       let banterIdx = 0;
+      let alliesInVehicle = false;
       updaters.push(dt => {
         if (isMultiplayer()) return;
         const p = world.player;
+        const veh = world.vehicle;
+        if (veh?.driving) {
+          alliesInVehicle = true;
+          for (let i = 0; i < squadAllies.length; i++) {
+            const seat = typeof veh.getPassengerSeat === 'function'
+              ? veh.getPassengerSeat(i)
+              : { pos: veh.pos.clone(), yaw: (veh.yaw || 0) + Math.PI };
+            squadAllies[i].setSeated?.(true, seat.pos, seat.yaw);
+          }
+        } else if (alliesInVehicle) {
+          alliesInVehicle = false;
+          for (let i = 0; i < squadAllies.length; i++) {
+            const exitPos = typeof veh?.getExitPos === 'function' ? veh.getExitPos(i) : p?.pos?.clone?.();
+            squadAllies[i].setSeated?.(false, exitPos, veh?.yaw ?? 0);
+          }
+        }
         for (let i = 0; i < squadAllies.length; i++) squadAllies[i].update(dt, p);
         if (driveBanterCd > 0) driveBanterCd -= dt;
         if (world.vehicle?.driving && driveBanterCd <= 0) {

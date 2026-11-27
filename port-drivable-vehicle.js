@@ -730,12 +730,35 @@
       syncVehicleCollider();
     }
 
+    const PASSENGER_SEAT_OFFSETS = [
+      new Vector3(.46, .33, .12),
+      new Vector3(-.42, .42, 1.28),
+      new Vector3(.42, .42, 1.28),
+    ];
+
+    function getPassengerSeat(slotIdx = 0) {
+      const local = PASSENGER_SEAT_OFFSETS[slotIdx % PASSENGER_SEAT_OFFSETS.length];
+      root.updateMatrixWorld?.(true);
+      const worldPos = root.localToWorld(local.clone());
+      return { pos: worldPos, yaw: yaw + Math.PI };
+    }
+
+    function getExitPos(slotIdx = 0) {
+      const side = slotIdx % 2 === 0 ? 2.4 : -2.4;
+      const along = Math.floor(slotIdx / 2) % 2 === 0 ? 0.5 : -0.9;
+      const x = pos.x + Math.cos(yaw) * side + Math.sin(yaw) * along;
+      const z = pos.z - Math.sin(yaw) * side + Math.cos(yaw) * along;
+      const y = typeof physics?.groundHeight === 'function' ? physics.groundHeight(x, z, pos.y + 1.1) : pos.y;
+      return new Vector3(x, y + .05, z);
+    }
+
     return {
-      update, summonNear, setPosition, setActive, dispose,
+      update, summonNear, setPosition, setActive, dispose, getPassengerSeat, getExitPos,
       get mesh() { return root; },
       isDriving() { return driving; },
       get driving() { return driving; },
       get pos() { return pos; },
+      get yaw() { return yaw; },
     };
   };
 })();

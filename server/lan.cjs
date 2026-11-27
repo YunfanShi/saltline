@@ -41,6 +41,10 @@ const ASSETS = new Set([
   'art/v2-rooftop.jpg', 'art/v2-alley.jpg', 'art/v2-plaza.jpg', 'art/v2-skyline.jpg',
   'art/v2-industrial.jpg', 'art/v2-terrain.jpg', 'art/v2-coastline.jpg', 'art/v2-night.jpg',
   'assets/models/characters/Soldier.glb', 'assets/models/characters/Michelle.glb', 'assets/models/characters/CesiumMan.glb',
+  'assets/models/characters/specops_male.glb', 'assets/models/characters/specops_female.glb',
+  'assets/models/characters/commander.glb', 'assets/models/characters/medic_female.glb',
+  'assets/models/characters/worker_male.glb', 'assets/models/characters/civilian_male.glb',
+  'assets/models/characters/civilian_female.glb',
 ]);
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
