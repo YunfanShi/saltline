@@ -1860,10 +1860,13 @@
           rec.actionTimer = 4.2 + (rec.age % 3.0);
         }
 
-        if ((rec.currentAnim === 'inspect_console' || rec.currentAnim === 'point_ahead') && objectivePos) {
-          rec.human.actor.rotation.y = Math.atan2(objectivePos.x - pos.x, objectivePos.z - pos.z);
-        } else if (distPlayer < 16) {
+        if (rec.behavior === 'talk') {
           rec.human.actor.rotation.y = Math.atan2(playerPos.x - pos.x, playerPos.z - pos.z);
+        } else if (objectivePos) {
+          // Face forward toward the mission objective / tactical perimeter instead of staring at the player!
+          const objYaw = Math.atan2(objectivePos.x - pos.x, objectivePos.z - pos.z);
+          const scan = rec.currentAnim === 'aim_guard' ? Math.sin(rec.age * 0.55) * 0.22 : 0;
+          rec.human.actor.rotation.y = objYaw + scan;
         }
         rec.human.pose(rec.currentAnim, 0, rec.age, false, dt);
       }

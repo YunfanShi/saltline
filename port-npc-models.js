@@ -555,15 +555,20 @@
     if (isArmed && rightHand) {
       const rifle = createTacticalRifle(THREE);
       if (rifle) {
-        // Compensate for bone world scale (Mixamo uses 0.01 cm scale; Bip01 uses meters)
-        const handScale = spec.mixamo ? 100 : 1;
+        // Compute exact compensation for bone world scale (both Mixamo and Rocketbox Bip01 use cm ~0.01 scale!)
+        root.updateMatrixWorld(true);
+        const ws = new THREE.Vector3(1, 1, 1);
+        if (typeof rightHand.getWorldScale === 'function') rightHand.getWorldScale(ws);
+        const avgScale = (Math.abs(ws.x) + Math.abs(ws.y) + Math.abs(ws.z)) / 3;
+        const handScale = avgScale > 0.0005 && avgScale < 0.5 ? (1 / avgScale) : (spec.mixamo ? 100 : 1);
         rifle.scale.setScalar(handScale);
         if (spec.mixamo) {
           rifle.position.set(0, 8, 6);
           rifle.rotation.set(Math.PI / 2, 0, -Math.PI / 2);
         } else {
-          rifle.position.set(0.06, -0.02, 0.04);
-          rifle.rotation.set(0, Math.PI / 2, 0);
+          // Bip01 R Hand: X along fingers, Z roughly forward; offset in cm-scale hand space
+          rifle.position.set(0.08 * handScale, 0.02 * handScale, 0.04 * handScale);
+          rifle.rotation.set(0.15, -0.35, -0.25);
         }
         rightHand.add(rifle);
       }
@@ -612,35 +617,49 @@
         else fadeTo(idleAct, 0.28, isTalking ? 0.85 : 0.9);
         mixer.update(safeDt);
       } else {
-        // Procedural Bip01 skeletal animation (for Microsoft Rocketbox photorealistic characters)
+        // =========================================================================
+        // Verified Rocketbox Bip01 Local Bone Axes (A-pose rest: arms 45 deg down):
+        //   UpperArm: +Y lowers L / -Y lowers R; -Z swings forward (+Z world); +Z swings back
+        //   Forearm:  -Z bends elbow forward/inward
+        //   Thigh:    +Z swings leg forward; Calf: -Z bends knee backward
+        //   Spine2/Head: X = yaw (left/right), Z = pitch (nod), Y = roll (tilt)
+        // =========================================================================
         for (const b of restRot.keys()) resetToRest(b);
+        // Bring both arms gently down from 45 deg A-pose to natural relaxed sides first
+        if (leftArm) leftArm.rotation.y += 0.56;
+        if (rightArm) rightArm.rotation.y -= 0.56;
+
         if (isWalking || isRunning) {
           walkClock += safeDt * (isRunning ? 10.5 : 6.4);
-          const sw = Math.sin(walkClock) * (isRunning ? 0.62 : 0.38);
-          const knL = Math.max(0, -Math.sin(walkClock)) * (isRunning ? 0.85 : 0.52);
-          const knR = Math.max(0, Math.sin(walkClock)) * (isRunning ? 0.85 : 0.52);
+          const sw = Math.sin(walkClock) * (isRunning ? 0.58 : 0.34);
+          const knL = Math.max(0, -Math.sin(walkClock)) * (isRunning ? 0.82 : 0.48);
+          const knR = Math.max(0, Math.sin(walkClock)) * (isRunning ? 0.82 : 0.48);
           if (leftUpLeg) leftUpLeg.rotation.z += sw;
           if (rightUpLeg) rightUpLeg.rotation.z -= sw;
           if (leftLeg) leftLeg.rotation.z -= knL;
           if (rightLeg) rightLeg.rotation.z -= knR;
-          if (spineBone) spineBone.rotation.y += Math.sin(walkClock) * 0.04;
+          if (spineBone) spineBone.rotation.x += Math.sin(walkClock) * 0.04;
           if (!isArmed) {
-            if (leftArm) leftArm.rotation.z -= sw * 0.65;
-            if (rightArm) rightArm.rotation.z += sw * 0.65;
+            if (leftArm) leftArm.rotation.z += sw * 0.55;
+            if (rightArm) rightArm.rotation.z -= sw * 0.55;
+            if (leftForeArm) leftForeArm.rotation.z -= 0.22;
+            if (rightForeArm) rightForeArm.rotation.z -= 0.22;
           }
         } else {
-          // Relaxed natural arms-down posture from T-pose + subtle breathing
-          if (leftArm) leftArm.rotation.x += 1.12;
-          if (rightArm) rightArm.rotation.x -= 1.12;
-          if (spineBone) spineBone.rotation.z += Math.sin(age * 1.8) * 0.018;
-          if (headBone) headBone.rotation.y += Math.sin(age * 0.55) * 0.10;
+          // Subtle breathing & calm perimeter look-around
+          if (spineBone) spineBone.rotation.z += Math.sin(age * 1.8) * 0.015;
+          if (headBone) headBone.rotation.x += Math.sin(age * 0.55) * 0.14;
+          if (!isArmed) {
+            if (leftForeArm) leftForeArm.rotation.z -= 0.16;
+            if (rightForeArm) rightForeArm.rotation.z -= 0.16;
+          }
         }
-        // Rifle-ready hold for armed Special Forces teammates
-        if (isArmed && !isSeated && !hasOverlay) {
-          if (rightArm) { rightArm.rotation.x -= 0.45; rightArm.rotation.z += 0.55; }
-          if (rightForeArm) rightForeArm.rotation.y -= 0.72;
-          if (leftArm) { leftArm.rotation.x += 0.55; leftArm.rotation.z += 0.65; }
-          if (leftForeArm) leftForeArm.rotation.y += 0.82;
+        // Tactical low-ready two-hand rifle hold for armed Special Forces teammates
+        if (isArmed && !isSeated) {
+          if (rightArm) { rightArm.rotation.y -= 0.10; rightArm.rotation.z -= 0.52; }
+          if (rightForeArm) rightForeArm.rotation.z -= 0.88;
+          if (leftArm) { leftArm.rotation.y += 0.12; leftArm.rotation.z -= 0.68; }
+          if (leftForeArm) leftForeArm.rotation.z -= 1.02;
         }
       }
 
@@ -658,13 +677,77 @@
           if (rightUpLeg) rightUpLeg.rotation.z += 1.38;
           if (leftLeg) leftLeg.rotation.z -= 1.42;
           if (rightLeg) rightLeg.rotation.z -= 1.42;
-          if (rightArm) rightArm.rotation.z += 0.45;
-          if (leftArm) leftArm.rotation.z += 0.45;
+          if (rightArm) rightArm.rotation.z -= 0.45;
+          if (leftArm) leftArm.rotation.z -= 0.45;
+          if (rightForeArm) rightForeArm.rotation.z -= 0.55;
+          if (leftForeArm) leftForeArm.rotation.z -= 0.55;
         }
         return;
       }
 
-      // Expressive procedural character action overlays (works for both Mixamo & Rocketbox Bip01)
+      // Expressive procedural character action overlays (calibrated separately for Mixamo vs Rocketbox Bip01)
+      if (!spec.mixamo) {
+        if (isTalking && w > 0.001) {
+          talkClock += safeDt;
+          const nod = (Math.sin(talkClock * 2.8) * 0.065 + Math.sin(talkClock * 1.15) * 0.04) * w;
+          const turn = Math.sin(talkClock * 1.45) * 0.10 * w;
+          if (headBone) { headBone.rotation.z += nod; headBone.rotation.x += turn; }
+          if (spineBone) spineBone.rotation.x += Math.sin(talkClock * 0.85) * 0.04 * w;
+          if (!isArmed && rightArm && rightForeArm) {
+            const g = Math.max(0, Math.sin(talkClock * 2.2));
+            rightArm.rotation.z -= (0.28 + g * 0.18) * w;
+            rightForeArm.rotation.z -= (0.55 + Math.sin(talkClock * 3.1) * 0.14) * w;
+          }
+        } else if (isInspect && w > 0.001) {
+          talkClock += safeDt;
+          if (spineBone) spineBone.rotation.z -= (0.12 + Math.sin(talkClock * 1.8) * 0.025) * w;
+          if (headBone) { headBone.rotation.z -= 0.16 * w; headBone.rotation.x += Math.sin(talkClock * 1.5) * 0.14 * w; }
+          if (!isArmed) {
+            if (rightArm) rightArm.rotation.z -= (0.62 + Math.sin(talkClock * 5.0) * 0.10) * w;
+            if (rightForeArm) rightForeArm.rotation.z -= (0.72 + Math.cos(talkClock * 5.4) * 0.14) * w;
+            if (leftArm) leftArm.rotation.z -= (0.58 + Math.cos(talkClock * 4.6) * 0.10) * w;
+            if (leftForeArm) leftForeArm.rotation.z -= (0.68 + Math.sin(talkClock * 5.0) * 0.14) * w;
+          }
+        } else if (isPoint && w > 0.001) {
+          talkClock += safeDt;
+          if (headBone) headBone.rotation.x += Math.sin(talkClock * 1.2) * 0.12 * w;
+          if (leftArm) { leftArm.rotation.y -= 0.25 * w; leftArm.rotation.z -= (0.85 + Math.sin(talkClock * 2.4) * 0.06) * w; }
+          if (leftForeArm) leftForeArm.rotation.z += (isArmed ? 0.85 : 0.0) * w;
+        } else if (isWave && w > 0.001) {
+          talkClock += safeDt;
+          if (leftArm) { leftArm.rotation.y -= 0.55 * w; leftArm.rotation.z -= (0.95 + Math.sin(talkClock * 6.5) * 0.22) * w; }
+          if (leftForeArm) leftForeArm.rotation.z -= (0.35 + Math.cos(talkClock * 6.5) * 0.20) * w;
+        } else if (isRadio && w > 0.001) {
+          talkClock += safeDt;
+          if (headBone) { headBone.rotation.y -= 0.10 * w; headBone.rotation.z += Math.sin(talkClock * 3.0) * 0.04 * w; }
+          if (leftArm) { leftArm.rotation.y += 0.05 * w; leftArm.rotation.z -= 0.55 * w; }
+          if (leftForeArm) leftForeArm.rotation.z -= 1.15 * w;
+        } else if (isSalute && w > 0.001) {
+          talkClock += safeDt;
+          if (headBone) headBone.rotation.z += 0.04 * w;
+          if (!isArmed && rightArm && rightForeArm) {
+            rightArm.rotation.y += 0.35 * w;
+            rightArm.rotation.z -= 0.92 * w;
+            rightForeArm.rotation.z -= 1.35 * w;
+          } else if (leftArm && leftForeArm) {
+            leftArm.rotation.z -= 0.35 * w;
+            leftForeArm.rotation.z -= 0.45 * w;
+          }
+        } else if (isGuardAim && w > 0.001) {
+          talkClock += safeDt;
+          const scan = Math.sin(talkClock * 1.1) * 0.26 * w;
+          if (spineBone) spineBone.rotation.x += scan * 0.45;
+          if (headBone) headBone.rotation.x += scan;
+          if (isArmed) {
+            if (rightArm) rightArm.rotation.z -= 0.24 * w;
+            if (leftArm) leftArm.rotation.z -= 0.22 * w;
+          }
+        } else {
+          talkClock = 0;
+        }
+        return;
+      }
+
       if (isTalking && w > 0.001) {
         talkClock += safeDt;
         const nod = (Math.sin(talkClock * 2.8) * 0.065 + Math.sin(talkClock * 1.15) * 0.04) * w;
