@@ -2074,7 +2074,7 @@
     spawnShootTarget(jammerRoot, { id: 'anchor-jam-1', stage: 8, labelZh: '南锚地北舷干扰器', pos: new Vector3(12, 0, 74), tall: true, maxHp: 3 });
     spawnShootTarget(jammerRoot, { id: 'anchor-jam-2', stage: 8, labelZh: '南锚地南舷干扰器', pos: new Vector3(18, 0, 96), tall: true, maxHp: 3 });
     spawnShootTarget(jammerRoot, { id: 'highway-sam-1', stage: 10, labelZh: '北段海岸大道防空架 A', pos: new Vector3(-22, 0, -108), tall: true, maxHp: 3 });
-    spawnShootTarget(jammerRoot, { id: 'highway-sam-2', stage: 10, labelZh: '北段海岸大道防空架 B', pos: new Vector3(-54, 0, -126), tall: true, maxHp: 3 });
+    spawnShootTarget(jammerRoot, { id: 'highway-sam-2', stage: 10, labelZh: '北段海岸大道防空架 B', pos: new Vector3(-54, 0, -116.5), tall: true, maxHp: 3 });
 
     // =========================================================================
     // SECTOR 1 (NORTH): COASTAL CITY DOWNTOWN & EAST SEAFRONT PROMENADE (x: -107..+24, z: -145..-30)
