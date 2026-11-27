@@ -11,7 +11,7 @@
     const style = document.createElement('style');
     style.id = 'saltline-campaign-v2-style';
     style.textContent = `
-      .sl-camp2-shell{display:grid;grid-template-columns:240px 1fr;gap:18px;width:min(1140px,95vw);max-height:84vh;margin:0 auto;color:#edf5f8;font-family:system-ui,-apple-system,sans-serif}
+      .sl-camp2-shell{position:relative;z-index:2;pointer-events:auto;display:grid;grid-template-columns:240px 1fr;gap:18px;width:min(1140px,95vw);max-height:84vh;margin:0 auto;color:#edf5f8;font-family:system-ui,-apple-system,sans-serif}
       @media(max-width:860px){.sl-camp2-shell{grid-template-columns:1fr;max-height:88vh;overflow:auto}}
       .sl-camp2-nav{display:flex;flex-direction:column;gap:8px;background:rgba(10,16,22,.88);border:1px solid rgba(110,185,220,.26);border-radius:8px;padding:14px}
       .sl-camp2-brand{font-size:11px;font-weight:800;letter-spacing:.22em;color:#f2c45a;margin-bottom:2px}
@@ -51,7 +51,7 @@
       .sl-high-contrast .sl-chud{background:#000;border-color:#fff;border-left-color:#ffd700}
 
       /* Chapter Transition Overlay */
-      .sl-trans{position:fixed;inset:0;z-index:58;background:rgba(5,9,14,.92);display:none;align-items:center;justify-content:center;padding:24px;color:#f2f7fa;font-family:system-ui,-apple-system,sans-serif}
+      .sl-trans{position:fixed;inset:0;z-index:58;pointer-events:auto;background:rgba(5,9,14,.92);display:none;align-items:center;justify-content:center;padding:24px;color:#f2f7fa;font-family:system-ui,-apple-system,sans-serif}
       .sl-trans.on{display:flex}
       .sl-trans-card{width:min(640px,92vw);background:#0d161f;border:1px solid rgba(242,196,90,.45);border-top:3px solid #f2c45a;border-radius:8px;padding:24px 28px;box-shadow:0 24px 60px rgba(0,0,0,.78)}
       .sl-trans-k{font:800 11px/1 ui-monospace,monospace;letter-spacing:.2em;color:#f2c45a;margin-bottom:8px}
@@ -100,35 +100,35 @@
         <aside class="sl-camp2-nav">
           <div class="sl-camp2-brand">SALTLINE CRISIS · 14 CHAPTERS</div>
           <h2 class="sl-camp2-title">${local('Saltline Crisis', '《盐线危机》战役')}</h2>
-          <button type="button" class="sl-camp2-navbtn primary" data-act="continue" ${hasProgress ? '' : 'disabled'}>
+          <button type="button" class="sl-camp2-navbtn primary" data-v2act="continue" ${hasProgress ? '' : 'disabled'}>
             <span>${local('Continue Campaign', '继续战役')}</span>
             <span>${curCh ? 'CH ' + String(curCh.number).padStart(2, '0') : ''}</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn" data-act="new">
+          <button type="button" class="sl-camp2-navbtn" data-v2act="new">
             <span>${local('New Campaign', '开始新战役')}</span><span>▶</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn ${activeTab === 'chapters' ? 'active' : ''}" data-tab="chapters">
+          <button type="button" class="sl-camp2-navbtn ${activeTab === 'chapters' ? 'active' : ''}" data-v2tab="chapters">
             <span>${local('Chapter Select', '章节选择')}</span><span>${completedSet.size}/${campaignV2.chapters.length}</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn ${activeTab === 'characters' ? 'active' : ''}" data-tab="characters">
+          <button type="button" class="sl-camp2-navbtn ${activeTab === 'characters' ? 'active' : ''}" data-v2tab="characters">
             <span>${local('Characters', '主要角色')}</span><span>${campaignV2.characters.length}</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn ${activeTab === 'difficulty' ? 'active' : ''}" data-tab="difficulty">
+          <button type="button" class="sl-camp2-navbtn ${activeTab === 'difficulty' ? 'active' : ''}" data-v2tab="difficulty">
             <span>${local('Difficulty', '难度设置')}</span><span>${(campaignV2.difficulties[slot.difficulty] || campaignV2.difficulties.tactical).nameZh}</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn ${activeTab === 'saves' ? 'active' : ''}" data-tab="saves">
+          <button type="button" class="sl-camp2-navbtn ${activeTab === 'saves' ? 'active' : ''}" data-v2tab="saves">
             <span>${local('Save Management', '存档管理')}</span><span>槽位 ${slotId + 1}</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn ${activeTab === 'accessibility' ? 'active' : ''}" data-tab="accessibility">
+          <button type="button" class="sl-camp2-navbtn ${activeTab === 'accessibility' ? 'active' : ''}" data-v2tab="accessibility">
             <span>${local('Accessibility', '无障碍辅助')}</span><span>⚙</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn ${activeTab === 'recap' ? 'active' : ''}" data-tab="recap">
+          <button type="button" class="sl-camp2-navbtn ${activeTab === 'recap' ? 'active' : ''}" data-v2tab="recap">
             <span>${local('Story Recap', '剧情回顾')}</span><span>📖</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn" data-act="training">
+          <button type="button" class="sl-camp2-navbtn" data-v2act="training">
             <span>${local('Training', '应急训练场')}</span><span>🎯</span>
           </button>
-          <button type="button" class="sl-camp2-navbtn" data-act="freeroam" ${slot.freeRoamUnlocked ? '' : 'title="通关第十四章后正式解锁，亦可随时试玩自由探索"'}>
+          <button type="button" class="sl-camp2-navbtn" data-v2act="freeroam" ${slot.freeRoamUnlocked ? '' : 'title="通关第十四章后正式解锁，亦可随时试玩自由探索"'}>
             <span>${local('Post-Campaign Free Roam', '战役后自由探索')}</span><span>${slot.freeRoamUnlocked ? '🔓' : '🌏'}</span>
           </button>
           <div style="margin-top:auto;font-size:11px;color:#84a7b5;line-height:1.45;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)">
@@ -170,11 +170,12 @@
                 </article>`;
             }).join('')}
           </div>`;
-        panel.querySelector('[data-play-selected]')?.addEventListener('click', () => {
+        panel.querySelector('[data-play-selected]')?.addEventListener('click', ev => {
+          ev.stopPropagation();
           onLaunchChapter?.(sel.id, { objectiveIndex: 0 });
         });
         panel.querySelectorAll('[data-ch]').forEach(el => {
-          el.addEventListener('click', () => { selectedChapterId = el.dataset.ch; render(); });
+          el.addEventListener('click', ev => { ev.stopPropagation(); selectedChapterId = el.dataset.ch; render(); });
         });
       } else if (activeTab === 'characters') {
         panel.innerHTML = `
@@ -275,21 +276,24 @@
             </div>`).join('') : '<div class="sl-camp2-row">尚未完成任何章节。点击左侧「开始新战役」即可从第一章《最后一个正常的早晨》启程。</div>'}`;
       }
 
-      container.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => {
-        activeTab = b.dataset.tab;
+      container.querySelectorAll('[data-v2tab]').forEach(b => b.addEventListener('click', ev => {
+        ev.stopPropagation();
+        activeTab = b.dataset.v2tab;
         render();
       }));
-      container.querySelector('[data-act="continue"]')?.addEventListener('click', () => {
+      container.querySelector('[data-v2act="continue"]')?.addEventListener('click', ev => {
+        ev.stopPropagation();
         const s = campaignV2.saveMgr.getSlot();
         onLaunchChapter?.(s.currentChapterId || 'ch01', { objectiveIndex: s.currentObjectiveIdx || 0 });
       });
-      container.querySelector('[data-act="new"]')?.addEventListener('click', () => {
+      container.querySelector('[data-v2act="new"]')?.addEventListener('click', ev => {
+        ev.stopPropagation();
         const s = campaignV2.saveMgr.startNewCampaign(slotId, slot.difficulty);
         selectedChapterId = s.currentChapterId;
         onLaunchChapter?.('ch01', { objectiveIndex: 0 });
       });
-      container.querySelector('[data-act="training"]')?.addEventListener('click', () => onLaunchTraining?.());
-      container.querySelector('[data-act="freeroam"]')?.addEventListener('click', () => onLaunchFreeRoam?.());
+      container.querySelector('[data-v2act="training"]')?.addEventListener('click', ev => { ev.stopPropagation(); onLaunchTraining?.(); });
+      container.querySelector('[data-v2act="freeroam"]')?.addEventListener('click', ev => { ev.stopPropagation(); onLaunchFreeRoam?.(); });
     }
 
     // Focused HUD & Chapter Transition Card

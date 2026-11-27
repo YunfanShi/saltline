@@ -7379,10 +7379,10 @@ if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
   const menuV2=window.mountSaltlineCampaignMenuV2(campHost,{
    campaignV2,
    onLaunchChapter:(chapterId,opts={})=>{
+    if(currentChapter!=='berth'){location.href='?chapter=berth&v2='+encodeURIComponent(chapterId);return;}
     cleanupMultiplayerSession();
     window.SALTLINE_OPEN_WORLD_ROAM=false;
     window.SALTLINE_CAMPAIGN_V2_ACTIVE=true;
-    currentChapter='berth';
     mode='mission';
     a(i.audio,'resume');
     const started=campaignV2.startChapter(chapterId,opts);
