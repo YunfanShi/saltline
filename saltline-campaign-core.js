@@ -1491,21 +1491,30 @@
       if (panelEl || typeof document === 'undefined') return panelEl;
       panelEl = document.createElement('div');
       panelEl.id = 'sl-v2-npc-cmd';
-      panelEl.style.cssText = 'position:fixed;right:24px;top:50%;transform:translateY(-50%);z-index:38;width:276px;background:rgba(10,16,22,.92);border:1px solid rgba(246,216,118,.48);border-radius:10px;padding:12px 14px;color:#edf5f8;font-family:system-ui,-apple-system,sans-serif;box-shadow:0 12px 32px rgba(0,0,0,.62);display:none;pointer-events:auto;';
+      panelEl.style.cssText = 'position:fixed;right:3.5vw;top:50%;transform:translateY(-50%);z-index:38;width:min(340px,42vw);padding:0;color:#f4f7fa;font-family:system-ui,-apple-system,"PingFang SC",sans-serif;display:none;pointer-events:auto;';
       panelEl.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.12);">
-          <div style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#f6d876;">[H] 队友行动指令</div>
-          <div style="font-size:11px;color:rgba(218,234,240,.6);">按 1-5 或点击</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;margin-bottom:8px;background:linear-gradient(90deg,rgba(10,15,24,.84) 0%,rgba(10,15,24,.48) 78%,rgba(10,15,24,0) 100%);border-left:2px solid #f3d284;border-bottom:1px solid rgba(243,210,132,.28);backdrop-filter:blur(10px);">
+          <div style="font-size:12.5px;font-weight:700;letter-spacing:.14em;color:#f3d284;">◆ 战术小队指令</div>
+          <div style="font-size:11px;color:rgba(224,234,244,.66);">[1-5] / [H] 关闭</div>
         </div>
-        <div data-cmd-list style="display:flex;flex-direction:column;gap:6px;"></div>
-        <div data-cmd-status style="margin-top:8px;font-size:11px;color:#7de0f5;"></div>`;
+        <div data-cmd-list style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div data-cmd-status style="margin-top:9px;padding:5px 12px;font-size:11px;color:#f3d284;letter-spacing:.05em;background:linear-gradient(90deg,rgba(10,15,24,.68) 0%,rgba(10,15,24,0) 100%);"></div>`;
       const list = panelEl.querySelector('[data-cmd-list]');
       for (const cmd of NPC_COMMAND_PRESETS) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.dataset.npcOrder = cmd.id;
-        btn.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:6px;color:#eef6f8;cursor:pointer;font-size:12px;';
-        btn.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:rgba(246,216,118,.2);color:#f6d876;font-weight:700;flex:none;">${cmd.key}</span><span><strong style="display:block;font-size:12px;">${cmd.labelZh}</strong><span style="font-size:10px;color:rgba(218,234,240,.68);">${cmd.descZh}</span></span>`;
+        btn.style.cssText = 'display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 14px;background:linear-gradient(90deg,rgba(12,17,26,.86) 0%,rgba(12,17,26,.64) 74%,rgba(12,17,26,.16) 100%);backdrop-filter:blur(10px);border:none;border-top:1px solid rgba(255,255,255,.18);border-bottom:1px solid rgba(255,255,255,.14);border-left:2px solid rgba(243,210,132,.48);color:#f3f6fa;cursor:pointer;font-size:13px;transition:transform .16s ease,background .16s ease,border-color .16s ease;box-shadow:0 6px 20px rgba(0,0,0,.34);';
+        btn.innerHTML = `<span data-cmd-key style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;background:rgba(255,255,255,.92);color:#0b1018;font-weight:800;font-size:11.5px;flex:none;">${cmd.key}</span><span style="flex:1;"><strong style="display:block;font-size:13px;font-weight:600;letter-spacing:.04em;">${cmd.labelZh}</strong><span style="font-size:11px;color:rgba(218,230,240,.68);">${cmd.descZh}</span></span>`;
+        btn.addEventListener('mouseenter', () => {
+          btn.style.transform = 'translateX(-7px)';
+          btn.style.borderLeftColor = '#f3d284';
+          btn.style.borderTopColor = 'rgba(243,210,132,.78)';
+        });
+        btn.addEventListener('mouseleave', () => {
+          btn.style.transform = 'translateX(0)';
+          refreshStatus();
+        });
         btn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           issueOrder(cmd.id);
@@ -1524,13 +1533,19 @@
       const orderMeta = NPC_COMMAND_PRESETS.find(c => c.id === lastOrderId);
       if (st) {
         st.textContent = cast.length
-          ? `当前小队 (${cast.length}人) · 执行：${orderMeta?.labelZh || lastOrderId}`
+          ? `◆ 当前小队 (${cast.length}人) · 执行中：${orderMeta?.labelZh || lastOrderId}`
           : '当前章节暂无可指挥队友';
       }
       for (const btn of panelEl.querySelectorAll('[data-npc-order]')) {
         const active = btn.dataset.npcOrder === lastOrderId;
-        btn.style.borderColor = active ? '#f6d876' : 'rgba(255,255,255,.14)';
-        btn.style.background = active ? 'rgba(246,216,118,.16)' : 'rgba(255,255,255,.06)';
+        btn.style.borderLeftColor = active ? '#f3d284' : 'rgba(243,210,132,.42)';
+        btn.style.borderTopColor = active ? 'rgba(243,210,132,.75)' : 'rgba(255,255,255,.18)';
+        btn.style.borderBottomColor = active ? 'rgba(243,210,132,.65)' : 'rgba(255,255,255,.14)';
+        btn.style.background = active
+          ? 'linear-gradient(90deg,rgba(243,210,132,.26) 0%,rgba(22,30,42,.80) 76%,rgba(12,17,26,.22) 100%)'
+          : 'linear-gradient(90deg,rgba(12,17,26,.86) 0%,rgba(12,17,26,.64) 74%,rgba(12,17,26,.16) 100%)';
+        const keyBadge = btn.querySelector('[data-cmd-key]');
+        if (keyBadge) keyBadge.style.background = active ? '#f3d284' : 'rgba(255,255,255,.92)';
       }
     }
 
@@ -1618,7 +1633,10 @@
           emotion: 'focused',
           homePos: { x: human.actor.position.x, z: human.actor.position.z },
           actionTimer: 2.5 + i * 1.4,
-          currentAnim: 'stand',
+          ackTimer: 0,
+          ackAnim: null,
+          patrolAngle: i * 1.6,
+          currentAnim: 'aim_guard',
           inVehicle: false,
           age: i * 1.3,
           stride: 0,
@@ -1636,11 +1654,22 @@
       }
     }
 
+    const ORDER_ACK_ANIMS = {
+      follow: 'wave_follow',
+      operate_objective: 'point_ahead',
+      hold: 'salute',
+      patrol_area: 'radio_call',
+      radio_report: 'radio_call',
+    };
+
     function issueSquadOrder(behavior) {
       let count = 0;
       for (const rec of activeActors.values()) {
         rec.behavior = behavior;
         rec.actionTimer = 0;
+        rec.ackTimer = 1.65;
+        rec.ackAnim = ORDER_ACK_ANIMS[behavior] || 'salute';
+        rec.currentAnim = rec.ackAnim;
         if (behavior === 'patrol_area' || behavior === 'hold') {
           rec.homePos = { x: rec.human.actor.position.x, z: rec.human.actor.position.z };
         }
@@ -1678,29 +1707,44 @@
             : { x: playerPos.x + 2.2, y: playerPos.y, z: playerPos.z };
           pos.set(exitPos.x, exitPos.y, exitPos.z);
           rec.human.actor.rotation.y = veh?.yaw ?? 0;
-          rec.currentAnim = 'stand';
-          rec.human.pose('stand', 0, rec.age, false, dt);
+          rec.currentAnim = 'aim_guard';
+          rec.human.pose('aim_guard', 0, rec.age, false, dt);
           continue;
         }
+
+        // Immediate visible tactical hand-signal acknowledgment on [H] squad order
+        if (rec.ackTimer > 0 && rec.ackAnim) {
+          rec.ackTimer -= dt;
+          rec.currentAnim = rec.ackAnim;
+          if (rec.ackAnim === 'point_ahead' && objectivePos) {
+            rec.human.actor.rotation.y = Math.atan2(objectivePos.x - pos.x, objectivePos.z - pos.z);
+          } else {
+            rec.human.actor.rotation.y = Math.atan2(playerPos.x - pos.x, playerPos.z - pos.z);
+          }
+          rec.human.pose(rec.currentAnim, 0, rec.age, false, dt);
+          continue;
+        }
+
         const distPlayer = Math.hypot(playerPos.x - pos.x, playerPos.z - pos.z);
         let target = null;
 
         if (rec.behavior === 'follow') {
-          if (distPlayer > 4.6) target = playerPos;
+          if (distPlayer > 4.2) target = playerPos;
         } else if ((rec.behavior === 'lead' || rec.behavior === 'operate_objective') && objectivePos) {
           target = objectivePos;
         } else if (rec.behavior === 'patrol_area') {
-          const px = rec.homePos.x + Math.cos(rec.age * 0.35) * 4.5;
-          const pz = rec.homePos.z + Math.sin(rec.age * 0.35) * 4.5;
-          if (Math.hypot(px - pos.x, pz - pos.z) > 0.6) target = { x: px, z: pz };
+          rec.patrolAngle = (rec.patrolAngle || 0) + dt * 0.42;
+          const px = rec.homePos.x + Math.cos(rec.patrolAngle) * 6.5;
+          const pz = rec.homePos.z + Math.sin(rec.patrolAngle) * 6.5;
+          if (Math.hypot(px - pos.x, pz - pos.z) > 0.45) target = { x: px, z: pz };
         }
 
         if (target) {
           const dx = target.x - pos.x, dz = target.z - pos.z;
           const d = Math.hypot(dx, dz);
-          const stopDist = rec.behavior === 'patrol_area' ? 0.35 : 2.2;
+          const stopDist = rec.behavior === 'patrol_area' ? 0.35 : 2.1;
           if (d > stopDist) {
-            const run = d > 9.0;
+            const run = rec.behavior === 'operate_objective' ? d > 4.5 : d > 8.0;
             const spd = Math.min(d - stopDist * 0.5, dt * (run ? 5.6 : 3.2));
             pos.x += (dx / d) * spd;
             pos.z += (dz / d) * spd;
@@ -1715,20 +1759,26 @@
         if (rec.behavior === 'talk') {
           rec.currentAnim = 'talk';
         } else if (rec.behavior === 'hold') {
-          rec.currentAnim = 'stand';
+          rec.currentAnim = 'aim_guard';
         } else if (rec.behavior === 'radio_report') {
-          rec.currentAnim = Math.floor(rec.age / 2.5) % 2 === 0 ? 'radio_call' : 'point_ahead';
+          rec.currentAnim = Math.floor(rec.age / 2.4) % 2 === 0 ? 'radio_call' : 'point_ahead';
         } else if (rec.behavior === 'inspect_console' || rec.behavior === 'operate_objective') {
           if (distPlayer < 5.5 && rec.actionTimer <= 0) {
             rec.currentAnim = rec.currentAnim === 'point_ahead' ? 'inspect_console' : 'point_ahead';
-            rec.actionTimer = 4.2;
+            rec.actionTimer = 4.0;
           } else if (distPlayer >= 5.5 || rec.behavior === 'operate_objective') {
             rec.currentAnim = 'inspect_console';
           }
+        } else if (rec.behavior === 'follow') {
+          if (rec.actionTimer <= 0) {
+            const pool = ['aim_guard', 'aim_guard', 'radio_call', 'point_ahead'];
+            rec.currentAnim = pool[Math.floor((rec.age * 10) % pool.length)];
+            rec.actionTimer = 3.8 + (rec.age % 2.8);
+          }
         } else if (rec.actionTimer <= 0) {
-          const pool = distPlayer < 7 ? ['wave_follow', 'point_ahead', 'radio_call', 'talk'] : ['radio_call', 'stand'];
+          const pool = distPlayer < 7 ? ['wave_follow', 'point_ahead', 'radio_call', 'aim_guard'] : ['aim_guard', 'radio_call'];
           rec.currentAnim = pool[Math.floor((rec.age * 10) % pool.length)];
-          rec.actionTimer = 4.5 + (rec.age % 3.5);
+          rec.actionTimer = 4.2 + (rec.age % 3.0);
         }
 
         if ((rec.currentAnim === 'inspect_console' || rec.currentAnim === 'point_ahead') && objectivePos) {

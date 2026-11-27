@@ -657,18 +657,25 @@
       const seated = mode === 'seated';
       const parachute = mode === 'parachute';
       const talking = mode === 'talk';
+      const waving = mode === 'wave_follow';
+      const pointing = mode === 'point_ahead';
+      const radioCall = mode === 'radio_call';
+      const inspecting = mode === 'inspect_console';
+      const saluting = mode === 'salute';
+      const guardAim = mode === 'aim_guard';
       const aiming = mode === 'aim' || (armed && crouched);
       const breath = Math.sin(age * 2.2) * .006;
+      const scanYaw = Math.sin(age * 1.15) * .36;
       torso.position.y = crouched ? .65 : seated ? .66 : parachute ? .95 : .95 + Math.abs(Math.sin(stride)) * .022 + breath;
       torso.rotation.set(
-        crouched ? .18 : seated ? .08 : parachute ? .06 : aiming ? .05 : talking ? .04 + Math.sin(age * 2.1) * .02 : .03,
-        aiming ? -.18 : talking ? Math.sin(age * 1.1) * .06 : (moving ? Math.sin(stride) * .045 : 0),
-        crouched ? -.04 : Math.sin(age * 1.7) * .01,
+        crouched ? .18 : seated ? .08 : parachute ? .06 : inspecting ? .16 + Math.sin(age * 2.4) * .02 : (aiming || guardAim) ? .06 : talking ? .04 + Math.sin(age * 2.1) * .02 : .03,
+        aiming ? -.18 : guardAim ? -.14 + scanYaw * .45 : pointing ? -.12 : talking ? Math.sin(age * 1.1) * .06 : (moving ? Math.sin(stride) * .045 : 0),
+        crouched ? -.04 : waving ? -.05 + Math.sin(age * 6.0) * .03 : Math.sin(age * 1.7) * .01,
       );
       head.rotation.set(
-        crouched ? -.14 : parachute ? -.25 : talking ? Math.sin(age * 2.8) * .07 - .02 : -.03,
-        aiming ? .16 : talking ? Math.sin(age * 1.45) * .10 : Math.sin(age * .8) * .15,
-        talking ? Math.sin(age * 1.1) * .05 : 0,
+        crouched ? -.14 : parachute ? -.25 : inspecting ? .24 : radioCall ? .06 + Math.sin(age * 3.2) * .04 : talking ? Math.sin(age * 2.8) * .07 - .02 : -.03,
+        aiming ? .16 : guardAim ? scanYaw : inspecting ? Math.sin(age * 1.8) * .16 : talking ? Math.sin(age * 1.45) * .10 : Math.sin(age * .8) * .15,
+        radioCall ? -.16 : talking ? Math.sin(age * 1.1) * .05 : 0,
       );
       limbs.forEach(({ shoulder, elbow, hip, knee, sign }, index) => {
         const swing = moving ? Math.sin(stride + index * Math.PI) : 0;
@@ -678,6 +685,58 @@
           hip.position.y = .95;
           hip.rotation.set(-.32, 0, sign * .06);
           knee.rotation.set(.58, 0, 0);
+        } else if (waving) {
+          if (index === 1) {
+            shoulder.rotation.set(-2.65, 0, .28 + Math.sin(age * 7.5) * .36);
+            elbow.rotation.set(-.45 + Math.cos(age * 7.5) * .25, 0, 0);
+          } else {
+            shoulder.rotation.set(-.18, 0, -.12);
+            elbow.rotation.set(-.25, 0, 0);
+          }
+          hip.position.y = .95; hip.rotation.set(0, 0, 0); knee.rotation.set(0, 0, 0);
+        } else if (pointing) {
+          if (index === 1) {
+            shoulder.rotation.set(-1.52 + Math.sin(age * 2.8) * .06, -.08, .08);
+            elbow.rotation.set(-.08, 0, 0);
+          } else {
+            shoulder.rotation.set(-.28, 0, -.12);
+            elbow.rotation.set(-.42, 0, 0);
+          }
+          hip.position.y = .95; hip.rotation.set(0, 0, 0); knee.rotation.set(0, 0, 0);
+        } else if (radioCall) {
+          if (index === 0) {
+            shoulder.rotation.set(-1.35, .38, -.32);
+            elbow.rotation.set(-1.68, 0, 0);
+          } else {
+            shoulder.rotation.set(armed ? -.58 : -.16, 0, .10);
+            elbow.rotation.set(armed ? -.68 : -.28, 0, 0);
+          }
+          hip.position.y = .95; hip.rotation.set(0, 0, 0); knee.rotation.set(0, 0, 0);
+        } else if (inspecting) {
+          const work = Math.sin(age * 5.2 + index * Math.PI);
+          shoulder.rotation.set(-.88 - work * .18, index === 1 ? -.16 : .16, sign * .08);
+          elbow.rotation.set(-.86 + work * .22, 0, 0);
+          hip.position.y = .95; hip.rotation.set(-.06, 0, 0); knee.rotation.set(.10, 0, 0);
+        } else if (saluting) {
+          if (index === 1) {
+            shoulder.rotation.set(-1.72, -.22, .38);
+            elbow.rotation.set(-1.82, 0, 0);
+          } else {
+            shoulder.rotation.set(-.08, 0, -.08);
+            elbow.rotation.set(-.18, 0, 0);
+          }
+          hip.position.y = .95; hip.rotation.set(0, 0, 0); knee.rotation.set(0, 0, 0);
+        } else if (guardAim) {
+          if (armed) {
+            shoulder.rotation.set(index === 1 ? -1.06 : -.96, index === 1 ? -.10 : .32, sign * .06);
+            elbow.rotation.set(index === 1 ? -.44 : -.72, 0, 0);
+          } else {
+            shoulder.rotation.set(-.34, 0, sign * .12);
+            elbow.rotation.set(-.58, 0, 0);
+          }
+          hip.position.y = .95;
+          hip.rotation.set(index === 0 ? -.10 : .08, 0, sign * .04);
+          knee.rotation.set(.14, 0, 0);
         } else if (talking) {
           const gesture = Math.sin(age * 2.4 + index * 1.3);
           shoulder.rotation.set(-.26 - Math.max(0, gesture) * .28, index === 1 ? -.10 : .10, sign * .10);

@@ -41,22 +41,23 @@
       .sl-camp2-btn.gold{background:#f2c45a;border-color:#f2c45a;color:#0b1116}
       .sl-camp2-btn.danger{background:rgba(239,68,68,.18);border-color:rgba(248,113,113,.5);color:#fecaca}
 
-      /* Focused Campaign V2 HUD (positioned cleanly below the top-left minimap) */
-      .sl-chud{position:fixed;left:18px;top:146px;z-index:21;width:min(350px,42vw);background:rgba(8,14,20,.86);border:1px solid rgba(110,196,225,.34);border-left:3px solid #f2c45a;border-radius:6px;padding:10px 14px;color:#edf5f8;font-family:system-ui,-apple-system,sans-serif;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.45);display:none}
+      /* Wuthering Waves-Inspired Sleek Frameless Campaign V2 HUD */
+      .sl-chud{position:fixed;left:20px;top:148px;z-index:21;width:min(360px,42vw);background:linear-gradient(90deg,rgba(8,12,18,.78) 0%,rgba(8,12,18,.44) 76%,rgba(8,12,18,0) 100%);backdrop-filter:blur(6px);border:none;border-left:2px solid #f3d284;padding:10px 16px 10px 14px;color:#f2f6fb;font-family:system-ui,-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;pointer-events:none;display:none;transition:opacity .25s ease}
       .sl-chud.on{display:block}
-      .sl-chud-kicker{font:800 10.5px/1 ui-monospace,monospace;letter-spacing:.14em;color:#f2c45a;margin-bottom:4px}
-      .sl-chud-obj{font:700 14px/1.35 system-ui,sans-serif;color:#fff;margin-bottom:4px}
-      .sl-chud-opt{font:500 11.5px/1.35 system-ui,sans-serif;color:#9cd8ea;margin-bottom:4px}
-      .sl-chud-dir{font:700 11.5px/1 ui-monospace,monospace;color:#7ee8aa}
-      .sl-high-contrast .sl-chud{background:#000;border-color:#fff;border-left-color:#ffd700}
+      .sl-chud-kicker{display:flex;align-items:center;gap:6px;font:700 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:#f3d284;margin-bottom:5px;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+      .sl-chud-kicker::before{content:'◆';font-size:9px;color:#f3d284}
+      .sl-chud-obj{font:600 14.5px/1.4 system-ui,sans-serif;color:#ffffff;margin-bottom:4px;text-shadow:0 1px 8px rgba(0,0,0,.92)}
+      .sl-chud-opt{font:500 11.5px/1.38 system-ui,sans-serif;color:rgba(210,228,242,.82);margin-bottom:5px;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+      .sl-chud-dir{font:600 11.5px/1.3 ui-monospace,monospace;color:#f3d284;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+      .sl-high-contrast .sl-chud{background:rgba(0,0,0,.88);border-left-color:#ffd700}
 
-      /* Chapter Transition Overlay */
-      .sl-trans{position:fixed;inset:0;z-index:58;pointer-events:auto;background:rgba(5,9,14,.92);display:none;align-items:center;justify-content:center;padding:24px;color:#f2f7fa;font-family:system-ui,-apple-system,sans-serif}
+      /* Wuthering Waves-Inspired Chapter Transition Overlay */
+      .sl-trans{position:fixed;inset:0;z-index:58;pointer-events:auto;background:radial-gradient(circle at 50% 45%,rgba(12,18,28,.86),rgba(4,7,12,.96));backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:24px;color:#f4f7fb;font-family:system-ui,-apple-system,'PingFang SC',sans-serif}
       .sl-trans.on{display:flex}
-      .sl-trans-card{width:min(640px,92vw);background:#0d161f;border:1px solid rgba(242,196,90,.45);border-top:3px solid #f2c45a;border-radius:8px;padding:24px 28px;box-shadow:0 24px 60px rgba(0,0,0,.78)}
-      .sl-trans-k{font:800 11px/1 ui-monospace,monospace;letter-spacing:.2em;color:#f2c45a;margin-bottom:8px}
-      .sl-trans-h{font:800 24px/1.2 system-ui,sans-serif;margin:0 0 10px}
-      .sl-trans-p{font:500 14.5px/1.65 system-ui,sans-serif;color:#c3dae4;margin:0 0 18px}
+      .sl-trans-card{width:min(660px,92vw);background:linear-gradient(180deg,rgba(14,19,28,.72),rgba(10,14,22,.88));border-top:1px solid rgba(243,210,132,.65);border-bottom:1px solid rgba(255,255,255,.16);padding:32px 36px;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.72)}
+      .sl-trans-k{font:700 11.5px/1 ui-monospace,monospace;letter-spacing:.26em;color:#f3d284;margin-bottom:10px}
+      .sl-trans-h{font:700 26px/1.25 system-ui,sans-serif;margin:0 0 12px;letter-spacing:.04em}
+      .sl-trans-p{font:400 15px/1.75 system-ui,sans-serif;color:rgba(224,234,244,.88);margin:0 0 22px}
     `;
     document.head.appendChild(style);
   }

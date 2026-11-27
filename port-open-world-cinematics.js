@@ -16,13 +16,14 @@
       .sl-cine-tag{font:800 11px/1 system-ui,sans-serif;letter-spacing:.22em;color:#f2c45a;text-transform:uppercase}
       .sl-cine-title{font:800 clamp(20px,2.8vw,32px)/1.15 system-ui,sans-serif;color:#f8f4e8}
       .sl-cine-sub{font:500 14px/1.4 system-ui,sans-serif;color:#c9dde4}
-      .sl-cine-caption{position:fixed;left:50%;bottom:calc(9.5vh + 18px);transform:translateX(-50%);max-width:min(760px,86vw);padding:11px 20px;background:rgba(6,11,15,.86);border:1px solid rgba(242,196,90,.35);border-left:3px solid #f2c45a;color:#f4f2ea;font:500 clamp(14px,1.55vw,17px)/1.55 system-ui,sans-serif;text-align:left;box-shadow:0 10px 28px rgba(0,0,0,.6);opacity:0;transition:opacity .25s ease}
+      .sl-cine-caption{position:fixed;left:0;right:0;bottom:0;z-index:43;padding:42px 24px 28px;background:linear-gradient(180deg,rgba(6,9,15,0) 0%,rgba(6,9,15,.62) 42%,rgba(5,8,13,.94) 100%);color:#f5f7fa;font:500 clamp(15px,1.55vw,17px)/1.65 system-ui,-apple-system,sans-serif;text-align:center;opacity:0;transition:opacity .28s ease;pointer-events:none}
       .sl-cine-caption.on{opacity:1}
-      .sl-cine-who{display:inline-block;margin-right:8px;font-weight:800;color:#8ed4f0}
-      .sl-cine-who.hostile{color:#ff867c}
-      .sl-cine-who.rescue{color:#7ee5a8}
-      .sl-cine-skip{position:fixed;right:24px;bottom:calc(4.75vh - 15px);z-index:43;padding:6px 14px;border:1px solid rgba(242,196,90,.48);background:rgba(14,22,28,.88);color:#f2e6c8;font:700 12px/1.2 system-ui,sans-serif;letter-spacing:.08em;cursor:pointer}
-      .sl-cine-skip:hover{background:#23323d;border-color:#ffd778}
+      .sl-cine-who{display:block;margin:0 0 6px;font:700 17px/1.2 system-ui,-apple-system,sans-serif;letter-spacing:.10em;color:#f3d284;text-shadow:0 2px 10px rgba(0,0,0,.95)}
+      .sl-cine-who.hostile{color:#ff8f82}
+      .sl-cine-who.rescue{color:#8be8b4}
+      .sl-cine-line{display:inline-block;max-width:min(820px,88vw);text-shadow:0 2px 12px rgba(0,0,0,.95)}
+      .sl-cine-skip{position:fixed;right:26px;top:24px;z-index:45;padding:7px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(10,14,22,.62);backdrop-filter:blur(10px);color:#f4f0e2;font:600 12px/1.2 system-ui,sans-serif;letter-spacing:.08em;cursor:pointer;transition:all .18s ease}
+      .sl-cine-skip:hover{background:rgba(243,210,132,.18);border-color:rgba(243,210,132,.75);color:#fff6dc}
 
       .sl-tracker{position:fixed;top:calc(238px + var(--sat, 0px));left:var(--gl, 18px);z-index:20;width:min(350px,46vw);padding:9px 12px;background:rgba(9,16,22,.88);border:1px solid rgba(112,214,242,.42);border-left:4px solid #59d2f2;color:#eef7fa;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 8px 22px rgba(0,0,0,.48);pointer-events:none;opacity:0;transform:translateY(-6px);transition:opacity .2s ease,transform .2s ease}
       .sl-tracker.on{opacity:1;transform:translateY(0)}
@@ -64,28 +65,46 @@
       .sl-cod-stamp-line{display:block;white-space:pre-wrap}
       .sl-cod-stamp-line:first-child{color:#f2c45a;font-size:14px;letter-spacing:.14em}
 
+      /* Wuthering Waves (鸣潮)-Inspired Frameless Dialogue Stage & HUD Suppression */
+      body.sl-dialogue-active #ui,
+      body.sl-dialogue-active .sl-chud,
+      body.sl-dialogue-active #sl-v2-waypoint,
+      body.sl-dialogue-active .sl-minimap,
+      body.sl-dialogue-active .sl-world-hud,
+      body.sl-dialogue-active .sl-interact-prompt,
+      body.sl-dialogue-active #sl-v2-npc-cmd{opacity:0!important;pointer-events:none!important;transition:opacity .22s ease}
+
+      @keyframes sl-wuwa-pulse{0%,100%{transform:translateY(0);opacity:.72}50%{transform:translateY(4px);opacity:1}}
       .sl-dlg-bars{position:fixed;inset:0;z-index:46;pointer-events:none;opacity:0;transition:opacity .32s ease}
       .sl-dlg-bars.on{opacity:1}
-      .sl-dlg-bar{position:fixed;left:0;right:0;height:6.5vh;min-height:34px;max-height:60px;background:rgba(4,7,10,.94);transition:transform .4s cubic-bezier(.22,1,.36,1)}
-      .sl-dlg-bar.top{top:0;transform:translateY(-100%);border-bottom:1px solid rgba(110,210,240,.28)}
-      .sl-dlg-bar.bot{bottom:0;transform:translateY(100%);border-top:1px solid rgba(110,210,240,.28)}
-      .sl-dlg-bars.on .sl-dlg-bar{transform:translateY(0)}
-      .sl-dlg-cam-tag{position:fixed;top:calc(6.5vh + 12px);right:22px;padding:4px 10px;background:rgba(6,12,17,.72);border:1px solid rgba(110,210,240,.34);color:#9ee8ff;font:700 11px/1.2 'SFMono-Regular',Menlo,Consolas,monospace;letter-spacing:.14em}
-      .sl-dlg-wrap{position:fixed;left:50%;bottom:calc(6.5vh + 16px);transform:translateX(-50%);z-index:49;width:min(700px,92vw);display:none;background:rgba(8,15,21,.84);backdrop-filter:blur(8px);border:1px solid rgba(110,210,240,.48);border-top:3px solid #68d6f5;padding:16px 22px;color:#f2f6f8;box-shadow:0 20px 52px rgba(0,0,0,.72);font-family:system-ui,-apple-system,sans-serif}
+      .sl-dlg-top-vignette{position:fixed;top:0;left:0;right:0;height:14vh;background:linear-gradient(180deg,rgba(5,8,13,.64) 0%,rgba(5,8,13,0) 100%);pointer-events:none}
+      .sl-dlg-top-tools{position:fixed;top:22px;right:28px;z-index:52;display:flex;align-items:center;gap:10px;pointer-events:auto}
+      .sl-dlg-tool-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;background:rgba(10,15,24,.58);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.20);color:rgba(242,245,250,.92);font:600 12px/1 system-ui,-apple-system,sans-serif;letter-spacing:.06em;cursor:pointer;transition:all .18s ease}
+      .sl-dlg-tool-btn:hover{background:rgba(243,210,132,.18);border-color:rgba(243,210,132,.76);color:#fff6dc}
+
+      .sl-dlg-wrap{position:fixed;left:0;right:0;bottom:0;z-index:49;display:none;padding:64px 28px 26px;background:linear-gradient(180deg,rgba(6,9,15,0) 0%,rgba(6,9,15,.58) 38%,rgba(6,9,15,.88) 76%,rgba(5,8,13,.95) 100%);color:#f5f7fa;font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;user-select:none}
       .sl-dlg-wrap.on{display:block}
-      .sl-dlg-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
-      .sl-dlg-who{font-size:15px;font-weight:800;color:#7ee4ff;letter-spacing:.04em}
-      .sl-dlg-who.ally{color:#7ee5a8}
-      .sl-dlg-who.hostile{color:#ff8c7a}
-      .sl-dlg-page{font-size:11px;font-weight:700;color:#9ab6c2;letter-spacing:.08em}
-      .sl-dlg-text{font-size:15px;line-height:1.7;color:#f4f7f8;min-height:52px;margin:0 0 12px}
-      .sl-dlg-choices{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-      .sl-dlg-choice{padding:7px 13px;background:rgba(24,48,62,.88);border:1px solid rgba(110,210,240,.46);color:#e6f6fb;font:600 13px/1.3 system-ui,sans-serif;cursor:pointer;text-align:left}
-      .sl-dlg-choice:hover{background:#29556d;border-color:#98ecff}
-      .sl-dlg-foot{display:flex;justify-content:space-between;align-items:center;gap:10px}
-      .sl-dlg-hint{font-size:12px;color:#9cb7c4}
-      .sl-dlg-btn{padding:8px 16px;border:1px solid rgba(242,196,90,.55);background:#c89835;color:#0b1114;font:800 13px/1 system-ui,sans-serif;cursor:pointer}
-      .sl-dlg-btn.ghost{background:#1b2932;color:#dbe8ee;border-color:rgba(150,190,206,.38)}
+      .sl-dlg-stage{max-width:min(820px,88vw);margin:0 auto;text-align:center;display:flex;flex-direction:column;align-items:center}
+      .sl-dlg-who{font-size:19px;font-weight:700;color:#f3d284;letter-spacing:.10em;text-shadow:0 2px 12px rgba(0,0,0,.95);margin-bottom:3px}
+      .sl-dlg-who.ally{color:#f3d284}
+      .sl-dlg-who.hostile{color:#ff8f82}
+      .sl-dlg-role{font-size:11.5px;font-weight:500;color:rgba(218,228,238,.68);letter-spacing:.14em;margin-bottom:8px;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+      .sl-dlg-hairline{width:min(300px,54vw);height:1px;background:linear-gradient(90deg,rgba(243,210,132,0) 0%,rgba(243,210,132,.68) 50%,rgba(243,210,132,0) 100%);margin:0 auto 12px}
+      .sl-dlg-text{font-size:clamp(15.5px,1.55vw,17.5px);line-height:1.78;color:#f7f9fc;min-height:48px;margin:0 0 12px;text-shadow:0 2px 10px rgba(0,0,0,.96);max-width:760px}
+      .sl-dlg-next-wrap{display:inline-flex;align-items:center;gap:8px;color:rgba(243,210,132,.86);font-size:11.5px;letter-spacing:.12em}
+      .sl-dlg-diamond{display:inline-block;color:#f3d284;font-size:14px;animation:sl-wuwa-pulse 1.55s ease-in-out infinite;text-shadow:0 0 10px rgba(243,210,132,.75)}
+      .sl-dlg-page{color:rgba(220,230,240,.54);font-size:11px;letter-spacing:.08em}
+
+      .sl-dlg-choices{position:fixed;right:4.5vw;bottom:24vh;z-index:51;width:min(410px,46vw);display:none;flex-direction:column;gap:9px;pointer-events:auto}
+      .sl-dlg-choices.on{display:flex}
+      .sl-dlg-choice{position:relative;display:flex;align-items:center;gap:11px;width:100%;padding:11px 16px;background:linear-gradient(90deg,rgba(12,17,26,.84) 0%,rgba(12,17,26,.64) 72%,rgba(12,17,26,.16) 100%);backdrop-filter:blur(10px);border:none;border-top:1px solid rgba(255,255,255,.20);border-bottom:1px solid rgba(255,255,255,.16);border-left:2px solid rgba(243,210,132,.52);color:#f3f6fa;font:500 14px/1.4 system-ui,-apple-system,sans-serif;cursor:pointer;text-align:left;transition:transform .18s cubic-bezier(.22,1,.36,1),background .18s ease,border-color .18s ease;box-shadow:0 8px 24px rgba(0,0,0,.38)}
+      .sl-dlg-choice:hover{transform:translateX(-8px);background:linear-gradient(90deg,rgba(243,210,132,.26) 0%,rgba(28,36,48,.78) 76%,rgba(12,17,26,.22) 100%);border-top-color:rgba(243,210,132,.82);border-bottom-color:rgba(243,210,132,.72);border-left-color:#f3d284;color:#fff8e6}
+      .sl-dlg-choice-key{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;background:rgba(255,255,255,.92);color:#0c111a;font:800 11.5px/1 system-ui,sans-serif;flex:none;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+      .sl-dlg-choice:hover .sl-dlg-choice-key{background:#f3d284;color:#0b1018}
+      .sl-dlg-choice-ico{width:16px;height:16px;flex:none;opacity:.88;color:#f3d284}
+      .sl-dlg-choice-txt{flex:1;text-shadow:0 1px 4px rgba(0,0,0,.85)}
+      .sl-dlg-btn{padding:8px 16px;border:1px solid rgba(243,210,132,.55);background:#c89835;color:#0b1114;font:800 13px/1 system-ui,sans-serif;cursor:pointer}
+      .sl-dlg-btn.ghost{background:rgba(16,22,32,.78);color:#dbe8ee;border-color:rgba(255,255,255,.24)}
 
       .sl-journal-bg{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;background:rgba(5,10,14,.78);backdrop-filter:blur(4px);font-family:system-ui,-apple-system,sans-serif}
       .sl-journal-bg.on{display:flex}
@@ -177,10 +196,16 @@
     document.body.appendChild(stampEl);
     let stampTimer = null, stampFadeTimer = null;
 
-    // 5. Interactive NPC Face-to-Face Dialogue Cinema Bars + Box DOM & Portrait Key Light
+    // 5. Interactive NPC Face-to-Face Dialogue (Wuthering Waves Frameless Vignette + Floating Ribbons)
     const dlgBars = document.createElement('div');
     dlgBars.className = 'sl-dlg-bars';
-    dlgBars.innerHTML = `<div class="sl-dlg-bar top"></div><div class="sl-dlg-bar bot"></div><div class="sl-dlg-cam-tag">DIALOGUE CAM · 50MM</div>`;
+    dlgBars.innerHTML = `
+      <div class="sl-dlg-top-vignette"></div>
+      <div class="sl-dlg-top-tools">
+        <button type="button" class="sl-dlg-tool-btn" data-dlg-log><span>记录</span><span style="opacity:.6">[J]</span></button>
+        <button type="button" class="sl-dlg-tool-btn" data-dlg-close><span>离开</span><span style="opacity:.6">[ESC]</span></button>
+      </div>
+    `;
     document.body.appendChild(dlgBars);
 
     let dlgKeyLight = null;
@@ -198,24 +223,27 @@
     const dlgWrap = document.createElement('div');
     dlgWrap.className = 'sl-dlg-wrap';
     dlgWrap.innerHTML = `
-      <div class="sl-dlg-head"><span class="sl-dlg-who"></span><span class="sl-dlg-page"></span></div>
-      <p class="sl-dlg-text"></p>
-      <div class="sl-dlg-choices"></div>
-      <div class="sl-dlg-foot">
-        <span class="sl-dlg-hint">按 [空格] / [E] 慢慢翻页 · [Esc] 结束对话</span>
-        <div style="display:flex;gap:8px;">
-          <button type="button" class="sl-dlg-btn ghost" data-dlg-close>离开 [Esc]</button>
-          <button type="button" class="sl-dlg-btn" data-dlg-next>下一句 [Space]</button>
+      <div class="sl-dlg-stage">
+        <div class="sl-dlg-who"></div>
+        <div class="sl-dlg-role"></div>
+        <div class="sl-dlg-hairline"></div>
+        <p class="sl-dlg-text"></p>
+        <div class="sl-dlg-next-wrap">
+          <span class="sl-dlg-diamond">✦</span>
+          <span class="sl-dlg-page"></span>
         </div>
       </div>
     `;
     document.body.appendChild(dlgWrap);
+    const dlgChoices = document.createElement('div');
+    dlgChoices.className = 'sl-dlg-choices';
+    document.body.appendChild(dlgChoices);
     const dlgWho = dlgWrap.querySelector('.sl-dlg-who');
+    const dlgRole = dlgWrap.querySelector('.sl-dlg-role');
     const dlgPage = dlgWrap.querySelector('.sl-dlg-page');
     const dlgText = dlgWrap.querySelector('.sl-dlg-text');
-    const dlgChoices = dlgWrap.querySelector('.sl-dlg-choices');
-    const dlgNextBtn = dlgWrap.querySelector('[data-dlg-next]');
-    const dlgCloseBtn = dlgWrap.querySelector('[data-dlg-close]');
+    const dlgLogBtn = dlgBars.querySelector('[data-dlg-log]');
+    const dlgCloseBtn = dlgBars.querySelector('[data-dlg-close]');
 
     // 6. Story Case Journal & Dialogue History Drawer ([J])
     const journalBg = document.createElement('div');
@@ -505,43 +533,61 @@
       return true;
     }
 
+    function selectDialogueChoice(idx) {
+      if (!activeDialogue || activeDialogue.replyText) return false;
+      const d = activeDialogue;
+      const isLast = d.page >= d.pages.length - 1;
+      if (!isLast || !Array.isArray(d.choices) || !d.choices[idx]) return false;
+      const ch = d.choices[idx];
+      recordStoryEntry(d.speaker, ch.reply);
+      activeDialogue.replyText = ch.reply;
+      activeDialogue.shotIndex = (activeDialogue.shotIndex || 0) + 1;
+      computeDialogueShot(activeDialogue, activeDialogue.shotIndex);
+      ch.onSelect?.();
+      renderDialogue();
+      return true;
+    }
+
     function renderDialogue() {
       if (!activeDialogue) return;
       const d = activeDialogue;
-      dlgWho.textContent = d.role ? `${d.speaker} · ${d.role}` : d.speaker;
+      dlgWho.textContent = d.speaker;
       dlgWho.className = 'sl-dlg-who' + (d.tone ? ' ' + d.tone : '');
+      dlgRole.textContent = d.role || '';
+      dlgRole.style.display = d.role ? 'block' : 'none';
       if (d.replyText) {
-        dlgPage.textContent = '追问回复';
+        dlgPage.textContent = '点击或按 [Space] 返回';
         dlgText.textContent = d.replyText;
         dlgChoices.innerHTML = '';
-        dlgNextBtn.textContent = '返回选项 [Space]';
+        dlgChoices.classList.remove('on');
         return;
       }
       const total = d.pages.length;
-      dlgPage.textContent = `第 ${d.page + 1} / ${total} 句`;
+      const isLast = d.page >= total - 1;
       dlgText.textContent = d.pages[d.page] || '';
       dlgChoices.innerHTML = '';
-      const isLast = d.page >= total - 1;
       if (isLast && Array.isArray(d.choices) && d.choices.length) {
-        for (const ch of d.choices) {
+        d.choices.forEach((ch, idx) => {
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'sl-dlg-choice';
-          btn.textContent = `💬 ${ch.label}`;
-          btn.addEventListener('click', () => {
-            if (!activeDialogue) return;
-            recordStoryEntry(d.speaker, ch.reply);
-            activeDialogue.replyText = ch.reply;
-            activeDialogue.shotIndex = (activeDialogue.shotIndex || 0) + 1;
-            computeDialogueShot(activeDialogue, activeDialogue.shotIndex);
-            ch.onSelect?.();
-            renderDialogue();
+          btn.innerHTML = `
+            <span class="sl-dlg-choice-key">${idx + 1}</span>
+            <svg class="sl-dlg-choice-ico" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6A2.5 2.5 0 0 1 14.5 13H9.2l-3.4 2.7A.75.75 0 0 1 4.6 15v-2.1A2.5 2.5 0 0 1 3 10.5v-6Z"/></svg>
+            <span class="sl-dlg-choice-txt"></span>
+          `;
+          btn.querySelector('.sl-dlg-choice-txt').textContent = ch.label;
+          btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            selectDialogueChoice(idx);
           });
           dlgChoices.appendChild(btn);
-        }
-        dlgNextBtn.textContent = '结束对话 [Space]';
+        });
+        dlgChoices.classList.add('on');
+        dlgPage.textContent = `${d.page + 1} / ${total} · 按 [1-${d.choices.length}] 选择或点击继续`;
       } else {
-        dlgNextBtn.textContent = isLast ? '结束对话 [Space]' : '下一句 [Space]';
+        dlgChoices.classList.remove('on');
+        dlgPage.textContent = isLast ? `${d.page + 1} / ${total} · 点击或按 [Space] 结束` : `${d.page + 1} / ${total}`;
       }
     }
 
@@ -550,8 +596,10 @@
       const d = activeDialogue;
       const cb = d.onComplete;
       activeDialogue = null;
+      document.body.classList.remove('sl-dialogue-active');
       dlgWrap.classList.remove('on');
       dlgBars.classList.remove('on');
+      dlgChoices.classList.remove('on');
       if (dlgKeyLight) dlgKeyLight.intensity = 0;
       if (d.hasCam && world.camera) {
         if (d.savedPos && world.camera.position?.copy) world.camera.position.copy(d.savedPos);
@@ -606,6 +654,7 @@
         }
       }
       activeDialogue = d;
+      document.body.classList.add('sl-dialogue-active');
       renderDialogue();
       dlgWrap.classList.add('on');
       dlgBars.classList.add('on');
@@ -632,8 +681,9 @@
       }
     }
 
-    dlgNextBtn.addEventListener('click', advanceDialogue);
-    dlgCloseBtn.addEventListener('click', closeDialogue);
+    dlgWrap.addEventListener('click', advanceDialogue);
+    dlgCloseBtn.addEventListener('click', (ev) => { ev.stopPropagation(); closeDialogue(); });
+    dlgLogBtn.addEventListener('click', (ev) => { ev.stopPropagation(); toggleJournal(true); });
 
     function toggleJournal(force, { title = '当前案情简报', brief = '' } = {}) {
       const next = force !== undefined ? Boolean(force) : !journalOpen;
@@ -670,10 +720,22 @@
         return;
       }
       if (activeDialogue) {
-        if ((e.code === 'Space' || e.code === 'KeyE') && !e.repeat) {
+        if (/^Digit[1-4]$/.test(e.code) && !e.repeat) {
+          const idx = Number(e.code.slice(5)) - 1;
+          if (selectDialogueChoice(idx)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            return;
+          }
+        }
+        if ((e.code === 'Space' || e.code === 'KeyE' || e.code === 'KeyF') && !e.repeat) {
           e.preventDefault();
           e.stopImmediatePropagation();
           advanceDialogue();
+        } else if (e.code === 'KeyJ' && !e.repeat) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          toggleJournal(true);
         } else if (e.code === 'Escape' && !e.repeat) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -780,8 +842,10 @@
       trackerEl.remove();
       tunerBg.remove();
       stampEl.remove();
+      document.body.classList.remove('sl-dialogue-active');
       dlgBars.remove();
       dlgWrap.remove();
+      dlgChoices.remove();
       journalBg.remove();
     }
 

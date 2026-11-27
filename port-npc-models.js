@@ -588,7 +588,9 @@
       const isPoint = mode === 'point_ahead';
       const isWave = mode === 'wave_follow';
       const isRadio = mode === 'radio_call';
-      const hasOverlay = isTalking || isInspect || isPoint || isWave || isRadio;
+      const isSalute = mode === 'salute';
+      const isGuardAim = mode === 'aim_guard';
+      const hasOverlay = isTalking || isInspect || isPoint || isWave || isRadio || isSalute || isGuardAim;
       const isWalking = !isSeated && (moving || mode === 'walk');
       const isRunning = !isSeated && mode === 'run';
 
@@ -662,7 +664,7 @@
         return;
       }
 
-      // Expressive procedural character action overlays
+      // Expressive procedural character action overlays (works for both Mixamo & Rocketbox Bip01)
       if (isTalking && w > 0.001) {
         talkClock += safeDt;
         const nod = (Math.sin(talkClock * 2.8) * 0.065 + Math.sin(talkClock * 1.15) * 0.04) * w;
@@ -672,27 +674,49 @@
         if (neckBone) { neckBone.rotation.x += nod * 0.45; neckBone.rotation.y += turn * 0.35; }
         if (spineBone) { spineBone.rotation.x += Math.sin(talkClock * 1.8) * 0.025 * w; spineBone.rotation.y += Math.sin(talkClock * 0.85) * 0.04 * w; }
         const gesture = Math.max(0, Math.sin(talkClock * 2.2));
-        if (rightArm) rightArm.rotation.x -= (0.18 + gesture * 0.16) * w;
-        if (rightForeArm) rightForeArm.rotation.z += (0.22 + Math.sin(talkClock * 3.1) * 0.14) * w;
+        if (rightArm) rightArm.rotation.z += (0.28 + gesture * 0.22) * w;
+        if (rightForeArm) rightForeArm.rotation.y -= (0.35 + Math.sin(talkClock * 3.1) * 0.16) * w;
       } else if (isInspect && w > 0.001) {
         talkClock += safeDt;
-        if (spineBone) spineBone.rotation.x += (0.11 + Math.sin(talkClock * 1.6) * 0.02) * w;
-        if (headBone) { headBone.rotation.x += 0.16 * w; headBone.rotation.y += Math.sin(talkClock * 1.4) * 0.14 * w; }
-        if (rightArm) rightArm.rotation.x -= (0.58 + Math.sin(talkClock * 4.5) * 0.08) * w;
-        if (rightForeArm) rightForeArm.rotation.z += (0.38 + Math.cos(talkClock * 5.2) * 0.12) * w;
+        if (spineBone) spineBone.rotation.z += (0.14 + Math.sin(talkClock * 1.8) * 0.03) * w;
+        if (headBone) { headBone.rotation.z += 0.18 * w; headBone.rotation.x += Math.sin(talkClock * 1.6) * 0.16 * w; }
+        if (rightArm) rightArm.rotation.z += (0.72 + Math.sin(talkClock * 5.2) * 0.14) * w;
+        if (rightForeArm) rightForeArm.rotation.y -= (0.65 + Math.cos(talkClock * 5.8) * 0.18) * w;
+        if (leftArm) leftArm.rotation.z += (0.68 + Math.cos(talkClock * 4.8) * 0.12) * w;
+        if (leftForeArm) leftForeArm.rotation.y += (0.58 + Math.sin(talkClock * 5.4) * 0.16) * w;
       } else if (isPoint && w > 0.001) {
         talkClock += safeDt;
         if (headBone) headBone.rotation.y += Math.sin(talkClock * 1.3) * 0.16 * w;
-        if (rightArm) rightArm.rotation.x -= (1.05 + Math.sin(talkClock * 2.4) * 0.06) * w;
+        if (rightArm) { rightArm.rotation.x += 0.42 * w; rightArm.rotation.z += (1.12 + Math.sin(talkClock * 2.6) * 0.08) * w; }
+        if (rightForeArm) rightForeArm.rotation.y -= 0.12 * w;
       } else if (isWave && w > 0.001) {
         talkClock += safeDt;
-        if (rightArm) rightArm.rotation.x -= 1.35 * w;
-        if (rightForeArm) rightForeArm.rotation.z += (0.35 + Math.sin(talkClock * 6.5) * 0.36) * w;
+        if (rightArm) { rightArm.rotation.x += 1.48 * w; rightArm.rotation.z += (0.42 + Math.sin(talkClock * 7.2) * 0.34) * w; }
+        if (rightForeArm) rightForeArm.rotation.y -= (0.48 + Math.cos(talkClock * 7.2) * 0.28) * w;
       } else if (isRadio && w > 0.001) {
         talkClock += safeDt;
-        if (headBone) headBone.rotation.z -= 0.09 * w;
-        if (leftArm) leftArm.rotation.x -= 0.85 * w;
-        if (leftForeArm) leftForeArm.rotation.z -= 0.72 * w;
+        if (headBone) { headBone.rotation.z -= 0.12 * w; headBone.rotation.x += Math.sin(talkClock * 3.2) * 0.05 * w; }
+        if (leftArm) { leftArm.rotation.x -= 0.65 * w; leftArm.rotation.z += 0.85 * w; }
+        if (leftForeArm) leftForeArm.rotation.y += 1.25 * w;
+      } else if (isSalute && w > 0.001) {
+        talkClock += safeDt;
+        if (spineBone) spineBone.rotation.z -= 0.04 * w;
+        if (rightArm) { rightArm.rotation.x += 0.92 * w; rightArm.rotation.z += 0.72 * w; }
+        if (rightForeArm) rightForeArm.rotation.y -= 1.45 * w;
+      } else if (isGuardAim && w > 0.001) {
+        talkClock += safeDt;
+        const scan = Math.sin(talkClock * 1.15) * 0.32 * w;
+        if (spineBone) spineBone.rotation.y += scan * 0.45;
+        if (headBone) headBone.rotation.y += scan;
+        if (isArmed) {
+          if (rightArm) { rightArm.rotation.x -= 0.38 * w; rightArm.rotation.z += 0.82 * w; }
+          if (rightForeArm) rightForeArm.rotation.y -= 0.78 * w;
+          if (leftArm) { leftArm.rotation.x += 0.48 * w; leftArm.rotation.z += 0.86 * w; }
+          if (leftForeArm) leftForeArm.rotation.y += 0.88 * w;
+        } else {
+          if (rightArm) rightArm.rotation.z += 0.22 * w;
+          if (leftArm) leftArm.rotation.z += 0.22 * w;
+        }
       } else {
         talkClock = 0;
       }
