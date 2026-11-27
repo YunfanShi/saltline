@@ -7437,14 +7437,9 @@ if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
   i.campaignMenuV2=menuV2;
   i._v2InteractTick=(dt,playerPos,interactDown)=>{
    if(v2InteractCooldown>0)v2InteractCooldown=Math.max(0,v2InteractCooldown-dt);
-   const obj=campaignV2.currentObjective;
-   if(!obj||!obj.target||!playerPos){o.setPrompt?.(null);return;}
-   const dist=Math.hypot(obj.target[0]-playerPos.x,obj.target[2]-playerPos.z);
-   if(dist<=7.5){
-    o.setPrompt?.(`[E] 按钮交互推进剧情 · ${obj.titleZh}`,0);
-    if(interactDown&&v2InteractCooldown<=0){
-     v2InteractCooldown=1.2;
-     const res=campaignV2.advanceObjective();
+   campaignV2.tickInteraction(dt,playerPos,interactDown,{
+    setPrompt:(text,prog)=>o.setPrompt?.(text,prog),
+    onAdvance:(res)=>{
      if(res?.completedChapter){
       menuV2?.render?.();
       if(res.nextChapter){
@@ -7456,8 +7451,8 @@ if(window.SaltlineCampaignV2&&window.mountSaltlineCampaignMenuV2){
      }else if(res?.objective){
       i.tactical?.notify?.(`✅ 目标更新：${res.objective.titleZh}`,res.objective.titleZh,true,3.8);
      }
-    }
-   }else{o.setPrompt?.(null);}
+    },
+   });
   };
  }
 }

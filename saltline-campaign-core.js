@@ -984,62 +984,132 @@
       root.add(g);
     }
 
-    // Physical 3D Interactive Story Console / Button / Valve spawned at every chapter objective
-    // (Replaces shooting pillars: players walk up to the physical console and press [E] to trigger story events!)
+    // Mechanic-Specific 3D Interactive Props (NO single generic console box across 42 objectives!)
     let beaconGroup = null;
     let activeConsoleButtonMat = null;
     let activeConsoleScreenMat = null;
+    let activeSubNodes = [];
     let consolePulseClock = 0;
-    function setObjectiveBeacon(targetPos, actionType = 'console') {
+    function setObjectiveBeacon(targetPos, actionType = 'console', opts = {}) {
       if (beaconGroup) { root.remove(beaconGroup); beaconGroup = null; activeConsoleButtonMat = null; activeConsoleScreenMat = null; }
-      if (!targetPos || !Array.isArray(targetPos)) return;
+      for (const sn of activeSubNodes) sn.human?.actor?.removeFromParent?.();
+      activeSubNodes = [];
+      if (!targetPos || !Array.isArray(targetPos)) return [];
+      const mechanic = opts.mechanic || resolveObjectiveMechanic(actionType);
       beaconGroup = new Group();
-      beaconGroup.name = 'campaign-v2-story-console';
+      beaconGroup.name = `campaign-v2-prop-${mechanic}`;
       const tx = targetPos[0], ty = targetPos[1] || 0, tz = targetPos[2];
-
-      // Subtle holographic locator ring on ground (no giant red shootable jammer pillars)
-      const ringMat = new MeshBasicMaterial({ color: 0x66d9f0, transparent: true, opacity: 0.62, depthWrite: false });
-      const ring = new Mesh(cylGeo, ringMat);
-      ring.scale.set(1.85, 0.06, 1.85);
-      ring.position.set(tx, ty + 0.05, tz);
-      beaconGroup.add(ring);
-
-      // Tactile 3D Interactive Console / Valve Pedestal
       const bodyMat = new MeshStandardMaterial({ color: 0x26313a, roughness: 0.52, metalness: 0.64 });
       const trimMat = new MeshStandardMaterial({ color: 0xd99b26, roughness: 0.48, metalness: 0.28 });
-      activeConsoleScreenMat = new MeshBasicMaterial({ color: 0x38c7e8 });
-      activeConsoleButtonMat = new MeshBasicMaterial({ color: 0x4cff8f, transparent: true, opacity: 0.95 });
 
-      const pedestal = new Mesh(boxGeo, bodyMat);
-      pedestal.scale.set(0.92, 1.18, 0.64);
-      pedestal.position.set(tx, ty + 0.59, tz);
-      const trim = new Mesh(boxGeo, trimMat);
-      trim.scale.set(0.98, 0.09, 0.68);
-      trim.position.set(tx, ty + 0.12, tz);
-      const screen = new Mesh(boxGeo, activeConsoleScreenMat);
-      screen.scale.set(0.68, 0.36, 0.06);
-      screen.position.set(tx, ty + 1.24, tz + 0.16);
-      screen.rotation.x = -0.35;
-
-      const isValve = /valve|ballast|flood/i.test(String(actionType));
-      const button = new Mesh(isValve ? cylGeo : boxGeo, activeConsoleButtonMat);
-      if (isValve) {
-        button.scale.set(0.28, 0.08, 0.28);
-        button.rotation.x = Math.PI / 2;
+      if (mechanic === 'dialogue' || mechanic === 'branch_choice') {
+        const haloMat = new MeshBasicMaterial({ color: 0xf3d284, transparent: true, opacity: 0.55, depthWrite: false });
+        const halo = new Mesh(cylGeo, haloMat);
+        halo.scale.set(2.1, 0.05, 2.1);
+        halo.position.set(tx, ty + 0.05, tz);
+        beaconGroup.add(halo);
+        activeConsoleButtonMat = haloMat;
+        activeSubNodes.push({ id: 'talk_0', pos: [tx, ty, tz], labelZh: mechanic === 'branch_choice' ? '关键抉择现场' : '对话人物', done: false, lampMat: haloMat });
+      } else if (mechanic === 'driving_gates') {
+        const start = opts.originPos || [tx, ty, tz + 36];
+        [0.35, 0.68, 1.0].forEach((f, idx) => {
+          const gx = start[0] + (tx - start[0]) * f;
+          const gy = (start[1] || ty) + (ty - (start[1] || ty)) * f;
+          const gz = start[2] + (tz - start[2]) * f;
+          const lampMat = new MeshBasicMaterial({ color: idx === 0 ? 0xf3d284 : 0x38c7e8, transparent: true, opacity: 0.88 });
+          const gate = new Group();
+          gate.position.set(gx, gy, gz);
+          const pL = new Mesh(boxGeo, trimMat); pL.scale.set(0.45, 5.2, 0.45); pL.position.set(-4.2, 2.6, 0);
+          const pR = new Mesh(boxGeo, trimMat); pR.scale.set(0.45, 5.2, 0.45); pR.position.set(4.2, 2.6, 0);
+          const bar = new Mesh(boxGeo, lampMat); bar.scale.set(9.0, 0.38, 0.45); bar.position.set(0, 5.1, 0);
+          gate.add(pL, pR, bar);
+          beaconGroup.add(gate);
+          activeSubNodes.push({ id: `gate_${idx}`, pos: [gx, gy, gz], labelZh: `驾驶检查点 ${idx + 1}/3`, done: false, lampMat, mesh: gate });
+        });
+        activeConsoleButtonMat = activeSubNodes[0]?.lampMat || null;
+      } else if (mechanic === 'survivor_rescue') {
+        const offsets = [[-4.5, 0, -2.5], [4.2, 0, 1.8], [0.5, 0, 5.4]];
+        offsets.forEach(([ox, oy, oz], idx) => {
+          const sx = tx + ox, sy = ty + oy, sz = tz + oz;
+          const ringMat = new MeshBasicMaterial({ color: 0x5ce094, transparent: true, opacity: 0.68, depthWrite: false });
+          const ring = new Mesh(cylGeo, ringMat);
+          ring.scale.set(1.5, 0.05, 1.5); ring.position.set(sx, sy + 0.05, sz);
+          beaconGroup.add(ring);
+          let human = null;
+          if (typeof window !== 'undefined' && typeof window.createSaltlineHuman === 'function') {
+            human = window.createSaltlineHuman(THREE, {
+              name: `survivor-${idx}`,
+              role: idx === 2 ? 'worker' : 'engineer',
+              modelType: idx === 0 ? 'civilian_female' : (idx === 1 ? 'civilian_male' : 'worker_male'),
+              armed: false,
+              variation: idx,
+            });
+            human.actor.position.set(sx, sy, sz);
+            scene.add(human.actor);
+          }
+          activeSubNodes.push({ id: `surv_${idx}`, pos: [sx, sy, sz], labelZh: `受困人员 ${idx + 1}/3`, done: false, lampMat: ringMat, human });
+        });
+        activeConsoleButtonMat = activeSubNodes[0]?.lampMat || null;
+      } else if (mechanic === 'multi_switch_puzzle') {
+        const isValve = /valve|ballast|gate|finale_stage1/i.test(String(actionType));
+        const offsets = [[-6.5, 0, -2.0], [0, 0, 0], [6.5, 0, 2.2]];
+        offsets.forEach(([ox, oy, oz], idx) => {
+          const nx = tx + ox, ny = ty + oy, nz = tz + oz;
+          const lampMat = new MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.92 });
+          const ped = new Mesh(boxGeo, bodyMat); ped.scale.set(0.85, 1.15, 0.58); ped.position.set(nx, ny + 0.58, nz);
+          const actuator = new Mesh(isValve ? cylGeo : boxGeo, trimMat);
+          if (isValve) { actuator.scale.set(0.36, 0.09, 0.36); actuator.rotation.x = Math.PI / 2; }
+          else { actuator.scale.set(0.12, 0.42, 0.12); actuator.rotation.x = -0.45; }
+          actuator.position.set(nx, ny + 1.15, nz + 0.32);
+          const lamp = new Mesh(boxGeo, lampMat); lamp.scale.set(0.28, 0.18, 0.12); lamp.position.set(nx, ny + 1.32, nz + 0.22);
+          beaconGroup.add(ped, actuator, lamp);
+          activeSubNodes.push({
+            id: `node_${idx}`, pos: [nx, ny, nz],
+            labelZh: isValve ? `液压泄压阀 ${idx + 1}/3` : `配电/道岔联锁 ${idx + 1}/3`,
+            done: false, lampMat, actuator,
+          });
+        });
+        activeConsoleButtonMat = activeSubNodes[0]?.lampMat || null;
+      } else if (mechanic === 'storm_climb_traversal') {
+        const start = opts.originPos || [tx, ty, tz + 24];
+        [0.38, 0.70, 1.0].forEach((f, idx) => {
+          const cx = start[0] + (tx - start[0]) * f;
+          const cy = (start[1] || ty) + (ty - (start[1] || ty)) * f;
+          const cz = start[2] + (tz - start[2]) * f;
+          const ringMat = new MeshBasicMaterial({ color: 0xf3d284, transparent: true, opacity: 0.65, depthWrite: false });
+          const ring = new Mesh(cylGeo, ringMat);
+          ring.scale.set(2.4, 0.06, 2.4); ring.position.set(cx, cy + 0.06, cz);
+          beaconGroup.add(ring);
+          activeSubNodes.push({ id: `trav_${idx}`, pos: [cx, cy, cz], labelZh: `推进节点 ${idx + 1}/3`, done: false, lampMat: ringMat });
+        });
+        activeConsoleButtonMat = activeSubNodes[0]?.lampMat || null;
       } else {
-        button.scale.set(0.24, 0.09, 0.18);
+        const ringMat = new MeshBasicMaterial({ color: 0x66d9f0, transparent: true, opacity: 0.58, depthWrite: false });
+        const ring = new Mesh(cylGeo, ringMat); ring.scale.set(1.9, 0.06, 1.9); ring.position.set(tx, ty + 0.05, tz);
+        activeConsoleScreenMat = new MeshBasicMaterial({ color: 0x38c7e8 });
+        activeConsoleButtonMat = new MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.95 });
+        const cabinet = new Mesh(boxGeo, bodyMat); cabinet.scale.set(1.25, 1.55, 0.78); cabinet.position.set(tx, ty + 0.78, tz);
+        const trim = new Mesh(boxGeo, trimMat); trim.scale.set(1.30, 0.12, 0.82); trim.position.set(tx, ty + 0.14, tz);
+        const screen = new Mesh(boxGeo, activeConsoleScreenMat); screen.scale.set(0.76, 0.36, 0.06); screen.position.set(tx, ty + 1.24, tz + 0.40);
+        const lamp = new Mesh(boxGeo, activeConsoleButtonMat); lamp.scale.set(0.28, 0.14, 0.14); lamp.position.set(tx, ty + 1.64, tz);
+        beaconGroup.add(ring, cabinet, trim, screen, lamp);
+        activeSubNodes.push({ id: 'repair_0', pos: [tx, ty, tz], labelZh: '长按 [E] 检修/启动设备', done: false, lampMat: activeConsoleButtonMat });
       }
-      button.position.set(tx, ty + 1.16, tz + 0.28);
-
-      // Grounded tactile 3D interactive console/valve only — NO vertical navigation light pillars!
-      // Navigation uses the 3D-to-2D screen-projected golden tactical waypoint reticle + distance HUD.
-      beaconGroup.add(pedestal, trim, screen, button);
       root.add(beaconGroup);
+      return activeSubNodes;
+    }
+
+    function markSubNodeDone(idx) {
+      const sn = activeSubNodes[idx];
+      if (!sn) return;
+      sn.done = true;
+      if (sn.lampMat?.color) sn.lampMat.color.setHex(0x5ce094);
+      if (sn.actuator) sn.actuator.rotation.z += Math.PI * 0.65;
     }
 
     function markConsoleActivated() {
-      if (activeConsoleButtonMat) activeConsoleButtonMat.color.setHex(0x66d9f0);
-      if (activeConsoleScreenMat) activeConsoleScreenMat.color.setHex(0x88ffaa);
+      if (activeConsoleButtonMat?.color) activeConsoleButtonMat.color.setHex(0x66d9f0);
+      if (activeConsoleScreenMat?.color) activeConsoleScreenMat.color.setHex(0x88ffaa);
     }
 
     // =========================================================================
@@ -1194,13 +1264,22 @@
     return {
       activate,
       setObjectiveBeacon,
+      markSubNodeDone,
       markConsoleActivated,
       triggerAircraftCrash,
       getAircraftPosition,
       setVaultZoneLit,
       lockWaterLevel,
       update,
-      dispose: () => { beaconGroup = null; crashState = null; crashRoot = null; clearCurrent(); },
+      dispose: () => {
+        for (const sn of activeSubNodes) sn.human?.actor?.removeFromParent?.();
+        activeSubNodes = [];
+        beaconGroup = null;
+        crashState = null;
+        crashRoot = null;
+        clearCurrent();
+      },
+      get subNodes() { return activeSubNodes; },
       get state() {
         return {
           preset: activePreset,
@@ -1808,6 +1887,55 @@
   }
 
   // =========================================================================
+  // 6B. TRUE 7-MECHANIC OBJECTIVE DIFFERENTIATION ENGINE (Zero Generic Console)
+  // =========================================================================
+  const OBJECTIVE_MECHANIC_MAP = Object.freeze({
+    reach_and_talk: 'dialogue',
+    dialogue: 'dialogue',
+    story_dialogue: 'dialogue',
+    story_reveal: 'dialogue',
+    relationship_beat: 'dialogue',
+    character_confrontation: 'dialogue',
+    epilogue_farewell: 'dialogue',
+    drive_route: 'driving_gates',
+    mountain_drive: 'driving_gates',
+    finale_stage2: 'driving_gates',
+    assist_npc: 'survivor_rescue',
+    rescue_group: 'survivor_rescue',
+    flood_rescue: 'survivor_rescue',
+    storm_rescue: 'survivor_rescue',
+    evacuate_crew: 'survivor_rescue',
+    puzzle_switches: 'multi_switch_puzzle',
+    power_puzzle: 'multi_switch_puzzle',
+    valve_lock: 'multi_switch_puzzle',
+    coop_console: 'multi_switch_puzzle',
+    platform_ballast: 'multi_switch_puzzle',
+    finale_stage1: 'multi_switch_puzzle',
+    escape_event: 'storm_climb_traversal',
+    multilevel_climb: 'storm_climb_traversal',
+    nature_explore: 'storm_climb_traversal',
+    storm_traverse: 'storm_climb_traversal',
+    epilogue_walk: 'storm_climb_traversal',
+    branch_choice: 'branch_choice',
+    power_allocation: 'branch_choice',
+    finale_choice: 'branch_choice',
+    event_trigger: 'hold_repair',
+    repair: 'hold_repair',
+    dynamic_rail_event: 'hold_repair',
+    facility_restore: 'hold_repair',
+    boat_launch: 'hold_repair',
+    platform_finale: 'hold_repair',
+    restore_district_power: 'hold_repair',
+    present_evidence: 'hold_repair',
+    briefing_lock: 'hold_repair',
+    epilogue_complete: 'hold_repair',
+  });
+
+  function resolveObjectiveMechanic(action) {
+    return OBJECTIVE_MECHANIC_MAP[String(action || '')] || 'hold_repair';
+  }
+
+  // =========================================================================
   // 7. UNIFIED CAMPAIGN CONTROLLER (Bridges 14 Chapters into Saltline Runtime)
   // =========================================================================
   function createSaltlineCampaignV2(world, { storage } = {}) {
@@ -1822,12 +1950,85 @@
     let objectiveIdx = 0;
     let active = false;
     let sessionTimeAccum = 0;
+    let objState = null;
+    let choiceOverlayEl = null;
     const listeners = new Set();
 
     function emit(event, payload) {
       for (const fn of listeners) {
         try { fn(event, payload); } catch {}
       }
+    }
+
+    function closeChoiceOverlay() {
+      if (choiceOverlayEl) { choiceOverlayEl.remove(); choiceOverlayEl = null; }
+    }
+
+    function openBranchChoiceOverlay(ch, obj, onPick) {
+      const choices = Array.isArray(obj.choices) && obj.choices.length ? obj.choices : [
+        { id: 'priority_civic', labelZh: '优先保障战地医院与市民避难所供电' },
+        { id: 'priority_harbor', labelZh: '优先保障港口防潮抽水与基础设施稳定' },
+      ];
+      if (typeof document === 'undefined') { onPick(choices[0].id); return; }
+      closeChoiceOverlay();
+      try { document.exitPointerLock?.(); } catch {}
+      if (world?.player) world.player.enabled = false;
+      choiceOverlayEl = document.createElement('div');
+      choiceOverlayEl.id = 'sl-v2-branch-choice';
+      choiceOverlayEl.style.cssText = 'position:fixed;inset:0;z-index:54;background:linear-gradient(180deg,rgba(6,9,15,.42) 0%,rgba(6,9,15,.88) 100%);backdrop-filter:blur(6px);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:42px 24px 48px;color:#f5f7fa;font-family:system-ui,-apple-system,"PingFang SC",sans-serif;';
+      choiceOverlayEl.innerHTML = `
+        <div style="text-align:center;max-width:740px;margin-bottom:24px;">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.22em;color:#f3d284;margin-bottom:6px;">◆ ${ch.titleZh} · 关键剧情抉择</div>
+          <div style="width:240px;height:1px;background:linear-gradient(90deg,transparent,#f3d284,transparent);margin:0 auto 12px;"></div>
+          <div style="font-size:18px;font-weight:600;line-height:1.6;">${obj.titleZh}</div>
+        </div>
+        <div data-bc-list style="width:min(580px,90vw);display:flex;flex-direction:column;gap:12px;"></div>`;
+      const list = choiceOverlayEl.querySelector('[data-bc-list]');
+      choices.forEach((c, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.cssText = 'display:flex;align-items:center;gap:14px;padding:15px 18px;background:linear-gradient(90deg,rgba(12,17,26,.92) 0%,rgba(12,17,26,.72) 82%,rgba(12,17,26,.28) 100%);border:none;border-top:1px solid rgba(255,255,255,.22);border-bottom:1px solid rgba(255,255,255,.18);border-left:3px solid #f3d284;color:#f7f9fc;font-size:14.5px;text-align:left;cursor:pointer;transition:transform .16s ease,background .16s ease;';
+        btn.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:4px;background:#f3d284;color:#0b1018;font-weight:800;flex:none;">${idx + 1}</span><span>${c.labelZh}</span>`;
+        btn.addEventListener('mouseenter', () => { btn.style.transform = 'translateX(-8px)'; });
+        btn.addEventListener('mouseleave', () => { btn.style.transform = 'translateX(0)'; });
+        btn.addEventListener('click', () => {
+          closeChoiceOverlay();
+          if (world?.player) world.player.enabled = true;
+          try { world?.input?.requestLock?.(); } catch {}
+          onPick(c.id);
+        });
+        list.appendChild(btn);
+      });
+      document.body.appendChild(choiceOverlayEl);
+    }
+
+    function setupObjectiveMechanic(ch, obj, originPos = null) {
+      closeChoiceOverlay();
+      if (!obj) { objState = null; return null; }
+      const mechanic = resolveObjectiveMechanic(obj.action);
+      const nodes = setPieces.setObjectiveBeacon?.(obj.target, obj.action, { mechanic, originPos }) || [
+        { id: 'node_0', pos: obj.target, labelZh: obj.titleZh, done: false },
+      ];
+      objState = {
+        objectiveId: obj.id,
+        action: obj.action,
+        mechanic,
+        nodes,
+        stepIdx: 0,
+        totalSteps: nodes.length,
+        holdSec: 0,
+        holdTarget: mechanic === 'hold_repair' ? 2.0 : 0,
+        cooldown: 0,
+        pendingModal: false,
+      };
+      return objState;
+    }
+
+    function getActiveWaypointTarget() {
+      const curObj = activeChapter?.objectives?.[objectiveIdx];
+      if (!curObj) return null;
+      const node = objState?.nodes?.[objState.stepIdx];
+      return node?.pos || curObj.target || null;
     }
 
     function startChapter(chapterId, { objectiveIndex = 0, slotId = saveMgr.getActiveSlotId(), skipCutscene = false } = {}) {
@@ -1841,7 +2042,7 @@
 
       setPieces.activate(ch.scenePreset);
       const firstObj = ch.objectives?.[objectiveIdx];
-      setPieces.setObjectiveBeacon?.(firstObj?.target, firstObj?.action);
+      setupObjectiveMechanic(ch, firstObj, ch.spawn);
       world?.audioV2?.setAmbience?.(ch.weather || 'overcast_mist');
       if (world?.openWorld?.setSkyPreset) world.openWorld.setSkyPreset(ch.skyPreset, true);
       if (world?.player?.pos && ch.spawn) {
@@ -1899,9 +2100,10 @@
       }
 
       if (objectiveIdx + 1 < activeChapter.objectives.length) {
+        const prevPos = curObj?.target || activeChapter.spawn;
         objectiveIdx++;
         const nextObj = activeChapter.objectives[objectiveIdx];
-        setPieces.setObjectiveBeacon?.(nextObj?.target, nextObj?.action);
+        setupObjectiveMechanic(activeChapter, nextObj, prevPos);
         saveMgr.saveCheckpoint(activeChapter.id, objectiveIdx, nextObj.target);
         emit('objective:advance', { chapter: activeChapter, objectiveIdx, objective: nextObj, triggeredEvent });
         return { completedChapter: false, chapter: activeChapter, objectiveIdx, objective: nextObj, triggeredEvent };
@@ -1912,19 +2114,173 @@
       const updatedSlot = saveMgr.completeChapter(finished.id);
       const nextIdx = SALTLINE_CHAPTERS.findIndex(c => c.id === finished.id) + 1;
       const nextChapter = SALTLINE_CHAPTERS[nextIdx] || null;
+      objState = null;
       emit('chapter:complete', { chapter: finished, nextChapter, slot: updatedSlot, triggeredEvent });
       return { completedChapter: true, chapter: finished, nextChapter, slot: updatedSlot, triggeredEvent };
+    }
+
+    function tickInteraction(dt, playerPos, interactDown, { setPrompt = null, onAdvance = null } = {}) {
+      if (!active || !activeChapter || !objState || !playerPos) {
+        setPrompt?.(null);
+        return null;
+      }
+      if (objState.cooldown > 0) objState.cooldown = Math.max(0, objState.cooldown - dt);
+      if (objState.pendingModal) { setPrompt?.(null); return null; }
+      const curObj = activeChapter.objectives[objectiveIdx];
+      const node = objState.nodes[objState.stepIdx];
+      if (!curObj || !node) { setPrompt?.(null); return null; }
+
+      const dist = Math.hypot(node.pos[0] - playerPos.x, node.pos[2] - playerPos.z);
+      const finishStepOrObj = (choiceId = null) => {
+        setPieces.markSubNodeDone?.(objState.stepIdx);
+        if (objState.stepIdx + 1 < objState.totalSteps) {
+          objState.stepIdx++;
+          objState.holdSec = 0;
+          objState.cooldown = 0.55;
+          world?.audioV2?.playButtonPress?.();
+          world?.tactical?.notify?.(`✓ 完成 ${node.labelZh}（${objState.stepIdx}/${objState.totalSteps}）`, `Step ${objState.stepIdx}/${objState.totalSteps}`, true, 2.4);
+          return { subStepAdvanced: true, stepIdx: objState.stepIdx, totalSteps: objState.totalSteps };
+        }
+        objState.cooldown = 1.1;
+        const res = advanceObjective({ choiceId });
+        onAdvance?.(res);
+        return res;
+      };
+
+      const m = objState.mechanic;
+      if (m === 'driving_gates') {
+        const isDriving = Boolean(world?.vehicle?.driving);
+        if (dist <= 9.5 && isDriving) return finishStepOrObj();
+        if (dist <= 10.5 && !isDriving) {
+          setPrompt?.(`[F] 请驾驶 SAR 四驱车高速穿过 ${node.labelZh}（或按 [E] 步行确认）`, 0);
+          if (interactDown && objState.cooldown <= 0) return finishStepOrObj();
+        } else {
+          setPrompt?.(null);
+        }
+        return null;
+      }
+
+      if (m === 'storm_climb_traversal') {
+        if (curObj.action === 'multilevel_climb' && dist <= 7.5 && playerPos.y < 2.6) {
+          setPrompt?.(`⚠ 水位持续上涨！请沿钢梯攀升至二层检修廊 (${node.labelZh})`, 0);
+          return null;
+        }
+        if (dist <= 6.2) return finishStepOrObj();
+        setPrompt?.(null);
+        return null;
+      }
+
+      if (m === 'dialogue') {
+        const leadChar = SALTLINE_CHARACTERS.find(c => c.id !== 'lin' && (activeChapter.characters || []).includes(c.id)) || SALTLINE_CHARACTERS[1];
+        if (dist <= 7.0) {
+          setPrompt?.(`[E] 与 ${leadChar.nameZh} 面对面交谈 · ${curObj.titleZh.slice(0, 22)}`, 0);
+          if (interactDown && objState.cooldown <= 0) {
+            if (world?.storyDirector?.openDialogue) {
+              objState.pendingModal = true;
+              const pages = (activeChapter.cutscene?.lines || []).map(l => l.line);
+              if (!pages.length) pages.push(activeChapter.transitionZh || curObj.titleZh);
+              world.storyDirector.openDialogue({
+                speaker: leadChar.nameZh,
+                role: leadChar.roleZh,
+                tone: 'ally',
+                pages,
+                choices: [{ label: '立刻推进当前行动方案', reply: `明白，${leadChar.nameZh}已经同步坐标，我们按计划行动！` }],
+                onComplete: () => { if (objState) objState.pendingModal = false; finishStepOrObj(); },
+              });
+              return { modalOpened: 'dialogue' };
+            }
+            return finishStepOrObj();
+          }
+        } else setPrompt?.(null);
+        return null;
+      }
+
+      if (m === 'branch_choice') {
+        if (dist <= 7.5) {
+          setPrompt?.(`[E] 作出关键剧情抉择 · ${activeChapter.shortZh}`, 0);
+          if (interactDown && objState.cooldown <= 0) {
+            objState.pendingModal = true;
+            openBranchChoiceOverlay(activeChapter, curObj, (choiceId) => {
+              if (objState) objState.pendingModal = false;
+              finishStepOrObj(choiceId);
+            });
+            return { modalOpened: 'branch_choice' };
+          }
+        } else setPrompt?.(null);
+        return null;
+      }
+
+      if (m === 'survivor_rescue') {
+        if (dist <= 5.5) {
+          setPrompt?.(`[E] 护送撤离 ${node.labelZh}（${objState.stepIdx + 1}/${objState.totalSteps}）`, 0);
+          if (interactDown && objState.cooldown <= 0) {
+            if (node.human) node.human.pose?.('wave_follow', 0, 1, false, 0.016);
+            return finishStepOrObj();
+          }
+        } else setPrompt?.(null);
+        return null;
+      }
+
+      if (m === 'multi_switch_puzzle') {
+        if (dist <= 5.5) {
+          setPrompt?.(`[E] 操作 ${node.labelZh}（${objState.stepIdx + 1}/${objState.totalSteps}）`, 0);
+          if (interactDown && objState.cooldown <= 0) {
+            const isFinalTuner = (objState.stepIdx + 1 >= objState.totalSteps) && (curObj.action === 'coop_console' || curObj.action === 'power_puzzle');
+            if (isFinalTuner && world?.storyDirector?.openSignalTuner) {
+              objState.pendingModal = true;
+              world.storyDirector.openSignalTuner({
+                title: curObj.titleZh.slice(0, 24),
+                subtitle: '将指针锁定在金色频段完成最终同步',
+                locksNeeded: 3,
+                onSuccess: () => { if (objState) objState.pendingModal = false; finishStepOrObj(); },
+                onCancel: () => { if (objState) objState.pendingModal = false; },
+              });
+              return { modalOpened: 'signal_tuner' };
+            }
+            return finishStepOrObj();
+          }
+        } else setPrompt?.(null);
+        return null;
+      }
+
+      if (dist <= 6.2) {
+        if (interactDown) {
+          objState.holdSec = Math.min(objState.holdTarget, objState.holdSec + dt);
+          const prog = objState.holdTarget > 0 ? objState.holdSec / objState.holdTarget : 1;
+          setPrompt?.(`长按 [E] 检修/启动中 ${Math.round(prog * 100)}% · ${curObj.titleZh.slice(0, 20)}`, prog);
+          if (objState.holdSec >= objState.holdTarget && objState.cooldown <= 0) {
+            return finishStepOrObj();
+          }
+        } else {
+          objState.holdSec = Math.max(0, objState.holdSec - dt * 1.5);
+          setPrompt?.(`长按 [E] 检修/启动设备 · ${curObj.titleZh.slice(0, 22)}`, objState.holdSec / Math.max(0.1, objState.holdTarget));
+        }
+      } else {
+        objState.holdSec = 0;
+        setPrompt?.(null);
+      }
+      return null;
     }
 
     function update(dt) {
       if (!active || !activeChapter || !(dt > 0)) return;
       const slot = saveMgr.getSlot();
       setPieces.update(dt, slot.difficulty);
+      if (objState?.mechanic === 'survivor_rescue') {
+        for (let idx = 0; idx < objState.nodes.length; idx++) {
+          const sn = objState.nodes[idx];
+          if (sn.human) sn.human.pose?.(sn.done ? 'salute' : 'wave_follow', 0, sessionTimeAccum + idx, false, dt);
+        }
+      }
       const isCine = cinematics.update(dt);
       const curObj = activeChapter.objectives[objectiveIdx];
-      const objPos = curObj?.target ? { x: curObj.target[0], y: curObj.target[1], z: curObj.target[2] } : null;
+      const wpTarget = getActiveWaypointTarget();
+      const objPos = wpTarget ? { x: wpTarget[0], y: wpTarget[1], z: wpTarget[2] } : null;
+      const wpLabel = objState && objState.totalSteps > 1
+        ? `${curObj?.titleZh || ''} (${objState.stepIdx + 1}/${objState.totalSteps})`
+        : (curObj?.titleZh || '');
       if (isCine) waypoint.hide();
-      else waypoint.update(curObj?.target, world?.player?.pos, curObj?.titleZh || '');
+      else waypoint.update(wpTarget, world?.player?.pos, wpLabel);
       charCtrl.update(dt, world?.player?.pos, objPos);
       sessionTimeAccum += dt;
       if (sessionTimeAccum >= 10) {
@@ -1938,6 +2294,8 @@
         saveMgr.addPlayTime(activeChapter.id, sessionTimeAccum);
         sessionTimeAccum = 0;
       }
+      closeChoiceOverlay();
+      objState = null;
       active = false;
       waypoint.dispose();
       npcCommands.dispose();
@@ -1960,6 +2318,9 @@
       charCtrl,
       startChapter,
       advanceObjective,
+      tickInteraction,
+      getObjectiveState: () => objState,
+      getActiveWaypointTarget,
       update,
       stop,
       on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
@@ -1976,6 +2337,8 @@
     SALTLINE_CHARACTERS,
     DIFFICULTY_PRESETS,
     NPC_COMMAND_PRESETS,
+    OBJECTIVE_MECHANIC_MAP,
+    resolveObjectiveMechanic,
     validateGameplayMatrix,
     createCampaignSaveManager,
     createChapterSetPieceManager,

@@ -348,11 +348,11 @@ test('SaltlineVoiceManager + [H] NPC Commands + 3D-to-2D Golden Waypoint (No Lig
   assert.equal(camp.waypoint.state.visible, true);
   assert.ok(camp.waypoint.state.distM > 0, `Expected positive waypoint distance, got ${camp.waypoint.state.distM}`);
 
-  // Verify NO vertical light pillar in the 3D objective console
+  // Verify NO vertical light pillar in the mechanic-specific 3D objective prop
   const setpieceRoot = scene.children.find(c => c.name === 'saltline-campaign-v2-setpieces');
-  const consoleGroup = setpieceRoot?.children?.find(c => c.name === 'campaign-v2-story-console');
-  assert.ok(consoleGroup, 'Physical story console group should exist');
-  const tallBeam = consoleGroup.children.find(m => m.scale && m.scale.y > 5);
+  const propGroup = setpieceRoot?.children?.find(c => typeof c.name === 'string' && c.name.startsWith('campaign-v2-prop-'));
+  assert.ok(propGroup, 'Mechanic-specific 3D objective prop group should exist');
+  const tallBeam = propGroup.children.find(m => m.scale && m.scale.y > 5);
   assert.equal(tallBeam, undefined, 'Must NOT render tall vertical light pillar beams for navigation');
 
   // Verify [H] NPC commands toggle and dispatch real orders to squad NPCs
@@ -364,5 +364,133 @@ test('SaltlineVoiceManager + [H] NPC Commands + 3D-to-2D Golden Waypoint (No Lig
   assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'hold'), 'All squad NPCs should execute hold');
   camp.npcCommands.issueOrder('radio_report');
   assert.ok(camp.charCtrl.cast.every(c => c.behavior === 'radio_report'), 'All squad NPCs should execute radio_report');
+  camp.stop();
+});
+
+test('SaltlineCampaignV2: 7 genuinely distinct interactive mechanics across all 42 objectives (Zero generic console)', () => {
+  const { sandbox } = makeSandbox();
+  loadBrowserScript('saltline-campaign-core.js', sandbox);
+  const C = sandbox.SaltlineCampaignV2;
+
+  const seenMechanics = new Set();
+  for (const ch of C.SALTLINE_CHAPTERS) {
+    for (const obj of ch.objectives) {
+      const m = C.resolveObjectiveMechanic(obj.action);
+      assert.ok(m, `Objective ${obj.id} (${obj.action}) must resolve to a valid mechanic`);
+      seenMechanics.add(m);
+    }
+  }
+  for (const expected of ['dialogue', 'driving_gates', 'survivor_rescue', 'multi_switch_puzzle', 'storm_climb_traversal', 'branch_choice', 'hold_repair']) {
+    assert.ok(seenMechanics.has(expected), `Campaign must actively use mechanic "${expected}"`);
+  }
+
+  class Vec3 {
+    constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+    set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
+    copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
+  }
+  class Obj {
+    constructor() { this.children = []; this.position = new Vec3(); this.rotation = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }; this.scale = new Vec3(1, 1, 1); }
+    add(...items) { this.children.push(...items); }
+    remove(item) { const i = this.children.indexOf(item); if (i >= 0) this.children.splice(i, 1); }
+    lookAt() {}
+    updateMatrix() {}
+  }
+  const mockTHREE = {
+    Group: Obj,
+    Mesh: class extends Obj { constructor(g, m) { super(); this.geometry = g; this.material = m; } },
+    BoxGeometry: class {},
+    CylinderGeometry: class {},
+    PlaneGeometry: class {},
+    MeshStandardMaterial: class { constructor(o) { Object.assign(this, o); this.color = { setHex() {} }; } },
+    MeshBasicMaterial: class { constructor(o) { Object.assign(this, o); this.color = { setHex() {} }; } },
+    PointLight: class extends Obj {},
+    Vector3: Vec3,
+  };
+  const scene = new Obj();
+  let driving = false;
+  let dialogueOpened = 0;
+  let tunerOpened = 0;
+  const world = {
+    THREE: mockTHREE,
+    scene,
+    camera: { position: new Vec3(), lookAt() {} },
+    player: { pos: new Vec3(), vel: new Vec3() },
+    vehicle: { get driving() { return driving; } },
+    storyDirector: {
+      openDialogue(opts) { dialogueOpened++; opts.onComplete?.(); },
+      openSignalTuner(opts) { tunerOpened++; opts.onSuccess?.(); },
+    },
+  };
+
+  const camp = C.createSaltlineCampaignV2(world);
+
+  // 1. Driving gates (ch03 obj 0: drive_route -> 3 physical gates auto-triggered by driving)
+  camp.startChapter('ch03', { skipCutscene: true });
+  assert.equal(camp.getObjectiveState().mechanic, 'driving_gates');
+  assert.equal(camp.getObjectiveState().totalSteps, 3);
+  driving = true;
+  for (let g = 0; g < 3; g++) {
+    const t = camp.getActiveWaypointTarget();
+    const res = camp.tickInteraction(0.1, { x: t[0], y: t[1], z: t[2] }, false);
+    if (g < 2) assert.equal(res.subStepAdvanced, true, `Driving gate ${g + 1}/3 should advance sub-step`);
+    else assert.equal(res.objectiveIdx, 1, 'Passing 3rd driving gate should advance to next objective');
+  }
+  driving = false;
+
+  // 2. Survivor rescue (ch03 obj 1: assist_npc -> 3 individual survivors rescued one by one)
+  assert.equal(camp.getObjectiveState().mechanic, 'survivor_rescue');
+  assert.equal(camp.getObjectiveState().totalSteps, 3);
+  for (let s = 0; s < 3; s++) {
+    const t = camp.getActiveWaypointTarget();
+    camp.tickInteraction(1.0, { x: t[0], y: t[1], z: t[2] }, false);
+    const res = camp.tickInteraction(0.1, { x: t[0], y: t[1], z: t[2] }, true);
+    if (s < 2) assert.equal(res.subStepAdvanced, true);
+    else assert.equal(res.objectiveIdx, 2);
+  }
+
+  // 3. Multi-switch puzzle + Signal Tuner mini-game (ch05 obj 0: power_puzzle -> 3 switches + tuner on final)
+  camp.startChapter('ch05', { skipCutscene: true });
+  assert.equal(camp.getObjectiveState().mechanic, 'multi_switch_puzzle');
+  assert.equal(camp.getObjectiveState().totalSteps, 3);
+  for (let k = 0; k < 3; k++) {
+    const t = camp.getActiveWaypointTarget();
+    camp.tickInteraction(1.0, { x: t[0], y: t[1], z: t[2] }, false);
+    camp.tickInteraction(0.1, { x: t[0], y: t[1], z: t[2] }, true);
+  }
+  assert.equal(tunerOpened, 1, 'Final power_puzzle switch must launch openSignalTuner mini-game');
+
+  // 4. Dialogue mechanic (ch01 obj 0: reach_and_talk -> opens face-to-face openDialogue)
+  camp.startChapter('ch01', { skipCutscene: true });
+  assert.equal(camp.getObjectiveState().mechanic, 'dialogue');
+  const dT = camp.getActiveWaypointTarget();
+  camp.tickInteraction(0.1, { x: dT[0], y: dT[1], z: dT[2] }, true);
+  assert.equal(dialogueOpened, 1, 'Dialogue objective must open face-to-face storyDirector.openDialogue');
+
+  // 5. Hold-to-repair mechanic (ch02 obj 0: repair -> requires holding [E] for 2.0s)
+  camp.startChapter('ch02', { skipCutscene: true });
+  assert.equal(camp.getObjectiveState().mechanic, 'hold_repair');
+  const rT = camp.getActiveWaypointTarget();
+  assert.equal(camp.tickInteraction(0.5, { x: rT[0], y: rT[1], z: rT[2] }, true), null, 'Short tap must NOT finish hold_repair');
+  const holdDone = camp.tickInteraction(1.6, { x: rT[0], y: rT[1], z: rT[2] }, true);
+  assert.equal(holdDone.objectiveIdx, 1, 'Holding [E] for 2.0s should complete hold_repair');
+
+  // 6. Branch choice mechanic (ch08 obj 2: branch_choice -> records choice in save manager)
+  camp.startChapter('ch08', { objectiveIndex: 2, skipCutscene: true });
+  assert.equal(camp.getObjectiveState().mechanic, 'branch_choice');
+  const cT = camp.getActiveWaypointTarget();
+  camp.tickInteraction(0.1, { x: cT[0], y: cT[1], z: cT[2] }, true);
+  assert.equal(camp.saveMgr.getSlot().choices.ch08, 'public_truth', 'branch_choice must persist decision');
+
+  // 7. Storm/climb traversal with rising-water elevation check (ch06 obj 1: multilevel_climb)
+  camp.startChapter('ch06', { objectiveIndex: 1, skipCutscene: true });
+  assert.equal(camp.getObjectiveState().mechanic, 'storm_climb_traversal');
+  const clT = camp.getActiveWaypointTarget();
+  let promptMsg = '';
+  assert.equal(camp.tickInteraction(0.1, { x: clT[0], y: 0.5, z: clT[2] }, false, { setPrompt: (m) => { promptMsg = m || ''; } }), null, 'Low elevation must warn instead of advancing multilevel_climb');
+  assert.ok(promptMsg.includes('攀升'), 'Should warn player to climb above rising water');
+  const climbed = camp.tickInteraction(0.1, { x: clT[0], y: 3.8, z: clT[2] }, false);
+  assert.equal(climbed.subStepAdvanced, true, 'Elevated catwalk traversal should advance step');
+
   camp.stop();
 });

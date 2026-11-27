@@ -64,7 +64,26 @@ function makeMockThree() {
   class BoxGeometry { constructor() { this.disposed = false; } dispose() { this.disposed = true; } }
   class CylinderGeometry extends BoxGeometry {}
   class ConeGeometry extends BoxGeometry {}
-  class PlaneGeometry extends BoxGeometry {}
+  class PlaneGeometry extends BoxGeometry {
+    constructor(w = 1, h = 1, sw = 1, sh = 1) {
+      super();
+      const pts = [];
+      for (let iz = 0; iz <= sh; iz++) for (let ix = 0; ix <= sw; ix++) {
+        pts.push(-w / 2 + (w * ix) / Math.max(1, sw), 0, -h / 2 + (h * iz) / Math.max(1, sh));
+      }
+      this.attributes = {
+        position: {
+          count: pts.length / 3,
+          getX: (i) => pts[i * 3],
+          getY: (i) => pts[i * 3 + 1],
+          getZ: (i) => pts[i * 3 + 2],
+          setY: (i, v) => { pts[i * 3 + 1] = v; },
+        },
+      };
+    }
+    rotateX() {}
+    computeVertexNormals() {}
+  }
   class MeshStandardMaterial { constructor(opts) { Object.assign(this, opts); this.userData = {}; this.disposed = false; } dispose() { this.disposed = true; } }
   class MeshBasicMaterial extends MeshStandardMaterial {}
   class Mesh extends Object3D {
@@ -178,11 +197,31 @@ test('SaltlineMPModes: 5 independent controllers with distinct rules & monotonic
   assert.equal(conq.exportState().tickets.blue, 88, 'Stale stateSeq snapshot must be rejected');
 });
 
-test('SaltlineMPMaps: 5 truly independent 3D maps with distinct layouts & clean GPU unload', () => {
+test('SaltlineMPMaps: 5 expanded 360x320m WorldEngine 3D maps with displaced terrain & clean GPU unload', () => {
   const sandbox = makeSandbox();
+  let builtBuildings = 0;
+  sandbox.WorldEngine = {
+    createMaterialLibrary: (THREE) => ({
+      get: () => new THREE.MeshStandardMaterial({ color: 0x556677 }),
+      dispose: () => {},
+    }),
+    createBuildingGenerator: (THREE) => ({
+      createCoastalBuildingTask: (root, cfg) => {
+        builtBuildings++;
+        const g = new THREE.Group();
+        g.name = `bldg-${cfg.styleName}`;
+        root.add(g);
+        return { group: g, step: () => true };
+      },
+      dispose: () => {},
+    }),
+  };
   loadBrowserScript('saltline-mp-maps.js', sandbox);
   const Maps = sandbox.SaltlineMPMaps;
   assert.ok(Maps, 'SaltlineMPMaps should attach to window');
+  assert.equal(Maps.MAP_BOUNDS.width, 360, 'MP maps must be expanded to 360m width');
+  assert.equal(Maps.MAP_BOUNDS.depth, 320, 'MP maps must be expanded to 320m depth');
+  assert.ok(Maps.highlandElevation(100, -70) > Maps.highlandElevation(-110, 70) + 4, 'Highland passage must have continuous multi-meter elevation slope');
 
   const requiredIds = ['coastal_metropolis', 'iron_harbor', 'highland_passage', 'old_saltline', 'industrial_coast'];
   assert.equal(Maps.MP_MAPS.length, 5, 'Should define 5 independent multiplayer maps');
@@ -196,19 +235,22 @@ test('SaltlineMPMaps: 5 truly independent 3D maps with distinct layouts & clean 
     const meta = Maps.resolveMapSpec(mapId);
     assert.ok(meta && meta.id === mapId, `Missing map metadata for ${mapId}`);
     assert.ok(typeof meta.previewSvg === 'string' && meta.previewSvg.includes('<rect'), `${mapId} needs preview SVG markup`);
-    assert.ok(Array.isArray(meta.objectives) && meta.objectives.length >= 3, `${mapId} needs >=3 objectives`);
+    assert.ok(Array.isArray(meta.objectives) && meta.objectives.length >= 5, `${mapId} needs >=5 spread-out objectives`);
     objectiveSignatures.add(JSON.stringify(meta.objectives.map((o) => o.pos || [o.x, o.z])));
 
     const loaded = loader.loadMap(mapId);
     assert.ok(loaded, `loadMap(${mapId}) should return map handle`);
-    const loadedId = loaded.id || loaded.mapId || loaded.spec?.id || loaded.map?.id;
-    assert.equal(loadedId, mapId);
+    assert.equal(loaded.id, mapId);
+    assert.equal(loaded.meta.id, mapId, 'Must expose loaded.meta for index.html compatibility');
+    assert.equal(loaded.usesWorldEngine, true, `${mapId} must use WorldEngine MaterialLibrary + BuildingGenerator`);
+    assert.ok(loaded.buildingCount >= 4, `${mapId} must generate >=4 WorldEngine architectural buildings`);
     assert.equal(scene.children.length, 1, 'Only active map group should be mounted in scene');
 
     loader.unloadMap();
     assert.equal(scene.children.length, 0, `${mapId} unloadMap() must remove all scene children`);
   }
 
+  assert.ok(builtBuildings >= 25, `Expected >=25 WorldEngine buildings across 5 maps, got ${builtBuildings}`);
   assert.equal(objectiveSignatures.size, 5, 'All 5 maps must have distinct spatial objective layouts');
 });
 
